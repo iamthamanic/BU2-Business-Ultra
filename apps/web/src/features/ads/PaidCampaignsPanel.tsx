@@ -4,6 +4,19 @@
  * Location: apps/web/src/features/ads/PaidCampaignsPanel.tsx
  */
 import { useMemo, useState } from 'react'
+import type { Icon } from '@phosphor-icons/react'
+import {
+  ChartLineUp,
+  Coin,
+  CurrencyEur,
+  CursorClick,
+  Eye,
+  Percent,
+  Tag,
+  Target,
+  TrendUp,
+  Wallet,
+} from '@phosphor-icons/react'
 import { useI18n } from '../../lib/i18n'
 
 export type PaidCampaignRow = {
@@ -105,16 +118,16 @@ export function PaidCampaignsPanel({
       </div>
 
       <div className="funnel-kpi-strip paid-kpi-strip" aria-label="KPIs">
-        <Kpi label={t('colSpend')} value={fmtEur(agg.spendCents)} accent />
-        <Kpi label={t('colImpr')} value={fmtN(agg.impressions)} />
-        <Kpi label={t('colClicks')} value={fmtN(agg.clicks)} />
-        <Kpi label={t('colCtr')} value={fmtPct(agg.ctr)} />
-        <Kpi label={t('colCpc')} value={fmtEur(agg.cpcCents)} />
-        <Kpi label={t('colConv')} value={fmtN(agg.conv)} />
-        <Kpi label={t('colCvr')} value={fmtPct(agg.cvr)} />
-        <Kpi label={t('colCpa')} value={fmtEur(agg.cpaCents)} />
-        <Kpi label={t('colRoas')} value={fmtRoas(agg.roas)} accent />
-        <Kpi label={t('colRevenue')} value={fmtEur(agg.revenueCents)} />
+        <Kpi icon={CurrencyEur} label={t('colSpend')} value={fmtEur(agg.spendCents)} accent />
+        <Kpi icon={Eye} label={t('colImpr')} value={fmtN(agg.impressions)} />
+        <Kpi icon={CursorClick} label={t('colClicks')} value={fmtN(agg.clicks)} />
+        <Kpi icon={ChartLineUp} label={t('colCtr')} value={fmtPct(agg.ctr)} />
+        <Kpi icon={Coin} label={t('colCpc')} value={fmtEur(agg.cpcCents)} />
+        <Kpi icon={Target} label={t('colConv')} value={fmtN(agg.conv)} />
+        <Kpi icon={Percent} label={t('colCvr')} value={fmtPct(agg.cvr)} />
+        <Kpi icon={Tag} label={t('colCpa')} value={fmtEur(agg.cpaCents)} />
+        <Kpi icon={TrendUp} label={t('colRoas')} value={fmtRoas(agg.roas)} accent />
+        <Kpi icon={Wallet} label={t('colRevenue')} value={fmtEur(agg.revenueCents)} />
       </div>
 
       <div className="panel funnel-table-wrap">
@@ -169,10 +182,25 @@ export function PaidCampaignsPanel({
   )
 }
 
-function Kpi({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function Kpi({
+  icon: Ic,
+  label,
+  value,
+  accent,
+}: {
+  icon: Icon
+  label: string
+  value: string
+  accent?: boolean
+}) {
   return (
     <div className={`funnel-kpi${accent ? ' funnel-kpi--accent' : ''}`}>
-      <div className="funnel-kpi-l muted">{label}</div>
+      <div className="funnel-kpi-head">
+        <span className="funnel-kpi-ic" aria-hidden>
+          <Ic size={16} weight="duotone" />
+        </span>
+        <div className="funnel-kpi-l muted">{label}</div>
+      </div>
       <div className="funnel-kpi-v">{value}</div>
     </div>
   )

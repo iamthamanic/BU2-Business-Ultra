@@ -3,6 +3,17 @@
  * Columns mirror Legacy dashboard COLS (reach only for Meta). Location: apps/web/src/features/marketing/OrganicPostsPanel.tsx
  */
 import { useMemo, useState } from 'react'
+import type { Icon } from '@phosphor-icons/react'
+import {
+  Article,
+  BookmarkSimple,
+  ChatCircle,
+  Eye,
+  Heart,
+  Lightning,
+  ShareNetwork,
+  UsersThree,
+} from '@phosphor-icons/react'
 import { useI18n } from '../../lib/i18n'
 
 export type OrganicPost = {
@@ -220,14 +231,14 @@ export function OrganicPostsPanel({
       </div>
 
       <div className="funnel-kpi-strip" aria-label="KPIs">
-        <Kpi label={t('kpiPosts')} value={fmtN(kpis.posts)} />
-        <Kpi label={t('colViews')} value={fmtN(kpis.views)} />
-        {showReach ? <Kpi label={t('colReach')} value={fmtN(kpis.reach)} /> : null}
-        <Kpi label={t('kpiInteractions')} value={fmtN(kpis.inter)} />
-        <Kpi label={t('colLikes')} value={fmtN(kpis.likes)} />
-        <Kpi label={t('colComments')} value={fmtN(kpis.comments)} />
-        <Kpi label={t('colShares')} value={fmtN(kpis.shares)} />
-        <Kpi label={t('colSaves')} value={fmtN(kpis.saves)} />
+        <Kpi icon={Article} label={t('kpiPosts')} value={fmtN(kpis.posts)} />
+        <Kpi icon={Eye} label={t('colViews')} value={fmtN(kpis.views)} />
+        {showReach ? <Kpi icon={UsersThree} label={t('colReach')} value={fmtN(kpis.reach)} /> : null}
+        <Kpi icon={Lightning} label={t('kpiInteractions')} value={fmtN(kpis.inter)} />
+        <Kpi icon={Heart} label={t('colLikes')} value={fmtN(kpis.likes)} />
+        <Kpi icon={ChatCircle} label={t('colComments')} value={fmtN(kpis.comments)} />
+        <Kpi icon={ShareNetwork} label={t('colShares')} value={fmtN(kpis.shares)} />
+        <Kpi icon={BookmarkSimple} label={t('colSaves')} value={fmtN(kpis.saves)} />
       </div>
 
       <div className="panel funnel-table-wrap">
@@ -309,11 +320,16 @@ export function OrganicPostsPanel({
   )
 }
 
-function Kpi({ label, value }: { label: string; value: string }) {
+function Kpi({ icon: Ic, label, value }: { icon: Icon; label: string; value: string }) {
   return (
     <div className="funnel-kpi">
+      <div className="funnel-kpi-head">
+        <span className="funnel-kpi-ic" aria-hidden>
+          <Ic size={16} weight="duotone" />
+        </span>
+        <div className="funnel-kpi-l muted">{label}</div>
+      </div>
       <div className="funnel-kpi-v">{value}</div>
-      <div className="funnel-kpi-l muted">{label}</div>
     </div>
   )
 }

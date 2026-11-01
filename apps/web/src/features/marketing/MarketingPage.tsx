@@ -3,8 +3,8 @@
  * Tables + KPI chrome always visible; soft connect banner when integrations missing.
  * Netzwerk-Fähigkeiten demoted to secondary disclosure. Location: apps/web/src/features/marketing/MarketingPage.tsx
  */
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useLocation, useParams } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { companyRoutes } from '../../lib/companyPaths'
 import { useI18n } from '../../lib/i18n'
@@ -98,14 +98,6 @@ export function MarketingPage() {
     refresh().catch(console.error)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh on route/window
   }, [slug, ch, isCustom, isEmail, isOffline, win])
-
-  const connectorLabel = useMemo(() => {
-    if (!organic?.connector) return 'Metricool'
-    const c = organic.connector
-    if (!c.contentReady) return 'Metricool'
-    const blog = c.blogIds[0]
-    return blog ? `Metricool · ${c.brandLabel || blog}` : 'Metricool'
-  }, [organic])
 
   async function createDraft() {
     await api(`/api/b/${slug}/marketing/drafts`, {
@@ -213,15 +205,6 @@ export function MarketingPage() {
           <FunnelConnectHint need="key" settingsHref={settingsHref} message={t('connectBannerBrevo')} />
         ) : null}
 
-        <div className="mkt-pane-toolbar">
-          <p className="muted page-lede" style={{ margin: 0 }}>
-            Connector: Brevo
-          </p>
-          <span className={`badge ${brevoGate ? 'ok' : 'warn'}`}>
-            Brevo {brevoGate ? t('statusReady') : t('keyRequired')}
-          </span>
-        </div>
-
         <div className="panel stack">
           <input
             className="input"
@@ -306,20 +289,6 @@ export function MarketingPage() {
       {need === 'key' || need === 'brand' ? (
         <FunnelConnectHint need={need} settingsHref={settingsHref} />
       ) : null}
-
-      <div className="mkt-pane-toolbar">
-        <p className="muted page-lede" style={{ margin: 0 }}>
-          Connector: {connectorLabel}
-        </p>
-        <div className="row funnel-gates">
-          <span className={`badge ${contentReady ? 'ok' : 'warn'}`}>
-            Metricool {contentReady ? t('statusReady') : t('keyRequired')}
-          </span>
-          <Link className="btn" to={settingsHref} style={{ fontSize: 12, padding: '4px 10px' }}>
-            {t('openConnections')}
-          </Link>
-        </div>
-      </div>
 
       <OrganicPostsPanel
         channel={ch}

@@ -2473,6 +2473,20 @@ select {
   background: color-mix(in srgb, var(--accent) 8%, var(--panel));
 }
 
+.funnel-kpi-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.funnel-kpi-ic {
+  display: inline-flex;
+  color: var(--accent);
+  opacity: 0.9;
+  flex-shrink: 0;
+}
+
 .funnel-kpi-v {
   font-size: 18px;
   font-weight: 700;
@@ -2481,13 +2495,8 @@ select {
 }
 
 .funnel-kpi-l {
-  margin-top: 2px;
   font-size: 11px;
-}
-
-.paid-kpi-strip .funnel-kpi-l {
-  margin-top: 0;
-  margin-bottom: 4px;
+  line-height: 1.2;
 }
 
 .funnel-table-wrap {
