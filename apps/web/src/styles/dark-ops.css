@@ -2414,8 +2414,8 @@ select {
 .funnel-filters-bar {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 10px 20px;
+  align-items: stretch;
+  gap: 10px;
 }
 
 .funnel-filters-bar .funnel-filter-row {
@@ -2427,12 +2427,16 @@ select {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel2);
 }
 
 .funnel-tip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   cursor: help;
   vertical-align: middle;
 }
@@ -2443,14 +2447,14 @@ select {
 
 .funnel-tip-ic {
   display: inline-flex;
-  color: color-mix(in srgb, var(--accent) 75%, var(--dim));
-  opacity: 0.95;
+  color: var(--dim);
+  opacity: 0.7;
   flex-shrink: 0;
 }
 
 .funnel-tip:hover .funnel-tip-ic,
 .funnel-tip:focus-visible .funnel-tip-ic {
-  color: var(--accent);
+  opacity: 1;
 }
 
 .funnel-tip--icon {
@@ -2459,16 +2463,16 @@ select {
 
 .funnel-tip-bubble {
   z-index: 1000;
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-strong);
-  background: #101820;
-  color: var(--text);
+  padding: 8px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel2) 92%, #888);
+  color: var(--dim);
   font-size: 12px;
-  font-weight: 500;
-  line-height: 1.45;
+  font-weight: 450;
+  line-height: 1.4;
   white-space: pre-wrap;
-  box-shadow: 0 16px 40px #000000aa;
+  box-shadow: 0 4px 12px #00000055;
   pointer-events: none;
 }
 
@@ -2520,9 +2524,9 @@ select {
   align-items: center;
   gap: 6px;
   padding: 5px 10px;
-  border-radius: 999px;
+  border-radius: 4px;
   border: 1px solid var(--border);
-  background: var(--panel2);
+  background: var(--panel);
   color: var(--text);
   font-size: 12px;
   transition: border-color var(--dur) var(--ease-out), background var(--dur) var(--ease-out);
