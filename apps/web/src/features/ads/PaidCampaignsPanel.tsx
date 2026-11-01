@@ -12,6 +12,8 @@ import {
   CursorClick,
   Eye,
   Percent,
+  SquaresFour,
+  Storefront,
   Tag,
   Target,
   TrendUp,
@@ -69,13 +71,25 @@ export function PaidCampaignsPanel({
 }: Props) {
   const { t } = useI18n()
   const [range, setRange] = useState<DateRangeValue>(() => defaultDateRange(initialWindow))
+  const [brand, setBrand] = useState('__all__')
+  const [postType, setPostType] = useState('__all__')
   const [q, setQ] = useState('')
+
+  const types = useMemo(() => {
+    const set = new Set(
+      campaigns.map((c) => c.status).filter((s): s is string => Boolean(s && s.trim())),
+    )
+    return Array.from(set).sort()
+  }, [campaigns])
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
-    if (!needle) return campaigns
-    return campaigns.filter((c) => c.name.toLowerCase().includes(needle))
-  }, [campaigns, q])
+    return campaigns.filter((c) => {
+      if (postType !== '__all__' && (c.status || '') !== postType) return false
+      if (needle && !c.name.toLowerCase().includes(needle)) return false
+      return true
+    })
+  }, [campaigns, q, postType])
 
   const agg = useMemo(() => sumCampaigns(filtered), [filtered])
   /** Without per-row dates yet, compare uses same filtered set (deltas 0 until sync lands). */
@@ -113,6 +127,8 @@ export function PaidCampaignsPanel({
     const cmp = resolveCompareRange(range)
     const filters = [
       { label: t('timeWindow'), value: `${range.from} – ${range.to}` },
+      { label: t('filterBrand'), value: brand === '__all__' ? t('filterAll') : brand },
+      { label: t('filterPostType'), value: postType === '__all__' ? t('filterAll') : postType },
       ...(q.trim() ? [{ label: t('exportSearch'), value: q.trim() }] : []),
     ]
     if (cmp) filters.push({ label: t('dateCompare'), value: `${cmp.from} – ${cmp.to}` })
@@ -159,6 +175,48 @@ export function PaidCampaignsPanel({
     <div className="stack paid-campaigns-panel">
       <div className="funnel-filters-bar">
         <FunnelDateRangePicker value={range} onChange={onRangeChange} presets={PAID_PRESETS} />
+
+        <div className="funnel-filter-row" role="toolbar" aria-label={t('filterBrand')}>
+          <span className="filter-lbl muted">
+            <Storefront className="filter-lbl-ic" size={14} weight="duotone" aria-hidden />
+            <FunnelTip tip={t('tipBrand')}>{t('filterBrand')}</FunnelTip>
+          </span>
+          <button
+            type="button"
+            className={`chip ${brand === '__all__' ? 'active' : ''}`}
+            onClick={() => setBrand('__all__')}
+          >
+            {t('filterAll')}
+            <span className="n">{campaigns.length}</span>
+          </button>
+        </div>
+
+        <div className="funnel-filter-row" role="toolbar" aria-label={t('filterPostType')}>
+          <span className="filter-lbl muted">
+            <SquaresFour className="filter-lbl-ic" size={14} weight="duotone" aria-hidden />
+            <FunnelTip tip={t('tipPaidPostType')}>{t('filterPostType')}</FunnelTip>
+          </span>
+          <button
+            type="button"
+            className={`chip ${postType === '__all__' ? 'active' : ''}`}
+            onClick={() => setPostType('__all__')}
+          >
+            {t('filterAll')}
+            <span className="n">{campaigns.length}</span>
+          </button>
+          {types.map((ty) => (
+            <button
+              key={ty}
+              type="button"
+              className={`chip ${postType === ty ? 'active' : ''}`}
+              onClick={() => setPostType(ty)}
+            >
+              {ty}
+              <span className="n">{campaigns.filter((c) => c.status === ty).length}</span>
+            </button>
+          ))}
+        </div>
+
         <label className="paid-search">
           <span className="sr-only">{t('adsSearchPh')}</span>
           <input
