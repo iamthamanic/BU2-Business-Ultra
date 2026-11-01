@@ -1,14 +1,15 @@
 /**
  * AdsPage — paid funnel campaigns; provider synced from `/marketing/funnel/paid/:channel`.
- * Campaigns table always visible; soft connect banner when key missing.
+ * Legacy chrome always visible (KPI strip + full table); soft connect banner when key missing.
  * Location: apps/web/src/features/ads/AdsPage.tsx
  */
-import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useParams } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { companyRoutes } from '../../lib/companyPaths'
 import { useI18n } from '../../lib/i18n'
 import { FunnelConnectHint } from '../marketing/FunnelConnectHint'
+import { PaidCampaignsPanel, type PaidCampaignRow } from './PaidCampaignsPanel'
 
 const LIVE_PROVIDERS = ['google_ads', 'meta_ads', 'tiktok_ads', 'chatgpt_ads'] as const
 const STUB_PROVIDERS = ['linkedin_ads', 'microsoft_ads'] as const
@@ -43,6 +44,7 @@ export function AdsPage() {
   const [ready, setReady] = useState(false)
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(true)
+  const [win, setWin] = useState<'7d' | '30d' | '90d' | 'all'>('30d')
 
   const settingsHref = slug ? companyRoutes(slug).settingsConnections : '#'
 
@@ -93,28 +95,37 @@ export function AdsPage() {
     }
   }
 
-  async function publish(id: string) {
-    if (!confirm(t('confirmPublish'))) return
-    try {
-      const r = await api(`/api/b/${slug}/ads/${id}/publish`, {
-        method: 'POST',
-        body: JSON.stringify({ confirm: true }),
-      })
-      setMsg(JSON.stringify(r))
-      await refresh()
-    } catch (e) {
-      setMsg(String(e))
-    }
-  }
-
   const title = providerLabel(provider, t)
   const stub = isStub(provider)
   const showConnect = stub || (!loading && !ready)
-  const emptyRow = stub
-    ? t('adsStubBody')
-    : !ready
-      ? t('campaignsEmptyNeedKey')
-      : t('noCampaigns')
+  const emptyRow = loading
+    ? t('loading')
+    : stub
+      ? t('adsStubBody')
+      : !ready
+        ? t('campaignsEmptyNeedKey')
+        : t('noCampaignsInWindow')
+
+  const rows: PaidCampaignRow[] = useMemo(
+    () =>
+      campaigns.map((c) => ({
+        id: String(c.id),
+        name: String(c.name || '—'),
+        notesCount: 0,
+        adsConv: null,
+        spendCents: typeof c.budgetDailyCents === 'number' ? null : null,
+        impressions: null,
+        clicks: null,
+        ctr: null,
+        cpcCents: null,
+        cvr: null,
+        cpaCents: null,
+        roas: null,
+        revenueCents: null,
+        status: c.status ? String(c.status) : undefined,
+      })),
+    [campaigns],
+  )
 
   return (
     <div className="stack funnel-page">
@@ -126,76 +137,31 @@ export function AdsPage() {
         />
       ) : null}
 
-      <div className="mkt-pane-toolbar">
-        <p className="muted page-lede" style={{ margin: 0 }}>
-          Connector: {title}
-        </p>
-        <div className="row funnel-gates">
-          <span className={`badge ${ready && !stub ? 'ok' : 'warn'}`}>
-            {ready && !stub ? t('statusReady') : t('keyRequired')}
-          </span>
-          <Link className="btn" to={settingsHref} style={{ fontSize: 12, padding: '4px 10px' }}>
-            {t('openConnections')}
-          </Link>
-        </div>
-      </div>
+      <PaidCampaignsPanel
+        campaigns={loading ? [] : rows}
+        emptyHint={emptyRow}
+        initialWindow={win}
+        onWindowChange={setWin}
+      />
 
-      <div className="panel stack">
-        <input
-          className="input"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder={t('campaignNamePh')}
-          disabled={!ready || stub}
-        />
-        <button className="btn primary" type="button" onClick={create} disabled={!ready || stub}>
-          {t('save')}
-        </button>
-      </div>
+      {!stub ? (
+        <details className="panel funnel-secondary">
+          <summary className="funnel-secondary-summary">{t('adsManualCreate')}</summary>
+          <div className="stack" style={{ marginTop: 12 }}>
+            <input
+              className="input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={t('campaignNamePh')}
+              disabled={!ready}
+            />
+            <button className="btn primary" type="button" onClick={create} disabled={!ready || !name.trim()}>
+              {t('save')}
+            </button>
+          </div>
+        </details>
+      ) : null}
 
-      <div className="panel">
-        <h3 className="section-title" style={{ marginTop: 0 }}>
-          {t('adsCampaigns')}
-        </h3>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>{t('name')}</th>
-              <th>Provider</th>
-              <th>{t('status')}</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={4} className="funnel-table-empty muted">
-                  {t('loading')}
-                </td>
-              </tr>
-            ) : campaigns.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="funnel-table-empty muted">
-                  {emptyRow}
-                </td>
-              </tr>
-            ) : (
-              campaigns.map((c) => (
-                <tr key={c.id}>
-                  <td>{c.name}</td>
-                  <td>{c.provider}</td>
-                  <td>{c.status}</td>
-                  <td>
-                    <button className="btn" type="button" onClick={() => publish(c.id)}>
-                      {t('publish')}
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
       {msg ? <pre className="panel muted">{msg}</pre> : null}
     </div>
   )

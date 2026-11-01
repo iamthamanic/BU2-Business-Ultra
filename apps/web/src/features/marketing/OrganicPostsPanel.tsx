@@ -57,6 +57,8 @@ export function OrganicPostsPanel({
 }: Props) {
   const { t } = useI18n()
   const [win, setWin] = useState<WindowKey>(initialWindow)
+  const [brand, setBrand] = useState('__all__')
+  const [postType, setPostType] = useState('__all__')
   const showReach = META.has(channel)
 
   const cols = useMemo(() => {
@@ -90,20 +92,84 @@ export function OrganicPostsPanel({
     onWindowChange?.(w)
   }
 
-  const kpis = useMemo(() => {
-    const views = posts.reduce((s, p) => s + (p.views || 0), 0)
-    const reach = posts.reduce((s, p) => s + (p.reach || 0), 0)
-    const likes = posts.reduce((s, p) => s + (p.likes || 0), 0)
-    const inter = posts.reduce(
-      (s, p) => s + (p.likes || 0) + (p.comments || 0) + (p.shares || 0) + (p.saves || 0),
-      0,
-    )
-    return { posts: posts.length, views, reach, inter, likes }
+  const types = useMemo(() => {
+    const set = new Set(posts.map((p) => p.type).filter(Boolean))
+    return Array.from(set).sort()
   }, [posts])
+
+  const filtered = useMemo(() => {
+    return posts.filter((p) => {
+      if (postType !== '__all__' && p.type !== postType) return false
+      return true
+    })
+  }, [posts, postType])
+
+  const top5 = useMemo(() => {
+    return [...filtered]
+      .sort((a, b) => (b.engagement ?? -1) - (a.engagement ?? -1) || b.views - a.views)
+      .slice(0, 5)
+  }, [filtered])
+
+  const kpis = useMemo(() => {
+    const views = filtered.reduce((s, p) => s + (p.views || 0), 0)
+    const reach = filtered.reduce((s, p) => s + (p.reach || 0), 0)
+    const likes = filtered.reduce((s, p) => s + (p.likes || 0), 0)
+    const comments = filtered.reduce((s, p) => s + (p.comments || 0), 0)
+    const shares = filtered.reduce((s, p) => s + (p.shares || 0), 0)
+    const saves = filtered.reduce((s, p) => s + (p.saves || 0), 0)
+    const inter = likes + comments + shares + saves
+    return { posts: filtered.length, views, reach, inter, likes, comments, shares, saves }
+  }, [filtered])
 
   return (
     <div className="stack organic-posts-panel">
-      <div className="funnel-filter-row" role="toolbar" aria-label={t('colDate')}>
+      <div className="panel funnel-top5">
+        <h3 className="section-title funnel-top5-title">{t('top5Title')}</h3>
+        <div className="funnel-table-wrap">
+          <table className="table funnel-top5-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>{t('colDate')}</th>
+                <th>{t('colType')}</th>
+                <th>{t('colPost')}</th>
+                <th>{t('colViews')}</th>
+                {showReach ? <th>{t('colReach')}</th> : null}
+                <th>{t('colLikes')}</th>
+                <th>{t('colShares')}</th>
+                <th>{t('colEr')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {top5.length === 0 ? (
+                <tr>
+                  <td colSpan={showReach ? 9 : 8} className="funnel-table-empty muted">
+                    {emptyHint}
+                  </td>
+                </tr>
+              ) : (
+                top5.map((p, i) => (
+                  <tr key={p.id}>
+                    <td className="num">{i + 1}</td>
+                    <td className="num">{fmtDate(p.date)}</td>
+                    <td>
+                      <span className="badge">{p.type}</span>
+                    </td>
+                    <td>{p.title || '—'}</td>
+                    <td className="num">{fmtN(p.views)}</td>
+                    {showReach ? <td className="num">{p.reach != null ? fmtN(p.reach) : '—'}</td> : null}
+                    <td className="num">{fmtN(p.likes)}</td>
+                    <td className="num">{fmtN(p.shares)}</td>
+                    <td className="num">{p.engagement != null ? `${p.engagement}%` : '—'}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="funnel-filter-row" role="toolbar" aria-label={t('timeWindow')}>
         <span className="filter-lbl muted">{t('timeWindow')}</span>
         {WINDOWS.map((w) => (
           <button
@@ -113,7 +179,42 @@ export function OrganicPostsPanel({
             onClick={() => pickWindow(w.key)}
           >
             {t(w.labelKey)}
-            <span className="n">{w.key === win ? posts.length : '·'}</span>
+            <span className="n">{w.key === win ? filtered.length : '·'}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="funnel-filter-row" role="toolbar" aria-label={t('filterBrand')}>
+        <span className="filter-lbl muted">{t('filterBrand')}</span>
+        <button
+          type="button"
+          className={`chip ${brand === '__all__' ? 'active' : ''}`}
+          onClick={() => setBrand('__all__')}
+        >
+          {t('filterAll')}
+          <span className="n">{posts.length}</span>
+        </button>
+      </div>
+
+      <div className="funnel-filter-row" role="toolbar" aria-label={t('filterPostType')}>
+        <span className="filter-lbl muted">{t('filterPostType')}</span>
+        <button
+          type="button"
+          className={`chip ${postType === '__all__' ? 'active' : ''}`}
+          onClick={() => setPostType('__all__')}
+        >
+          {t('filterAll')}
+          <span className="n">{posts.length}</span>
+        </button>
+        {types.map((ty) => (
+          <button
+            key={ty}
+            type="button"
+            className={`chip ${postType === ty ? 'active' : ''}`}
+            onClick={() => setPostType(ty)}
+          >
+            {ty}
+            <span className="n">{posts.filter((p) => p.type === ty).length}</span>
           </button>
         ))}
       </div>
@@ -124,6 +225,9 @@ export function OrganicPostsPanel({
         {showReach ? <Kpi label={t('colReach')} value={fmtN(kpis.reach)} /> : null}
         <Kpi label={t('kpiInteractions')} value={fmtN(kpis.inter)} />
         <Kpi label={t('colLikes')} value={fmtN(kpis.likes)} />
+        <Kpi label={t('colComments')} value={fmtN(kpis.comments)} />
+        <Kpi label={t('colShares')} value={fmtN(kpis.shares)} />
+        <Kpi label={t('colSaves')} value={fmtN(kpis.saves)} />
       </div>
 
       <div className="panel funnel-table-wrap">
@@ -136,14 +240,14 @@ export function OrganicPostsPanel({
             </tr>
           </thead>
           <tbody>
-            {posts.length === 0 ? (
+            {filtered.length === 0 ? (
               <tr>
                 <td colSpan={cols.length} className="funnel-table-empty muted">
                   {emptyHint}
                 </td>
               </tr>
             ) : (
-              posts.map((p) => (
+              filtered.map((p) => (
                 <tr key={p.id}>
                   <td className="funnel-thumb-cell">
                     {p.image ? (
@@ -171,13 +275,7 @@ export function OrganicPostsPanel({
                   <td className="num">{fmtN(p.views)}</td>
                   {showReach ? <td className="num">{p.reach != null ? fmtN(p.reach) : '—'}</td> : null}
                   <td className="num">
-                    {showReach
-                      ? p.sharesPer1000 != null
-                        ? String(p.sharesPer1000)
-                        : '—'
-                      : p.sharesPer1000 != null
-                        ? String(p.sharesPer1000)
-                        : '—'}
+                    {p.sharesPer1000 != null ? String(p.sharesPer1000) : '—'}
                   </td>
                   <td className="num">
                     {showReach

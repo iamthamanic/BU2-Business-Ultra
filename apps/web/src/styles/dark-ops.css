@@ -2411,6 +2411,7 @@ select {
   font-weight: 650;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  min-width: 72px;
 }
 
 .chip {
@@ -2451,12 +2452,23 @@ select {
   gap: 10px;
 }
 
+.paid-kpi-strip .funnel-kpi {
+  min-width: 96px;
+  flex: 1 1 96px;
+  max-width: 140px;
+}
+
 .funnel-kpi {
   min-width: 88px;
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--panel);
+}
+
+.funnel-kpi--accent {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
 }
 
 .funnel-kpi-v {
@@ -2471,12 +2483,72 @@ select {
   font-size: 11px;
 }
 
+.paid-kpi-strip .funnel-kpi-l {
+  margin-top: 0;
+  margin-bottom: 4px;
+}
+
 .funnel-table-wrap {
   overflow-x: auto;
 }
 
-.funnel-posts-table {
+.funnel-posts-table,
+.funnel-ads-table {
   min-width: 960px;
+}
+
+.funnel-ads-table th,
+.funnel-ads-table td {
+  white-space: nowrap;
+}
+
+.paid-filter-row {
+  gap: 10px;
+}
+
+.paid-search {
+  margin-left: auto;
+  min-width: min(280px, 100%);
+}
+
+.paid-search-input {
+  width: 100%;
+  font-size: 13px;
+}
+
+.paid-manual-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+
+.paid-manual-dash {
+  opacity: 0.45;
+}
+
+.paid-camp-name {
+  font-weight: 600;
+  margin-bottom: 4px;
+  white-space: normal;
+  max-width: 280px;
+}
+
+.funnel-top5 {
+  padding: 12px 14px;
+}
+
+.funnel-top5-title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.funnel-top5-table {
+  min-width: 640px;
 }
 
 .funnel-table-empty {
