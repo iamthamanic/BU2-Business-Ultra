@@ -2163,6 +2163,12 @@ select {
 .mkt-tab[data-ic='catalog'] {
   --mkt-ic: #f59e0b;
 }
+.mkt-tab[data-ic='analyse'] {
+  --mkt-ic: #38bdf8;
+}
+.mkt-tab[data-ic='produktion'] {
+  --mkt-ic: #34d399;
+}
 .mkt-tab[data-ic='cmb'] {
   --mkt-ic: var(--warn);
 }
@@ -3466,4 +3472,108 @@ select {
 
 .funnel-secondary[open] > .funnel-secondary-summary::before {
   content: '▾ ';
+}
+
+.funnel-mode-tabs {
+  margin-bottom: 4px;
+}
+
+.prod-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.prod-month-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.prod-month-label {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+  text-transform: capitalize;
+  min-width: 10ch;
+  text-align: center;
+}
+
+.prod-lede {
+  margin: 0;
+  font-size: 13px;
+  max-width: 65ch;
+}
+
+.prod-calendar {
+  padding: 12px;
+}
+
+.prod-cal-head,
+.prod-cal-body {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.prod-cal-dow {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 4px 0 8px;
+}
+
+.prod-cal-cell {
+  min-height: 64px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel2);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  padding: 6px 8px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.prod-cal-cell:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel2));
+}
+
+.prod-cal-cell:disabled,
+.prod-cal-cell.is-empty {
+  cursor: default;
+  opacity: 0.35;
+  background: transparent;
+}
+
+.prod-cal-cell.is-today {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.prod-cal-day {
+  font-size: 12px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.prod-composer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+@media (max-width: 720px) {
+  .prod-cal-cell {
+    min-height: 44px;
+    padding: 4px;
+  }
 }

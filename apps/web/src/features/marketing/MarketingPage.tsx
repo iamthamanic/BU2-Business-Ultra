@@ -1,16 +1,19 @@
 /**
  * MarketingPage — organic + custom funnel channel depth (Legacy IA).
- * Tables + KPI chrome always visible; soft connect banner when integrations missing.
- * Netzwerk-Fähigkeiten demoted to secondary disclosure. Location: apps/web/src/features/marketing/MarketingPage.tsx
+ * Organic: Analyse (KPIs/table) · Produktion (calendar + drafts). Soft connect banner when needed.
+ * Location: apps/web/src/features/marketing/MarketingPage.tsx
  */
 import { useEffect, useState } from 'react'
+import { ChartBar, CalendarBlank } from '@phosphor-icons/react'
 import { useLocation, useParams } from 'react-router-dom'
+import { MktTab, MktTabs } from '../../components/MktTabs'
 import { api } from '../../lib/api'
 import { companyRoutes } from '../../lib/companyPaths'
 import { useI18n } from '../../lib/i18n'
 import { CustomFunnelToolbar } from './CustomFunnelToolbar'
 import { FunnelConnectHint } from './FunnelConnectHint'
 import { OrganicPostsPanel, type OrganicPost } from './OrganicPostsPanel'
+import { OrganicProductionPanel } from './OrganicProductionPanel'
 
 type Connector = {
   surface: string
@@ -56,6 +59,7 @@ export function MarketingPage() {
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(true)
   const [win, setWin] = useState<'24h' | '7d' | '30d' | 'all'>('30d')
+  const [organicMode, setOrganicMode] = useState<'analyse' | 'produktion'>('analyse')
 
   const settingsHref = slug ? companyRoutes(slug).settingsConnections : '#'
 
@@ -100,25 +104,23 @@ export function MarketingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh on route/window
   }, [slug, ch, isCustom, isEmail, isOffline, win])
 
-  async function createDraft() {
+  async function createDraft(nextTitle: string, nextText: string) {
     await api(`/api/b/${slug}/marketing/drafts`, {
       method: 'POST',
       body: JSON.stringify({
-        title,
-        masterText: text,
+        title: nextTitle,
+        masterText: nextText,
         variants: caps
           .filter((c) => c.canSchedule)
           .slice(0, 5)
           .map((c) => ({
             network: c.network,
-            text,
+            text: nextText,
             enabled: true,
             mediaKind: c.supportsVideo && !c.supportsImage ? 'video' : 'text',
           })),
       }),
     })
-    setTitle('')
-    setText('')
     await refresh()
   }
 
@@ -309,109 +311,40 @@ export function MarketingPage() {
         <FunnelConnectHint need={need} settingsHref={settingsHref} />
       ) : null}
 
-      <OrganicPostsPanel
-        channel={ch}
-        posts={organic?.posts ?? []}
-        emptyHint={loading && !organic ? t('loading') : emptyHint}
-        initialWindow={win}
-        onWindowChange={(w) => setWin(w)}
-      />
+      <MktTabs level="surface" label={t('navOrganic')} className="funnel-mode-tabs">
+        <MktTab
+          active={organicMode === 'analyse'}
+          label={t('tabAnalyse')}
+          icon={ChartBar}
+          dataIc="analyse"
+          onClick={() => setOrganicMode('analyse')}
+        />
+        <MktTab
+          active={organicMode === 'produktion'}
+          label={t('tabProduktion')}
+          icon={CalendarBlank}
+          dataIc="produktion"
+          onClick={() => setOrganicMode('produktion')}
+        />
+      </MktTabs>
 
-      <details className="panel funnel-secondary">
-        <summary className="funnel-secondary-summary">{t('composeDrafts')}</summary>
-        <div className="stack" style={{ marginTop: 12 }}>
-          <input
-            className="input"
-            placeholder={t('draftTitlePh')}
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-          <textarea
-            className="textarea"
-            placeholder={t('draftTextPh')}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-          />
-          <button className="btn primary" type="button" onClick={createDraft}>
-            {t('saveDraft')}
-          </button>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>{t('name')}</th>
-                <th>Remote</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {drafts.length === 0 ? (
-                <tr>
-                  <td colSpan={3} className="funnel-table-empty muted">
-                    {t('funnelEmpty')}
-                  </td>
-                </tr>
-              ) : (
-                drafts.map((d) => (
-                  <tr key={d.id}>
-                    <td>{d.title}</td>
-                    <td className="kpi" style={{ maxWidth: 280, overflow: 'hidden' }}>
-                      {JSON.stringify(d.remoteStatus ?? {})}
-                    </td>
-                    <td className="row">
-                      <button
-                        className="btn"
-                        type="button"
-                        disabled={!contentReady}
-                        onClick={() => schedule(d.id)}
-                      >
-                        {t('schedule')}
-                      </button>
-                      <button
-                        className="btn"
-                        type="button"
-                        disabled={!contentReady}
-                        onClick={() => retry(d.id)}
-                      >
-                        {t('retry')}
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </details>
-
-      <details className="panel funnel-secondary">
-        <summary className="funnel-secondary-summary">{t('capabilities')}</summary>
-        {caps.length === 0 ? (
-          <p className="muted" style={{ marginTop: 12 }}>
-            —
-          </p>
-        ) : (
-          <table className="table" style={{ marginTop: 12 }}>
-            <thead>
-              <tr>
-                <th>Network</th>
-                <th>Image</th>
-                <th>Video</th>
-                <th>Max text</th>
-              </tr>
-            </thead>
-            <tbody>
-              {caps.map((c) => (
-                <tr key={c.network}>
-                  <td>{c.network}</td>
-                  <td>{c.supportsImage ? '✓' : '—'}</td>
-                  <td>{c.supportsVideo ? '✓' : '—'}</td>
-                  <td className="kpi">{c.maxTextLength}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </details>
+      {organicMode === 'analyse' ? (
+        <OrganicPostsPanel
+          channel={ch}
+          posts={organic?.posts ?? []}
+          emptyHint={loading && !organic ? t('loading') : emptyHint}
+          initialWindow={win}
+          onWindowChange={(w) => setWin(w)}
+        />
+      ) : (
+        <OrganicProductionPanel
+          drafts={drafts}
+          contentReady={contentReady}
+          onCreateDraft={createDraft}
+          onSchedule={schedule}
+          onRetry={retry}
+        />
+      )}
 
       {msg ? <pre className="panel muted">{msg}</pre> : null}
     </div>
