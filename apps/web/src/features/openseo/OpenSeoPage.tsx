@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { MktTab, MktTabs } from '../../components/MktTabs'
+import { MKT_SURFACE_ICONS } from '../../components/mktTabIcons'
 import { api } from '../../lib/api'
 import { companyRoutes } from '../../lib/companyPaths'
 import { useI18n } from '../../lib/i18n'
@@ -63,8 +64,18 @@ export function OpenSeoPage() {
       {underWebsite ? (
         <div className="mkt-pane-toolbar">
           <MktTabs level="surface" label={t('navWebsite')}>
-            <MktTab active={!isGeo} label={t('seo')} onClick={() => setSurface('seo')} />
-            <MktTab active={isGeo} label={t('geo')} onClick={() => setSurface('geo')} />
+            <MktTab
+              active={!isGeo}
+              label={t('seo')}
+              onClick={() => setSurface('seo')}
+              icon={MKT_SURFACE_ICONS.seo}
+            />
+            <MktTab
+              active={isGeo}
+              label={t('geo')}
+              onClick={() => setSurface('geo')}
+              icon={MKT_SURFACE_ICONS.geo}
+            />
           </MktTabs>
           <p className="muted page-lede" style={{ margin: 0 }}>
             {isGeo ? t('geoLede') : t('seoLede')}

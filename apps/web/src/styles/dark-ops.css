@@ -1997,7 +1997,28 @@ select {
   border-radius: calc(var(--radius-sm) - 1px);
   cursor: pointer;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   transition: color 120ms ease, background-color 120ms ease;
+}
+
+.mkt-tab-ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 0;
+  opacity: 0.9;
+}
+
+.mkt-tab-ic svg {
+  width: 13px;
+  height: 13px;
+}
+
+.mkt-tab-label {
+  min-width: 0;
 }
 
 .mkt-tabs--l1 .mkt-tab {
@@ -2005,6 +2026,12 @@ select {
   font-weight: 650;
   height: 30px;
   padding: 0 12px;
+  gap: 7px;
+}
+
+.mkt-tabs--l1 .mkt-tab-ic svg {
+  width: 14px;
+  height: 14px;
 }
 
 .mkt-tabs--l2 .mkt-tab {
@@ -2018,6 +2045,13 @@ select {
   font-weight: 500;
   height: 26px;
   padding: 0 10px;
+  gap: 5px;
+}
+
+.mkt-tabs--l3 .mkt-tab-ic svg,
+.mkt-tabs--surface .mkt-tab-ic svg {
+  width: 12px;
+  height: 12px;
 }
 
 .mkt-tab:hover {

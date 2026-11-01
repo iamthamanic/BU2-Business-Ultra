@@ -9,6 +9,13 @@ import { canOpenSeo, canSeeNavTab } from '@bu2/shared'
 import type { CompanyOutletContext } from '../../components/BusinessShell'
 import { MktTab, MktTabs } from '../../components/MktTabs'
 import {
+  MKT_CUSTOM_ICONS,
+  MKT_L1_ICONS,
+  MKT_L2_ICONS,
+  MKT_ORGANIC_ICONS,
+  MKT_PAID_ICONS,
+} from '../../components/mktTabIcons'
+import {
   CUSTOM_CHANNELS,
   ORGANIC_TABS,
   PAID_CHANNELS,
@@ -92,12 +99,14 @@ export function MarketingShell() {
               })
             }
             label={t('navFunnel')}
+            icon={MKT_L1_ICONS.funnel}
           />
           {canSeeNavTab(tabs, 'personas') ? (
             <MktTab
               active={parsed.top === 'personas'}
               onClick={() => go({ top: 'personas' })}
               label={t('personaJourney')}
+              icon={MKT_L1_ICONS.personas}
             />
           ) : null}
         </MktTabs>
@@ -112,6 +121,7 @@ export function MarketingShell() {
                     go({ top: 'funnel', funnel: 'organic', channel: organicTabs[0] ?? 'instagram' })
                   }
                   label={t('navOrganic')}
+                  icon={MKT_L2_ICONS.organic}
                 />
               ) : null}
               {paidTabs.length ? (
@@ -119,6 +129,7 @@ export function MarketingShell() {
                   active={parsed.funnel === 'paid'}
                   onClick={() => go({ top: 'funnel', funnel: 'paid', channel: paidTabs[0] ?? 'meta' })}
                   label={t('navPaid')}
+                  icon={MKT_L2_ICONS.paid}
                 />
               ) : null}
               {customTabs.length ? (
@@ -128,6 +139,7 @@ export function MarketingShell() {
                     go({ top: 'funnel', funnel: 'custom', channel: customTabs[0] ?? 'email' })
                   }
                   label={t('navCustom')}
+                  icon={MKT_L2_ICONS.custom}
                 />
               ) : null}
             </MktTabs>
@@ -140,6 +152,7 @@ export function MarketingShell() {
                       active={parsed.channel === ch}
                       onClick={() => go({ top: 'funnel', funnel: 'organic', channel: ch })}
                       label={ch === 'website' ? t('navWebsite') : t(`ch_${ch}` as 'ch_instagram')}
+                      icon={MKT_ORGANIC_ICONS[ch]}
                     />
                   ))
                 : null}
@@ -150,6 +163,7 @@ export function MarketingShell() {
                       active={parsed.channel === ch}
                       onClick={() => go({ top: 'funnel', funnel: 'paid', channel: ch })}
                       label={t(PAID_LABEL[ch])}
+                      icon={MKT_PAID_ICONS[ch]}
                     />
                   ))
                 : null}
@@ -160,6 +174,7 @@ export function MarketingShell() {
                       active={parsed.channel === ch}
                       onClick={() => go({ top: 'funnel', funnel: 'custom', channel: ch })}
                       label={t(CUSTOM_LABEL[ch])}
+                      icon={MKT_CUSTOM_ICONS[ch]}
                     />
                   ))
                 : null}

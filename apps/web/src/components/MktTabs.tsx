@@ -1,8 +1,10 @@
 /**
  * MktTabs — unified Marketing Dark-Ops tab chrome for all hierarchy levels.
- * One segmented metaphor; size/weight/spacing only. Used by MarketingShell + OpenSeo.
+ * One segmented metaphor; size/weight/spacing only. Optional Phosphor icons
+ * (decorative, aria-hidden) beside text labels. Used by MarketingShell + OpenSeo.
  * Location: apps/web/src/components/MktTabs.tsx
  */
+import type { Icon } from '@phosphor-icons/react'
 import type { ReactNode } from 'react'
 
 export type MktTabsLevel = 'l1' | 'l2' | 'l3' | 'surface'
@@ -31,9 +33,13 @@ type TabProps = {
   active: boolean
   label: string
   onClick: () => void
+  /** Decorative Phosphor glyph; label remains the accessible name */
+  icon?: Icon
 }
 
-export function MktTab({ active, label, onClick }: TabProps) {
+const ICON_SIZE = 14
+
+export function MktTab({ active, label, onClick, icon: Glyph }: TabProps) {
   return (
     <button
       type="button"
@@ -43,7 +49,12 @@ export function MktTab({ active, label, onClick }: TabProps) {
       tabIndex={active ? 0 : -1}
       onClick={onClick}
     >
-      {label}
+      {Glyph ? (
+        <span className="mkt-tab-ic" aria-hidden>
+          <Glyph size={ICON_SIZE} weight="regular" />
+        </span>
+      ) : null}
+      <span className="mkt-tab-label">{label}</span>
     </button>
   )
 }
