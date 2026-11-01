@@ -4,6 +4,7 @@
  */
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { MktTab, MktTabs } from '../../components/MktTabs'
 import { api } from '../../lib/api'
 import { companyRoutes } from '../../lib/companyPaths'
 import { useI18n } from '../../lib/i18n'
@@ -21,7 +22,7 @@ export function OpenSeoPage() {
     searchParams.get('surface') === 'geo' ||
     (underWebsite && searchParams.get('surface') === 'geo')
 
-  const title = isGeo ? t('geo') : underWebsite ? t('navWebsite') : t('seo')
+  const title = isGeo ? t('geo') : t('seo')
   const [info, setInfo] = useState<any>(null)
   const [handoff, setHandoff] = useState<any>(null)
   const [err, setErr] = useState('')
@@ -59,37 +60,26 @@ export function OpenSeoPage() {
 
   return (
     <div className="stack funnel-page">
-      <header className="funnel-head">
-        <div>
-          <h1 className="page-title" style={{ margin: 0 }}>
-            {title}
-          </h1>
-          <p className="muted page-lede">{isGeo ? t('geoLede') : t('seoLede')}</p>
-        </div>
-      </header>
-
       {underWebsite ? (
-        <div className="mkt-tabs mkt-tabs-surface" role="tablist" aria-label={t('navWebsite')}>
-          <button
-            type="button"
-            role="tab"
-            className={`mkt-tab ${!isGeo ? 'active' : ''}`}
-            aria-selected={!isGeo}
-            onClick={() => setSurface('seo')}
-          >
-            {t('seo')}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            className={`mkt-tab ${isGeo ? 'active' : ''}`}
-            aria-selected={isGeo}
-            onClick={() => setSurface('geo')}
-          >
-            {t('geo')}
-          </button>
+        <div className="mkt-pane-toolbar">
+          <MktTabs level="surface" label={t('navWebsite')}>
+            <MktTab active={!isGeo} label={t('seo')} onClick={() => setSurface('seo')} />
+            <MktTab active={isGeo} label={t('geo')} onClick={() => setSurface('geo')} />
+          </MktTabs>
+          <p className="muted page-lede" style={{ margin: 0 }}>
+            {isGeo ? t('geoLede') : t('seoLede')}
+          </p>
         </div>
-      ) : null}
+      ) : (
+        <header className="funnel-head">
+          <div>
+            <h1 className="page-title" style={{ margin: 0 }}>
+              {title}
+            </h1>
+            <p className="muted page-lede">{isGeo ? t('geoLede') : t('seoLede')}</p>
+          </div>
+        </header>
+      )}
 
       {err && <p className="badge bad">{err}</p>}
       <div className="panel stack">

@@ -120,15 +120,12 @@ export function AdsPage() {
   if (isStub(provider)) {
     return (
       <div className="stack funnel-page">
-        <header className="funnel-head">
-          <div>
-            <h1 className="page-title" style={{ margin: 0 }}>
-              {title}
-            </h1>
-            <p className="muted page-lede">{t('adsStubHint')}</p>
-          </div>
+        <div className="mkt-pane-toolbar">
+          <p className="muted page-lede" style={{ margin: 0 }}>
+            {t('adsStubHint')}
+          </p>
           <span className="badge warn">{t('statusNeedKey')}</span>
-        </header>
+        </div>
         <div className="panel">
           <p className="muted">{t('adsStubBody')}</p>
         </div>
@@ -138,15 +135,12 @@ export function AdsPage() {
 
   return (
     <div className="stack funnel-page">
-      <header className="funnel-head">
-        <div>
-          <h1 className="page-title" style={{ margin: 0 }}>
-            {title}
-          </h1>
-          <p className="muted page-lede">{t('navPaid')}</p>
-        </div>
+      <div className="mkt-pane-toolbar">
+        <p className="muted page-lede" style={{ margin: 0 }}>
+          {title}
+        </p>
         <span className={`badge ${ready ? 'ok' : 'warn'}`}>{ready ? t('statusReady') : t('keyRequired')}</span>
-      </header>
+      </div>
       <div className="panel stack">
         <select
           className="select"

@@ -12,12 +12,6 @@ export function MarketingPage() {
   const { slug, channel } = useParams()
   const { t } = useI18n()
   const ch = (channel || 'instagram').toLowerCase()
-  const isCustom = ch === 'email' || ch === 'offline'
-  const channelLabel = isCustom
-    ? ch === 'email'
-      ? t('emailMarketing')
-      : t('offlineFlyer')
-    : t(`ch_${ch}` as 'ch_instagram')
   const [drafts, setDrafts] = useState<any[]>([])
   const [title, setTitle] = useState('')
   const [text, setText] = useState('')
@@ -123,12 +117,7 @@ export function MarketingPage() {
 
   return (
     <div className="stack funnel-page">
-      <header className="funnel-head">
-        <div>
-          <h1 className="page-title" style={{ margin: 0 }}>
-            {channelLabel}
-          </h1>
-        </div>
+      <div className="mkt-pane-toolbar">
         <div className="row funnel-gates">
           <span className={`badge ${gate ? 'ok' : 'warn'}`}>
             Metricool {gate ? t('statusReady') : t('keyRequired')}
@@ -137,7 +126,7 @@ export function MarketingPage() {
             Brevo {brevoGate ? t('statusReady') : t('keyRequired')}
           </span>
         </div>
-      </header>
+      </div>
 
       <div className="panel">
         <h3 className="section-title" style={{ marginTop: 0 }}>

@@ -74,9 +74,6 @@ export function PersonasPage() {
 
   return (
     <div className="stack funnel-page">
-      <h1 className="page-title" style={{ margin: 0 }}>
-        {t('personaJourney')}
-      </h1>
       <div className="panel stack">
         <input className="input" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
         <textarea className="textarea" placeholder="Summary" value={summary} onChange={(e) => setSummary(e.target.value)} />
