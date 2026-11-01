@@ -69,12 +69,14 @@ export function OpenSeoPage() {
               label={t('seo')}
               onClick={() => setSurface('seo')}
               icon={MKT_SURFACE_ICONS.seo}
+              dataIc="seo"
             />
             <MktTab
               active={isGeo}
               label={t('geo')}
               onClick={() => setSurface('geo')}
               icon={MKT_SURFACE_ICONS.geo}
+              dataIc="geo"
             />
           </MktTabs>
           <p className="muted page-lede" style={{ margin: 0 }}>

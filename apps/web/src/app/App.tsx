@@ -16,6 +16,8 @@ import { VerifyPage } from '../features/auth/VerifyPage'
 import { HomePage } from '../features/business/HomePage'
 import { BusinessShell } from '../components/BusinessShell'
 import { CatalogPage } from '../features/catalog/CatalogPage'
+import { ProductPage } from '../features/product/ProductPage'
+import { CustomerPage } from '../features/customer/CustomerPage'
 import { MarketingShell } from '../features/marketing/MarketingShell'
 import { MarketingPage } from '../features/marketing/MarketingPage'
 import { AdsPage } from '../features/ads/AdsPage'
@@ -108,6 +110,8 @@ export function App() {
         {/* Default company landing = Marketing */}
         <Route index element={<CoRedirect to="marketing" />} />
         <Route path="catalog" element={<CatalogPage />} />
+        <Route path="product" element={<ProductPage />} />
+        <Route path="customer" element={<CustomerPage />} />
 
         <Route path="marketing" element={<MarketingShell />}>
           <Route

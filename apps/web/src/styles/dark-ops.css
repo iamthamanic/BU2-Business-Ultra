@@ -670,6 +670,15 @@ select {
 .sb-item[data-ic='marketing'] {
   --sb-ic: #60a5fa;
 }
+.sb-item[data-ic='catalog'] {
+  --sb-ic: #f59e0b;
+}
+.sb-item[data-ic='product'] {
+  --sb-ic: #38bdf8;
+}
+.sb-item[data-ic='customer'] {
+  --sb-ic: #2dd4bf;
+}
 .sb-item[data-ic='instagram'] {
   --sb-ic: #e4405f;
 }
@@ -2009,12 +2018,88 @@ select {
   justify-content: center;
   flex-shrink: 0;
   line-height: 0;
-  opacity: 0.9;
+  color: var(--mkt-ic, currentColor);
+  /* Inactive: keep brand hue readable — soft dim, light desaturate */
+  opacity: 0.62;
+  filter: saturate(0.72);
+  transition: opacity 120ms ease, filter 120ms ease;
 }
 
 .mkt-tab-ic svg {
   width: 13px;
   height: 13px;
+}
+
+/* Brand / accent tones (sidebar data-ic parity; muted Dark-Ops accents) */
+.mkt-tab[data-ic='funnel'] {
+  --mkt-ic: #7dd3fc;
+}
+.mkt-tab[data-ic='personas'] {
+  --mkt-ic: #60a5fa;
+}
+.mkt-tab[data-ic='organic'] {
+  --mkt-ic: #34d399;
+}
+.mkt-tab[data-ic='paid'] {
+  --mkt-ic: #fbbf24;
+}
+.mkt-tab[data-ic='custom'] {
+  --mkt-ic: #94a3b8;
+}
+.mkt-tab[data-ic='instagram'] {
+  --mkt-ic: #e4405f;
+}
+.mkt-tab[data-ic='facebook'] {
+  --mkt-ic: #1877f2;
+}
+.mkt-tab[data-ic='tiktok'],
+.mkt-tab[data-ic='tiktok_ads'] {
+  --mkt-ic: #25f4ee;
+}
+.mkt-tab[data-ic='linkedin'],
+.mkt-tab[data-ic='linkedin_ads'] {
+  --mkt-ic: #0a66c2;
+}
+.mkt-tab[data-ic='youtube'] {
+  --mkt-ic: #ff0000;
+}
+.mkt-tab[data-ic='website'] {
+  --mkt-ic: #38bdf8;
+}
+.mkt-tab[data-ic='meta_ads'] {
+  --mkt-ic: #0081fb;
+}
+.mkt-tab[data-ic='google_ads'] {
+  --mkt-ic: #fbbc04;
+}
+.mkt-tab[data-ic='chatgpt_ads'] {
+  --mkt-ic: #10a37f;
+}
+.mkt-tab[data-ic='microsoft_ads'] {
+  --mkt-ic: #00a4ef;
+}
+.mkt-tab[data-ic='email'] {
+  --mkt-ic: #a78bfa;
+}
+.mkt-tab[data-ic='offline'] {
+  --mkt-ic: #f59e0b;
+}
+.mkt-tab[data-ic='seo'] {
+  --mkt-ic: #34d399;
+}
+.mkt-tab[data-ic='geo'] {
+  --mkt-ic: #22d3ee;
+}
+
+.mkt-tab:hover .mkt-tab-ic {
+  opacity: 0.85;
+  filter: saturate(0.88);
+}
+
+.mkt-tab.is-active .mkt-tab-ic,
+.mkt-tab.active .mkt-tab-ic {
+  opacity: 1;
+  filter: none;
 }
 
 .mkt-tab-label {
@@ -2078,7 +2163,8 @@ select {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mkt-tab {
+  .mkt-tab,
+  .mkt-tab-ic {
     transition: none;
   }
 }

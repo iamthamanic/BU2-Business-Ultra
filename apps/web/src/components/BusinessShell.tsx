@@ -1,12 +1,21 @@
 /**
  * BusinessShell — `/co/:slug` layout with department sidebar IA.
- * Flat Marketing item (megaphone → `/marketing`) · Tools (CMB, Sortanize, CheckMap).
+ * Flat Katalog · Marketing · Product · Customer · Tools (CMB, Sortanize, CheckMap).
  * Settings in footer; company switcher in topbar. Nav filtered by membership.tabs.
  * API calls remain `/api/b/:slug`. Location: apps/web/src/components/BusinessShell.tsx
  */
 import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useParams } from 'react-router-dom'
-import { Package, Calculator, MapTrifold, ArrowsDownUp, GearSix, Megaphone } from '@phosphor-icons/react'
+import {
+  Package,
+  Calculator,
+  MapTrifold,
+  ArrowsDownUp,
+  GearSix,
+  Megaphone,
+  Cube,
+  UsersThree,
+} from '@phosphor-icons/react'
 import { canSeeNavTab } from '@bu2/shared'
 import { api } from '../lib/api'
 import { companyRoutes } from '../lib/companyPaths'
@@ -76,6 +85,24 @@ export function BusinessShell({
         label: t('marketing'),
         icon: Megaphone,
         dataIc: 'marketing',
+      })
+    }
+    if (canSeeNavTab(tabs, 'product')) {
+      items.push({
+        key: 'product',
+        to: routes.product,
+        label: t('product'),
+        icon: Cube,
+        dataIc: 'product',
+      })
+    }
+    if (canSeeNavTab(tabs, 'customer')) {
+      items.push({
+        key: 'customer',
+        to: routes.customer,
+        label: t('customer'),
+        icon: UsersThree,
+        dataIc: 'customer',
       })
     }
     return items

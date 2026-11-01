@@ -100,6 +100,7 @@ export function MarketingShell() {
             }
             label={t('navFunnel')}
             icon={MKT_L1_ICONS.funnel}
+            dataIc="funnel"
           />
           {canSeeNavTab(tabs, 'personas') ? (
             <MktTab
@@ -107,6 +108,7 @@ export function MarketingShell() {
               onClick={() => go({ top: 'personas' })}
               label={t('personaJourney')}
               icon={MKT_L1_ICONS.personas}
+              dataIc="personas"
             />
           ) : null}
         </MktTabs>
@@ -122,6 +124,7 @@ export function MarketingShell() {
                   }
                   label={t('navOrganic')}
                   icon={MKT_L2_ICONS.organic}
+                  dataIc="organic"
                 />
               ) : null}
               {paidTabs.length ? (
@@ -130,6 +133,7 @@ export function MarketingShell() {
                   onClick={() => go({ top: 'funnel', funnel: 'paid', channel: paidTabs[0] ?? 'meta' })}
                   label={t('navPaid')}
                   icon={MKT_L2_ICONS.paid}
+                  dataIc="paid"
                 />
               ) : null}
               {customTabs.length ? (
@@ -140,6 +144,7 @@ export function MarketingShell() {
                   }
                   label={t('navCustom')}
                   icon={MKT_L2_ICONS.custom}
+                  dataIc="custom"
                 />
               ) : null}
             </MktTabs>
@@ -153,6 +158,7 @@ export function MarketingShell() {
                       onClick={() => go({ top: 'funnel', funnel: 'organic', channel: ch })}
                       label={ch === 'website' ? t('navWebsite') : t(`ch_${ch}` as 'ch_instagram')}
                       icon={MKT_ORGANIC_ICONS[ch]}
+                      dataIc={ch === 'website' ? 'website' : ch}
                     />
                   ))
                 : null}
@@ -164,6 +170,7 @@ export function MarketingShell() {
                       onClick={() => go({ top: 'funnel', funnel: 'paid', channel: ch })}
                       label={t(PAID_LABEL[ch])}
                       icon={MKT_PAID_ICONS[ch]}
+                      dataIc={PAID_TAB_KEY[ch]}
                     />
                   ))
                 : null}
@@ -175,6 +182,7 @@ export function MarketingShell() {
                       onClick={() => go({ top: 'funnel', funnel: 'custom', channel: ch })}
                       label={t(CUSTOM_LABEL[ch])}
                       icon={MKT_CUSTOM_ICONS[ch]}
+                      dataIc={ch}
                     />
                   ))
                 : null}

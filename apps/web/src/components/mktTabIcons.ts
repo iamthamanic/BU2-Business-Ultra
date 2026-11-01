@@ -1,6 +1,7 @@
 /**
  * mktTabIcons — Phosphor glyphs for Marketing chrome tabs (L1/L2/L3/surface).
  * Matches Legacy intent: funnel/persona/route + channel brand marks.
+ * Brand/accent colors live in dark-ops.css via MktTab `dataIc` → `[data-ic]` / `--mkt-ic`.
  * Location: apps/web/src/components/mktTabIcons.ts
  */
 import type { Icon } from '@phosphor-icons/react'
