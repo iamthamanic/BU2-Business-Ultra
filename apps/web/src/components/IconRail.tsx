@@ -1,12 +1,13 @@
 /**
  * IconRail / Sidebar — legacy-parity collapsible left nav (slim icons ↔ expanded labels).
- * Logo + brand at top; admin/lang/logout in footer. Mobile: overlay drawer.
+ * Supports grouped funnel sections (details) with session persistence; brand + toggle in head;
+ * settings/admin/lang/logout in footer. Mobile: overlay drawer.
  * Location: apps/web/src/components/IconRail.tsx
  */
 import { useEffect, useState } from 'react'
 import type { Icon } from '@phosphor-icons/react'
 import { CaretDown, SignOut, ShieldCheck } from '@phosphor-icons/react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { BrandMark } from './BrandMark'
 import { useI18n } from '../lib/i18n'
 
@@ -16,9 +17,18 @@ export type RailItem = {
   end?: boolean
   label: string
   icon: Icon
+  /** Legacy data-ic brand color key */
+  dataIc?: string
+}
+
+export type RailGroup = {
+  id: string
+  label: string
+  items: RailItem[]
 }
 
 const SB_SLIM_KEY = 'sb_slim'
+const SB_GROUP_KEY = 'bu.sidebar.groups.v1'
 
 function readSlim(): boolean {
   try {
@@ -31,8 +41,36 @@ function readSlim(): boolean {
   }
 }
 
+function readGroupOpen(id: string, fallback: boolean): boolean {
+  try {
+    const m = JSON.parse(sessionStorage.getItem(SB_GROUP_KEY) || '{}') as Record<string, boolean>
+    if (typeof m[id] === 'boolean') return m[id]!
+  } catch {
+    /* ignore */
+  }
+  return fallback
+}
+
+function writeGroupOpen(id: string, open: boolean) {
+  try {
+    const m = JSON.parse(sessionStorage.getItem(SB_GROUP_KEY) || '{}') as Record<string, boolean>
+    m[id] = open
+    sessionStorage.setItem(SB_GROUP_KEY, JSON.stringify(m))
+  } catch {
+    /* ignore */
+  }
+}
+
+function pathMatches(pathname: string, to: string, end?: boolean) {
+  if (end) return pathname === to
+  return pathname === to || pathname.startsWith(`${to}/`)
+}
+
 type Props = {
-  items: RailItem[]
+  items?: RailItem[]
+  groups?: RailGroup[]
+  /** Settings link shown in footer (legacy Verwaltung position) */
+  settingsItem?: RailItem | null
   /** Mobile overlay open */
   open: boolean
   onNavigate?: () => void
@@ -45,8 +83,75 @@ type Props = {
 const ICON_WEIGHT = 'regular' as const
 const ICON_SIZE = 18
 
+function RailLink({
+  item,
+  onNavigate,
+}: {
+  item: RailItem
+  onNavigate?: () => void
+}) {
+  const Glyph = item.icon
+  return (
+    <NavLink
+      to={item.to}
+      end={item.end}
+      title={item.label}
+      aria-label={item.label}
+      data-ic={item.dataIc || item.key}
+      className={({ isActive }) => `sb-item${isActive ? ' active' : ''}`}
+      onClick={onNavigate}
+    >
+      <span className="sb-ic" aria-hidden>
+        <Glyph size={ICON_SIZE} weight={ICON_WEIGHT} />
+      </span>
+      <span className="sb-label">{item.label}</span>
+    </NavLink>
+  )
+}
+
+function GroupBlock({
+  group,
+  onNavigate,
+}: {
+  group: RailGroup
+  onNavigate?: () => void
+}) {
+  const location = useLocation()
+  const childActive = group.items.some((it) => pathMatches(location.pathname, it.to, it.end))
+  const [open, setOpen] = useState(() => readGroupOpen(group.id, childActive))
+
+  useEffect(() => {
+    if (childActive) setOpen(true)
+  }, [childActive, location.pathname])
+
+  return (
+    <details
+      className="sb-group"
+      open={open}
+      data-sb-group={group.id}
+      onToggle={(e) => {
+        const next = (e.currentTarget as HTMLDetailsElement).open
+        setOpen(next)
+        writeGroupOpen(group.id, next)
+      }}
+    >
+      <summary className="sb-group-title">
+        <span className="sb-toggle-arrow" aria-hidden>
+          ▸
+        </span>
+        {group.label}
+      </summary>
+      {group.items.map((item) => (
+        <RailLink key={item.key} item={item} onNavigate={onNavigate} />
+      ))}
+    </details>
+  )
+}
+
 export function IconRail({
-  items,
+  items = [],
+  groups = [],
+  settingsItem,
   open,
   onNavigate,
   onCloseMobile,
@@ -97,28 +202,16 @@ export function IconRail({
       </div>
 
       <nav className="sb-nav" id="sb-nav">
-        {items.map((item) => {
-          const Glyph = item.icon
-          return (
-            <NavLink
-              key={item.key}
-              to={item.to}
-              end={item.end}
-              title={item.label}
-              aria-label={item.label}
-              className={({ isActive }) => `sb-item${isActive ? ' active' : ''}`}
-              onClick={onNavigate}
-            >
-              <span className="sb-ic" aria-hidden>
-                <Glyph size={ICON_SIZE} weight={ICON_WEIGHT} />
-              </span>
-              <span className="sb-label">{item.label}</span>
-            </NavLink>
-          )
-        })}
+        {items.map((item) => (
+          <RailLink key={item.key} item={item} onNavigate={onNavigate} />
+        ))}
+        {groups.map((g) => (
+          <GroupBlock key={g.id} group={g} onNavigate={onNavigate} />
+        ))}
       </nav>
 
       <div className="sb-foot">
+        {settingsItem ? <RailLink item={settingsItem} onNavigate={onNavigate} /> : null}
         {showAdmin && (
           <NavLink
             to="/admin"

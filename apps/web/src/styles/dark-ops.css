@@ -307,8 +307,17 @@ select {
 }
 
 .sidebar.slim .sb-head {
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
+.sidebar.slim .sb-head .brand {
+  flex: 0 0 auto;
   justify-content: center;
-  flex-wrap: wrap;
+  width: 100%;
 }
 
 .sidebar.slim .brand .brand-name {
@@ -317,6 +326,8 @@ select {
 
 .sidebar.slim .sb-toggle {
   margin-left: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .sb-head {
@@ -362,6 +373,48 @@ select {
 
 .sidebar.slim .sb-toggle-chevron {
   transform: rotate(90deg);
+}
+
+.sb-group {
+  margin: var(--sp-3) 0 var(--sp-1);
+}
+
+.sb-group-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.9px;
+  color: var(--dim);
+  padding: 0 var(--sp-3);
+  margin-bottom: 4px;
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sb-group-title::-webkit-details-marker {
+  display: none;
+}
+
+.sb-toggle-arrow {
+  display: inline-block;
+  transition: transform 0.15s ease;
+  margin-right: 2px;
+}
+
+.sb-group[open] > .sb-group-title .sb-toggle-arrow {
+  transform: rotate(90deg);
+}
+
+.sidebar.slim .sb-group-title,
+.sidebar.slim .sb-toggle-arrow {
+  display: none;
+}
+
+.sidebar.slim .sb-group {
+  margin: 2px 0;
 }
 
 .sb-drawer-close {
@@ -429,16 +482,65 @@ select {
   color: var(--sb-ic, var(--dim));
 }
 
-.sb-item.active .sb-ic {
-  color: var(--accent);
+.sb-item[data-ic='overview'] {
+  --sb-ic: #60a5fa;
 }
-
+.sb-item[data-ic='instagram'] {
+  --sb-ic: #e4405f;
+}
+.sb-item[data-ic='facebook'] {
+  --sb-ic: #1877f2;
+}
+.sb-item[data-ic='tiktok'] {
+  --sb-ic: #25f4ee;
+}
+.sb-item[data-ic='linkedin'] {
+  --sb-ic: #0a66c2;
+}
+.sb-item[data-ic='youtube'] {
+  --sb-ic: #ff0000;
+}
+.sb-item[data-ic='google_ads'] {
+  --sb-ic: #fbbc04;
+}
+.sb-item[data-ic='meta_ads'] {
+  --sb-ic: #0081fb;
+}
+.sb-item[data-ic='chatgpt_ads'] {
+  --sb-ic: #10a37f;
+}
+.sb-item[data-ic='email'] {
+  --sb-ic: #a78bfa;
+}
+.sb-item[data-ic='offline'] {
+  --sb-ic: #f59e0b;
+}
+.sb-item[data-ic='cmb'] {
+  --sb-ic: var(--warn);
+}
+.sb-item[data-ic='sortanize'] {
+  --sb-ic: #a78bfa;
+}
+.sb-item[data-ic='personas'] {
+  --sb-ic: #60a5fa;
+}
+.sb-item[data-ic='checkmap'] {
+  --sb-ic: #34d399;
+}
+.sb-item[data-ic='seo'] {
+  --sb-ic: #34d399;
+}
+.sb-item[data-ic='settings'] {
+  --sb-ic: #94a3b8;
+}
 .sb-item[data-ic='admin'] {
   --sb-ic: #94a3b8;
 }
-
 .sb-item[data-ic='logout'] {
   --sb-ic: #f87171;
+}
+.sb-item.active .sb-ic {
+  color: var(--sb-ic, var(--accent));
 }
 
 .sb-label {
@@ -559,6 +661,249 @@ select {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.hdr-company {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-left: 2px;
+  min-width: 0;
+}
+
+.hdr-company-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px 0 6px;
+  max-width: min(300px, 52vw);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #1a222c 0%, var(--panel2) 100%);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+}
+
+.hdr-company-btn:hover {
+  border-color: #3a4656;
+}
+
+.hdr-company-btn:active {
+  transform: scale(0.98);
+}
+
+.hdr-company-btn[aria-expanded='true'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px #3b82f618;
+}
+
+.hdr-company-btn .hdr-chip-kicker {
+  flex-shrink: 0;
+}
+
+.hdr-company-btn .hdr-chip-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.hdr-company-logo,
+.hdr-company-item-logo {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #94a3b8;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  padding: 2px;
+}
+
+.hdr-company-logo.has-img,
+.hdr-company-item-logo.has-img {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  padding: 2px;
+}
+
+.hdr-company-logo img,
+.hdr-company-item-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+}
+
+.hdr-company-item-logo {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  font-size: 10px;
+  padding: 3px;
+}
+
+.hdr-company-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hdr-company-chevron {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  margin-left: 2px;
+  color: var(--dim);
+  opacity: 0.9;
+  transition: transform 0.15s ease;
+}
+
+.hdr-company-btn[aria-expanded='true'] .hdr-company-chevron {
+  transform: rotate(180deg);
+  color: var(--accent);
+}
+
+.hdr-company-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 50;
+  min-width: 240px;
+  max-width: 320px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: 0 16px 40px #00000077;
+  display: none;
+}
+
+.hdr-company-menu.open {
+  display: grid;
+  gap: 2px;
+}
+
+.hdr-company-item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.hdr-company-item:hover {
+  background: #ffffff0c;
+}
+
+.hdr-company-item.active {
+  background: #3b82f618;
+  color: #93c5fd;
+}
+
+.hdr-company-item.create {
+  color: var(--warn);
+  font-weight: 600;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 10px 10px;
+  padding-top: 12px;
+  justify-content: center;
+}
+
+.hdr-company-item.create:hover {
+  background: #f59e0b14;
+}
+
+.hdr-company-empty {
+  padding: 10px 12px;
+  color: var(--dim);
+  font-size: 12px;
+}
+
+.hdr-company-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 55;
+  min-width: 280px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: 0 16px 40px #00000077;
+  display: grid;
+  gap: 8px;
+}
+
+.hdr-company-panel .hdr-chip-kicker {
+  margin-bottom: 2px;
+}
+
+.hdr-company-panel input {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  padding: 9px 12px;
+  font-size: 12px;
+  width: 100%;
+}
+
+.hdr-company-panel .hdr-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+
+.hdr-company-panel .hdr-actions button {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+}
+
+.hdr-company-panel .hdr-actions button[data-save] {
+  border: none;
+  background: var(--warn);
+  color: #14100a;
+  font-weight: 700;
+}
+
+.hdr-company-panel [data-msg] {
+  font-size: 11px;
+  color: var(--dim);
+  min-height: 14px;
 }
 
 .brand {
@@ -968,8 +1313,14 @@ select {
   /* Mobile overlay always shows labels (expanded drawer) */
   .sidebar.slim .sb-label,
   .sidebar.slim .sb-lang-label,
-  .sidebar.slim .brand .brand-name {
+  .sidebar.slim .brand .brand-name,
+  .sidebar.slim .sb-group-title,
+  .sidebar.slim .sb-toggle-arrow {
     display: initial;
+  }
+
+  .sidebar.slim .sb-group-title {
+    display: flex;
   }
 
   .sidebar.slim .sb-item {
@@ -978,11 +1329,23 @@ select {
   }
 
   .sidebar.slim .sb-head {
+    flex-direction: row;
     justify-content: space-between;
+    align-items: center;
+  }
+
+  .sidebar.slim .sb-head .brand {
+    width: auto;
+    flex: 1;
+    justify-content: flex-start;
   }
 
   .sidebar .sb-toggle {
     display: none;
+  }
+
+  .hdr-company-btn {
+    max-width: min(220px, 70vw);
   }
 
   .sidebar.open {

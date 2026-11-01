@@ -1,18 +1,30 @@
 /**
  * AppShell — legacy-parity chrome: collapsible sidebar + header context chip bar.
- * Brand lives in sidebar; account/logout/lang in sidebar footer; topbar = context + user.
+ * Brand lives in sidebar; company switcher in topbar; account/logout/lang in sidebar footer.
  * Location: apps/web/src/components/AppShell.tsx
  */
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { List, X } from '@phosphor-icons/react'
-import { IconRail, type RailItem } from './IconRail'
+import { IconRail, type RailGroup, type RailItem } from './IconRail'
+import { CompanySwitcher } from './CompanySwitcher'
 import { useI18n } from '../lib/i18n'
 import type { AuthUser } from '../app/App'
+
+type CompanyCtx = {
+  slug: string
+  name: string
+  logoPath?: string | null
+  status?: string
+}
 
 type Props = {
   user: AuthUser
   railItems: RailItem[]
+  railGroups?: RailGroup[]
+  settingsItem?: RailItem | null
+  /** Static subtitle chip (home/admin). Company pages use `company` instead. */
   subtitle?: ReactNode
+  company?: CompanyCtx | null
   showAdmin?: boolean
   onLogout?: () => void
   children: ReactNode
@@ -21,7 +33,10 @@ type Props = {
 export function AppShell({
   user,
   railItems,
+  railGroups,
+  settingsItem,
   subtitle,
+  company,
   showAdmin,
   onLogout,
   children,
@@ -61,12 +76,20 @@ export function AppShell({
           >
             {drawerOpen ? <X size={18} weight="regular" /> : <List size={18} weight="regular" />}
           </button>
-          {subtitle ? (
+          {company ? (
+            <CompanySwitcher
+              activeSlug={company.slug}
+              activeName={company.name}
+              activeLogoPath={company.logoPath}
+              canCreate
+            />
+          ) : subtitle ? (
             <div className="hdr-chip hdr-context" title={typeof subtitle === 'string' ? subtitle : undefined}>
               <span className="hdr-chip-kicker">{t('workspaceHome')}</span>
               <span className="hdr-chip-value">{subtitle}</span>
             </div>
           ) : null}
+          {company?.status === 'archived' ? <span className="badge warn">archived</span> : null}
         </div>
         <div className="hdr-toolbar">
           <span className="hdr-chip" title={user.email}>
@@ -88,6 +111,8 @@ export function AppShell({
         />
         <IconRail
           items={railItems}
+          groups={railGroups}
+          settingsItem={settingsItem}
           open={drawerOpen}
           onNavigate={() => setDrawerOpen(false)}
           onCloseMobile={() => setDrawerOpen(false)}

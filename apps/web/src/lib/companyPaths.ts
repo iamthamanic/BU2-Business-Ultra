@@ -7,6 +7,25 @@ export const DEFAULT_ORGANIC_CHANNEL = 'instagram'
 export const DEFAULT_PAID_CHANNEL = 'google'
 export const DEFAULT_CUSTOM_CHANNEL = 'email'
 
+/** Legacy organic channel order (sidebar Organic Funnel). */
+export const ORGANIC_CHANNELS = [
+  'instagram',
+  'facebook',
+  'tiktok',
+  'linkedin',
+  'youtube',
+] as const
+
+/** Legacy paid channel keys used in `/marketing/funnel/paid/:channel`. */
+export const PAID_CHANNELS = ['google', 'meta', 'tiktok', 'chatgpt'] as const
+
+/** Legacy custom funnel channels. */
+export const CUSTOM_CHANNELS = ['email', 'offline'] as const
+
+export type OrganicChannel = (typeof ORGANIC_CHANNELS)[number]
+export type PaidChannel = (typeof PAID_CHANNELS)[number]
+export type CustomChannel = (typeof CUSTOM_CHANNELS)[number]
+
 /** Build `/co/:slug` base (no trailing slash). */
 export function companyBase(slug: string) {
   return `/co/${encodeURIComponent(slug)}`
@@ -19,8 +38,11 @@ export function companyRoutes(slug: string) {
     overview: base,
     catalog: `${base}/catalog`,
     marketing: `${base}/marketing/funnel/organic/${DEFAULT_ORGANIC_CHANNEL}`,
+    organic: (ch: string) => `${base}/marketing/funnel/organic/${ch}`,
     ads: `${base}/marketing/funnel/paid/${DEFAULT_PAID_CHANNEL}`,
+    paid: (ch: string) => `${base}/marketing/funnel/paid/${ch}`,
     custom: `${base}/marketing/funnel/custom/${DEFAULT_CUSTOM_CHANNEL}`,
+    customCh: (ch: string) => `${base}/marketing/funnel/custom/${ch}`,
     cmb: `${base}/tools/cmb`,
     sortanize: `${base}/tools/sortanize`,
     checkmap: `${base}/tools/checkmap`,

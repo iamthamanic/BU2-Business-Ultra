@@ -1,11 +1,22 @@
+/**
+ * MarketingPage — organic + custom funnel surface; channel from route params.
+ * Location: apps/web/src/features/marketing/MarketingPage.tsx
+ */
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { useI18n } from '../../lib/i18n'
 
 export function MarketingPage() {
-  const { slug } = useParams()
+  const { slug, channel } = useParams()
   const { t } = useI18n()
+  const ch = (channel || 'instagram').toLowerCase()
+  const isCustom = ch === 'email' || ch === 'offline'
+  const channelLabel = isCustom
+    ? ch === 'email'
+      ? t('emailMarketing')
+      : t('offlineFlyer')
+    : t(`ch_${ch}` as 'ch_instagram')
   const [drafts, setDrafts] = useState<any[]>([])
   const [title, setTitle] = useState('')
   const [text, setText] = useState('')
@@ -95,8 +106,10 @@ export function MarketingPage() {
 
   return (
     <div className="stack">
-      <h1 style={{ margin: 0 }}>{t('marketing')}</h1>
-      <p className="muted">Master draft + {t('variants')} · Metricool scheduler SoR</p>
+      <h1 style={{ margin: 0 }}>{channelLabel}</h1>
+      <p className="muted">
+        {isCustom ? t('navCustom') : t('navOrganic')} · Master draft + {t('variants')} · Metricool / Brevo
+      </p>
       <div className="row">
         <span className={`badge ${gate ? 'ok' : 'warn'}`}>Metricool {gate ? 'ready' : t('keyRequired')}</span>
         <span className={`badge ${brevoGate ? 'ok' : 'warn'}`}>Brevo {brevoGate ? 'ready' : t('keyRequired')}</span>
