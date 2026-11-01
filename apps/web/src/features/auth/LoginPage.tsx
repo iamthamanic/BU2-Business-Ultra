@@ -3,9 +3,11 @@
  * Location: apps/web/src/features/auth/LoginPage.tsx
  */
 import { useState, type FormEvent } from 'react'
+import { Eye, EyeSlash } from '@phosphor-icons/react'
 import { api } from '../../lib/api'
 import { useI18n } from '../../lib/i18n'
 import type { AuthUser } from '../../app/App'
+import { BrandMark } from '../../components/BrandMark'
 
 type LoginMode = 'credentials' | 'magic'
 
@@ -76,16 +78,7 @@ export function LoginPage({ onAuthed }: { onAuthed: (u: AuthUser) => void }) {
   return (
     <div className="login-page">
       <div className="login-card stack">
-        <div className="brand">
-          <img
-            className="brand-mark"
-            src="/brand/bu-mark.png"
-            alt="Business Ultra"
-            width={80}
-            height={50}
-          />
-          <span className="brand-name">{t('brand')}</span>
-        </div>
+        <BrandMark to={false} showName size="lg" />
 
         <div className="login-mode-toggle" role="tablist" aria-label={t('login')}>
           <button
@@ -138,27 +131,9 @@ export function LoginPage({ onAuthed }: { onAuthed: (u: AuthUser) => void }) {
                   onClick={() => setShowPassword((v) => !v)}
                 >
                   {showPassword ? (
-                    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
-                      <path
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.75"
-                        strokeLinecap="round"
-                        d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.1A10.5 10.5 0 0 1 12 5c5 0 9.3 3.1 11 7.5a11.7 11.7 0 0 1-4.2 5.1M6.1 6.1A11.7 11.7 0 0 0 1 12.5C2.7 16.9 7 20 12 20c1.5 0 2.9-.3 4.2-.8"
-                      />
-                    </svg>
+                    <EyeSlash size={18} weight="regular" aria-hidden />
                   ) : (
-                    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
-                      <path
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.75"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M1 12.5C2.7 8.1 7 5 12 5s9.3 3.1 11 7.5C21.3 16.9 17 20 12 20S2.7 16.9 1 12.5z"
-                      />
-                      <circle cx="12" cy="12.5" r="2.5" fill="none" stroke="currentColor" strokeWidth="1.75" />
-                    </svg>
+                    <Eye size={18} weight="regular" aria-hidden />
                   )}
                 </button>
               </div>

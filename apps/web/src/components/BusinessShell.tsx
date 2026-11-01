@@ -1,26 +1,37 @@
-import { useEffect, useState } from 'react'
-import { NavLink, Outlet, useParams } from 'react-router-dom'
+/**
+ * BusinessShell — /b/:slug layout with collapsible module sidebar (legacy parity).
+ * Location: apps/web/src/components/BusinessShell.tsx
+ */
+import { useEffect, useMemo, useState } from 'react'
+import { Outlet, useParams } from 'react-router-dom'
+import {
+  SquaresFour,
+  Package,
+  Megaphone,
+  Target,
+  Calculator,
+  MapTrifold,
+  UsersThree,
+  ArrowsDownUp,
+  MagnifyingGlass,
+  GearSix,
+  Buildings,
+} from '@phosphor-icons/react'
 import { api } from '../lib/api'
 import { useI18n } from '../lib/i18n'
 import type { AuthUser } from '../app/App'
+import { AppShell } from './AppShell'
+import type { RailItem } from './IconRail'
 
-const icons: Record<string, string> = {
-  overview: '◉',
-  catalog: '▤',
-  marketing: '✎',
-  ads: '◈',
-  cmb: '∑',
-  checkmap: '⧉',
-  personas: '☺',
-  sortanize: '⇅',
-  openseo: '◎',
-  settings: '⚙',
-}
-
-export function BusinessShell({ user }: { user: AuthUser }) {
+export function BusinessShell({
+  user,
+  onLogout,
+}: {
+  user: AuthUser
+  onLogout: () => void
+}) {
   const { slug } = useParams()
-  const { t, locale, setLocale } = useI18n()
-  const [railOpen, setRailOpen] = useState(false)
+  const { t } = useI18n()
   const [biz, setBiz] = useState<{ name: string; status: string; logoPath?: string | null } | null>(null)
 
   useEffect(() => {
@@ -31,58 +42,33 @@ export function BusinessShell({ user }: { user: AuthUser }) {
   }, [slug])
 
   const base = `/b/${slug}`
-  const links = [
-    ['', 'overview'],
-    ['catalog', 'catalog'],
-    ['marketing', 'marketing'],
-    ['ads', 'ads'],
-    ['cmb', 'cmb'],
-    ['checkmap', 'checkmap'],
-    ['personas', 'personas'],
-    ['sortanize', 'sortanize'],
-    ['openseo', 'openseo'],
-    ['settings', 'settings'],
-  ] as const
+  const railItems: RailItem[] = useMemo(
+    () => [
+      { key: 'home', to: '/', end: true, label: t('businesses'), icon: Buildings },
+      { key: 'overview', to: base, end: true, label: t('overview'), icon: SquaresFour },
+      { key: 'catalog', to: `${base}/catalog`, label: t('catalog'), icon: Package },
+      { key: 'marketing', to: `${base}/marketing`, label: t('marketing'), icon: Megaphone },
+      { key: 'ads', to: `${base}/ads`, label: t('ads'), icon: Target },
+      { key: 'cmb', to: `${base}/cmb`, label: t('cmb'), icon: Calculator },
+      { key: 'checkmap', to: `${base}/checkmap`, label: t('checkmap'), icon: MapTrifold },
+      { key: 'personas', to: `${base}/personas`, label: t('personas'), icon: UsersThree },
+      { key: 'sortanize', to: `${base}/sortanize`, label: t('sortanize'), icon: ArrowsDownUp },
+      { key: 'openseo', to: `${base}/openseo`, label: t('openseo'), icon: MagnifyingGlass },
+      { key: 'settings', to: `${base}/settings`, label: t('settings'), icon: GearSix },
+    ],
+    [base, t],
+  )
+
+  const subtitle = (
+    <>
+      <span>{biz?.name ?? slug}</span>
+      {biz?.status === 'archived' ? <span className="badge warn">archived</span> : null}
+    </>
+  )
 
   return (
-    <div className="shell">
-      <div className={`rail-backdrop ${railOpen ? 'open' : ''}`} onClick={() => setRailOpen(false)} />
-      <aside className={`rail ${railOpen ? 'open' : ''}`} aria-label="Navigation">
-        {links.map(([path, key]) => (
-          <NavLink
-            key={key}
-            to={path ? `${base}/${path}` : base}
-            end={!path}
-            title={t(key)}
-            onClick={() => setRailOpen(false)}
-          >
-            <span aria-hidden>{icons[key]}</span>
-          </NavLink>
-        ))}
-      </aside>
-      <div className="main">
-        <header className="topbar">
-          <div className="row">
-            <button type="button" className="btn rail-toggle" onClick={() => setRailOpen(true)} aria-label="Menu">
-              ☰
-            </button>
-            <div>
-              <div className="brand">{t('brand')}</div>
-              <div className="muted">{biz?.name ?? slug}{biz?.status === 'archived' ? ' · archived' : ''}</div>
-            </div>
-          </div>
-          <div className="row">
-            <select className="select" style={{ width: 'auto' }} value={locale} onChange={(e) => setLocale(e.target.value as 'de' | 'en')}>
-              <option value="de">DE</option>
-              <option value="en">EN</option>
-            </select>
-            <span className="muted">{user.email}</span>
-          </div>
-        </header>
-        <div className="content">
-          <Outlet context={{ slug: slug!, user }} />
-        </div>
-      </div>
-    </div>
+    <AppShell user={user} railItems={railItems} subtitle={subtitle} onLogout={onLogout}>
+      <Outlet context={{ slug: slug!, user }} />
+    </AppShell>
   )
 }

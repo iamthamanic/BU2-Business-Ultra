@@ -40,21 +40,27 @@ export function App() {
     return <div className="login-page muted">…</div>
   }
 
+  async function logout() {
+    await api('/api/auth/logout', { method: 'POST' })
+    setUser(null)
+    navigate('/login', { replace: true })
+  }
+
   return (
     <Routes>
       <Route path="/login" element={<LoginPage onAuthed={(u) => { setUser(u); navigate('/') }} />} />
       <Route path="/login/verify" element={<VerifyPage onAuthed={(u) => { setUser(u); navigate('/') }} />} />
       <Route
         path="/"
-        element={user ? <HomePage user={user} onLogout={async () => { await api('/api/auth/logout', { method: 'POST' }); setUser(null) }} /> : <Navigate to="/login" replace />}
+        element={user ? <HomePage user={user} onLogout={logout} /> : <Navigate to="/login" replace />}
       />
       <Route
         path="/admin"
-        element={user?.isSuperadmin || user?.isBreakglassOperator ? <AdminPage user={user} /> : <Navigate to="/" replace />}
+        element={user?.isSuperadmin || user?.isBreakglassOperator ? <AdminPage user={user} onLogout={logout} /> : <Navigate to="/" replace />}
       />
       <Route
         path="/b/:slug/*"
-        element={user ? <BusinessShell user={user} /> : <Navigate to="/login" replace />}
+        element={user ? <BusinessShell user={user} onLogout={logout} /> : <Navigate to="/login" replace />}
       >
         <Route index element={<OverviewPage />} />
         <Route path="catalog" element={<CatalogPage />} />
