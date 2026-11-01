@@ -1,5 +1,5 @@
 /**
- * BrandMark — BU monogram + optional wordmark for topbar and login.
+ * BrandMark — BU monogram + optional wordmark (login). Shell topbar uses logo-only; sidebar owns the wordmark.
  * Location: apps/web/src/components/BrandMark.tsx
  */
 import { Link } from 'react-router-dom'

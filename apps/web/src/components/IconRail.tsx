@@ -1,7 +1,7 @@
 /**
  * IconRail / Sidebar — legacy-parity collapsible left nav (slim icons ↔ expanded labels).
- * Supports grouped funnel sections (details) with session persistence; collapse toggle in head;
- * settings/admin/lang/logout in footer. Brand lives in topbar. Mobile: overlay drawer.
+ * Supports grouped funnel sections (details) with session persistence; collapse toggle + wordmark in sb-head
+ * (wordmark hidden when slim); settings/admin/lang/logout in footer. Logo stays in topbar. Mobile: overlay drawer.
  * Location: apps/web/src/components/IconRail.tsx
  */
 import { useEffect, useState } from 'react'
@@ -182,6 +182,9 @@ export function IconRail({
       data-expanded={expanded ? 'true' : 'false'}
     >
       <div className="sb-head">
+        <span className="sb-brand-name brand-name" aria-hidden={slim || undefined}>
+          {t('brand')}
+        </span>
         <button
           type="button"
           className="sb-toggle"

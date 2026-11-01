@@ -1,6 +1,6 @@
 /**
  * AppShell — legacy-parity chrome: collapsible sidebar + header context chip bar.
- * BrandMark lives left in the topbar; company switcher follows; account/logout/lang in sidebar footer.
+ * Logo-only BrandMark left in the topbar; wordmark lives in sidebar sb-head; company switcher follows; account/logout/lang in sidebar footer.
  * Location: apps/web/src/components/AppShell.tsx
  */
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
@@ -77,7 +77,7 @@ export function AppShell({
           >
             {drawerOpen ? <X size={18} weight="regular" /> : <List size={18} weight="regular" />}
           </button>
-          <BrandMark to="/" showName size="sm" />
+          <BrandMark to="/" showName={false} size="sm" />
           {company ? (
             <CompanySwitcher
               activeSlug={company.slug}
