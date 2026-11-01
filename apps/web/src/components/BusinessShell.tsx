@@ -1,13 +1,12 @@
 /**
  * BusinessShell — `/co/:slug` layout with department sidebar IA.
- * Flat Katalog · Marketing · Product · Customer · Tools (CMB, Sortanize, CheckMap).
+ * Flat Marketing · Product (hosts Katalog) · Customer · Tools (CMB, Sortanize, CheckMap).
  * Settings in footer; company switcher in topbar. Nav filtered by membership.tabs.
  * API calls remain `/api/b/:slug`. Location: apps/web/src/components/BusinessShell.tsx
  */
 import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useParams } from 'react-router-dom'
 import {
-  Package,
   Calculator,
   MapTrifold,
   ArrowsDownUp,
@@ -75,9 +74,7 @@ export function BusinessShell({
   const topItems: RailItem[] = useMemo(() => {
     if (!routes) return []
     const items: RailItem[] = []
-    if (canSeeNavTab(tabs, 'catalog')) {
-      items.push({ key: 'catalog', to: routes.catalog, label: t('catalog'), icon: Package, dataIc: 'catalog' })
-    }
+    // Order: Marketing → Product → Customer (Katalog is nested under Product)
     if (canSeeNavTab(tabs, 'overview') || canSeeNavTab(tabs, 'home') || canSeeNavTab(tabs, 'instagram')) {
       items.push({
         key: 'marketing',
@@ -87,7 +84,8 @@ export function BusinessShell({
         dataIc: 'marketing',
       })
     }
-    if (canSeeNavTab(tabs, 'product')) {
+    // Product rail highlights for /product/* including Katalog; catalog entitlement still unlocks Product
+    if (canSeeNavTab(tabs, 'product') || canSeeNavTab(tabs, 'catalog')) {
       items.push({
         key: 'product',
         to: routes.product,

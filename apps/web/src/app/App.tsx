@@ -16,7 +16,7 @@ import { VerifyPage } from '../features/auth/VerifyPage'
 import { HomePage } from '../features/business/HomePage'
 import { BusinessShell } from '../components/BusinessShell'
 import { CatalogPage } from '../features/catalog/CatalogPage'
-import { ProductPage } from '../features/product/ProductPage'
+import { ProductShell } from '../features/product/ProductShell'
 import { CustomerPage } from '../features/customer/CustomerPage'
 import { MarketingShell } from '../features/marketing/MarketingShell'
 import { MarketingPage } from '../features/marketing/MarketingPage'
@@ -109,8 +109,14 @@ export function App() {
       <Route path="/co/:slug" element={authedShell}>
         {/* Default company landing = Marketing */}
         <Route index element={<CoRedirect to="marketing" />} />
-        <Route path="catalog" element={<CatalogPage />} />
-        <Route path="product" element={<ProductPage />} />
+        {/* Katalog lives under Product; keep old bookmarks alive */}
+        <Route path="catalog" element={<CoRedirect to="product/katalog" />} />
+        <Route path="katalog" element={<CoRedirect to="product/katalog" />} />
+        <Route path="product" element={<ProductShell />}>
+          <Route index element={<Navigate to="katalog" replace />} />
+          <Route path="katalog" element={<CatalogPage />} />
+          <Route path="catalog" element={<CoRedirect to="product/katalog" />} />
+        </Route>
         <Route path="customer" element={<CustomerPage />} />
 
         <Route path="marketing" element={<MarketingShell />}>

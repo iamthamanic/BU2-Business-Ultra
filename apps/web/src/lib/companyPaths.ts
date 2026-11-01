@@ -55,7 +55,8 @@ export function companyRoutes(slug: string) {
     hub: `${base}/marketing`,
     /** Alias kept for older call sites; same as hub */
     overview: `${base}/marketing`,
-    catalog: `${base}/catalog`,
+    /** Katalog nested under Product (canonical) */
+    catalog: `${base}/product/katalog`,
     marketing: `${base}/marketing`,
     product: `${base}/product`,
     customer: `${base}/customer`,
@@ -134,6 +135,9 @@ export function mapOldBu2FrontendPath(slug: string, rest: string): string {
   const map: Record<string, string> = {
     '': routes.hub,
     catalog: routes.catalog,
+    katalog: routes.catalog,
+    'product/katalog': routes.catalog,
+    'product/catalog': routes.catalog,
     marketing: routes.hub,
     product: routes.product,
     customer: routes.customer,

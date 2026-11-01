@@ -1,3 +1,8 @@
+/**
+ * CatalogPage — Katalog SoR UI (products/offers) nested under Product.
+ * Route: `/co/:slug/product/katalog`. API remains `/api/b/:slug/catalog`.
+ * Location: apps/web/src/features/catalog/CatalogPage.tsx
+ */
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { api } from '../../lib/api'
