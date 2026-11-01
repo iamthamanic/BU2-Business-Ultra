@@ -2827,7 +2827,7 @@ select {
 }
 
 .paid-campaigns-panel .funnel-export-box {
-  margin-left: 0;
+  margin-left: auto;
   flex-shrink: 0;
 }
 
