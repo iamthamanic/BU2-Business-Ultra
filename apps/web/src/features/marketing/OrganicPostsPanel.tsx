@@ -162,13 +162,14 @@ export function OrganicPostsPanel({
   }, [filtered, sortKey, sortDir, showReach])
 
   function toggleSort(key: string) {
-    if (key === 'rank') return
     if (sortKey === key) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
       return
     }
     setSortKey(key)
-    setSortDir(key === 'date' || key === 'title' || key === 'type' || key === 'bucket' ? 'asc' : 'desc')
+    setSortDir(
+      key === 'date' || key === 'title' || key === 'type' || key === 'bucket' ? 'asc' : 'desc',
+    )
   }
 
   function sumPosts(rows: OrganicPost[]) {
@@ -340,30 +341,23 @@ export function OrganicPostsPanel({
           <thead>
             <tr>
               {cols.map((c) => {
-                const sortable = c.key !== 'rank'
                 const active = sortKey === c.key
                 return (
                   <th
                     key={c.key}
-                    className={sortable ? `funnel-th-sortable${active ? ' is-sorted' : ''}` : undefined}
-                    aria-sort={
-                      sortable && active ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined
-                    }
+                    className={`funnel-th-sortable${active ? ' is-sorted' : ''}`}
+                    aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
                   >
-                    {sortable ? (
-                      <button
-                        type="button"
-                        className="funnel-th-btn"
-                        onClick={() => toggleSort(c.key)}
-                      >
-                        <span>{c.label}</span>
-                        <span className="funnel-th-dir" aria-hidden>
-                          {active ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}
-                        </span>
-                      </button>
-                    ) : (
-                      c.label
-                    )}
+                    <button
+                      type="button"
+                      className="funnel-th-btn"
+                      onClick={() => toggleSort(c.key)}
+                    >
+                      <span>{c.label}</span>
+                      <span className="funnel-th-dir" aria-hidden>
+                        {active ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </button>
                     {c.tip ? (
                       <FunnelTip tip={t(c.tip)} iconOnly>
                         {c.label}
@@ -544,6 +538,9 @@ function sortValue(
   showReach: boolean,
 ): string | number | null {
   switch (key) {
+    case 'rank':
+      // Performance rank (same signal as former Top5): engagement rate
+      return p.engagement
     case 'date':
       return p.date || ''
     case 'type':
