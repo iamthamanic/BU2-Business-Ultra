@@ -96,9 +96,9 @@ export function PaidCampaignsPanel({
   return (
     <div className="stack paid-campaigns-panel">
       <div className="funnel-filter-row paid-filter-row" role="toolbar" aria-label={t('timeWindow')}>
-        <FunnelTip tip={t('tipWin')} as="span" className="filter-lbl muted">
-          {t('timeWindow')}
-        </FunnelTip>
+        <span className="filter-lbl muted">
+          <FunnelTip tip={t('tipWin')}>{t('timeWindow')}</FunnelTip>
+        </span>
         {WINDOWS.map((w) => (
           <button
             key={w.key}
@@ -135,7 +135,7 @@ export function PaidCampaignsPanel({
       </div>
 
       <div className="panel funnel-table-wrap">
-        <table className="table funnel-ads-table">
+        <table className="table funnel-grid-table funnel-ads-table">
           <thead>
             <tr>
               {cols.map((c) => (
@@ -202,15 +202,18 @@ function Kpi({
   accent?: boolean
 }) {
   return (
-    <FunnelTip tip={tip} as="div" className={`funnel-kpi${accent ? ' funnel-kpi--accent' : ''}`}>
+    <div className={`funnel-kpi${accent ? ' funnel-kpi--accent' : ''}`}>
       <div className="funnel-kpi-head">
         <span className="funnel-kpi-ic" aria-hidden>
           <Ic size={16} weight="duotone" />
         </span>
         <div className="funnel-kpi-l muted">{label}</div>
+        <FunnelTip tip={tip} iconOnly>
+          {label}
+        </FunnelTip>
       </div>
       <div className="funnel-kpi-v">{value}</div>
-    </FunnelTip>
+    </div>
   )
 }
 

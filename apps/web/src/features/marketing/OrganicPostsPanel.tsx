@@ -145,11 +145,11 @@ export function OrganicPostsPanel({
   return (
     <div className="stack organic-posts-panel">
       <div className="panel funnel-top5">
-        <FunnelTip tip={t('tipTop5')} as="h3" className="section-title funnel-top5-title">
-          {t('top5Title')}
-        </FunnelTip>
+        <h3 className="section-title funnel-top5-title">
+          <FunnelTip tip={t('tipTop5')}>{t('top5Title')}</FunnelTip>
+        </h3>
         <div className="funnel-table-wrap">
-          <table className="table funnel-top5-table">
+          <table className="table funnel-grid-table funnel-top5-table">
             <thead>
               <tr>
                 <th>#</th>
@@ -212,9 +212,9 @@ export function OrganicPostsPanel({
 
       <div className="funnel-filters-bar">
         <div className="funnel-filter-row" role="toolbar" aria-label={t('timeWindow')}>
-          <FunnelTip tip={t('tipWin')} as="span" className="filter-lbl muted">
-            {t('timeWindow')}
-          </FunnelTip>
+          <span className="filter-lbl muted">
+            <FunnelTip tip={t('tipWin')}>{t('timeWindow')}</FunnelTip>
+          </span>
           {WINDOWS.map((w) => (
             <button
               key={w.key}
@@ -229,9 +229,9 @@ export function OrganicPostsPanel({
         </div>
 
         <div className="funnel-filter-row" role="toolbar" aria-label={t('filterBrand')}>
-          <FunnelTip tip={t('tipBrand')} as="span" className="filter-lbl muted">
-            {t('filterBrand')}
-          </FunnelTip>
+          <span className="filter-lbl muted">
+            <FunnelTip tip={t('tipBrand')}>{t('filterBrand')}</FunnelTip>
+          </span>
           <button
             type="button"
             className={`chip ${brand === '__all__' ? 'active' : ''}`}
@@ -243,9 +243,9 @@ export function OrganicPostsPanel({
         </div>
 
         <div className="funnel-filter-row" role="toolbar" aria-label={t('filterPostType')}>
-          <FunnelTip tip={t('tipPostType')} as="span" className="filter-lbl muted">
-            {t('filterPostType')}
-          </FunnelTip>
+          <span className="filter-lbl muted">
+            <FunnelTip tip={t('tipPostType')}>{t('filterPostType')}</FunnelTip>
+          </span>
           <button
             type="button"
             className={`chip ${postType === '__all__' ? 'active' : ''}`}
@@ -302,7 +302,7 @@ export function OrganicPostsPanel({
       </div>
 
       <div className="panel funnel-table-wrap">
-        <table className="table funnel-posts-table">
+        <table className="table funnel-grid-table funnel-posts-table">
           <thead>
             <tr>
               {cols.map((c) => (
@@ -394,15 +394,18 @@ function Kpi({
   tip: string
 }) {
   return (
-    <FunnelTip tip={tip} as="div" className="funnel-kpi">
+    <div className="funnel-kpi">
       <div className="funnel-kpi-head">
         <span className="funnel-kpi-ic" aria-hidden>
           <Ic size={16} weight="duotone" />
         </span>
         <div className="funnel-kpi-l muted">{label}</div>
+        <FunnelTip tip={tip} iconOnly>
+          {label}
+        </FunnelTip>
       </div>
       <div className="funnel-kpi-v">{value}</div>
-    </FunnelTip>
+    </div>
   )
 }
 
