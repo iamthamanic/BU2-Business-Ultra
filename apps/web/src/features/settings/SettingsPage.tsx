@@ -1,143 +1,201 @@
 /**
- * SettingsPage — company secrets, invites, logo, and Companies switcher panel.
- * Location: apps/web/src/features/settings/SettingsPage.tsx
+ * SettingsPage — company settings with tabs: Übersicht | Verbindungen | Funnel | Team | Logo.
+ * Hash deep-links (#connections etc.) from Marketing Hub. Location: apps/web/src/features/settings/SettingsPage.tsx
  */
-import { useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { CompanySwitcher } from '../../components/CompanySwitcher'
+import { useEffect, useState } from 'react'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { useI18n } from '../../lib/i18n'
+import { SettingsConnectionsTab } from './SettingsConnectionsTab'
+import { SettingsFunnelTab } from './SettingsFunnelTab'
+import { SettingsHeader, type SettingsStatus } from './SettingsHeader'
+import { SettingsLogoTab } from './SettingsLogoTab'
+import { SettingsOverviewTab } from './SettingsOverviewTab'
+import { SettingsTeamTab } from './SettingsTeamTab'
+import { SETTINGS_TABS, hashForTab, tabFromHash, type SettingsTab } from './settingsTabs'
 
-const PROVIDERS = ['metricool', 'brevo', 'google_ads', 'meta_ads', 'tiktok_ads', 'chatgpt_ads'] as const
+type SecretRow = { provider: string; valid: boolean; keyHint?: string | null }
 
 export function SettingsPage() {
   const { slug } = useParams()
   const { t } = useI18n()
-  const [statuses, setStatuses] = useState<any[]>([])
-  const [keys, setKeys] = useState<Record<string, string>>({})
-  const [msg, setMsg] = useState('')
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteToken, setInviteToken] = useState('')
-  const fileRef = useRef<HTMLInputElement>(null)
-  const [preview, setPreview] = useState<string | null>(null)
-  const [companyMeta, setCompanyMeta] = useState<{ name: string; logoPath?: string | null } | null>(null)
+  const location = useLocation()
+  const navigate = useNavigate()
 
-  async function refresh() {
-    const r = await api<{ secrets: any[] }>(`/api/b/${slug}/settings/secrets`)
-    setStatuses(r.secrets)
+  const [tab, setTab] = useState<SettingsTab>(() => tabFromHash(window.location.hash))
+  const [secrets, setSecrets] = useState<SecretRow[]>([])
+  const [status, setStatus] = useState<SettingsStatus | null>(null)
+  const [companyMeta, setCompanyMeta] = useState<{
+    name: string
+    logoPath?: string | null
+    status: string
+  } | null>(null)
+  const [memberCount, setMemberCount] = useState(0)
+  const [dangerMsg, setDangerMsg] = useState('')
+
+  function setTabAndHash(next: SettingsTab) {
+    setTab(next)
+    const hash = hashForTab(next)
+    const path = `${location.pathname}${hash}`
+    if (`${location.pathname}${location.hash}` !== path) {
+      navigate(path, { replace: true })
+    }
   }
 
-  useEffect(() => { refresh().catch(console.error) }, [slug])
+  useEffect(() => {
+    setTabAndHash(tabFromHash(location.hash))
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync from URL only
+  }, [location.hash])
+
+  async function refreshSecrets() {
+    if (!slug) return
+    const r = await api<{ secrets: SecretRow[] }>(`/api/b/${slug}/settings/secrets`)
+    setSecrets(r.secrets)
+  }
+
+  async function refreshStatus() {
+    if (!slug) return
+    const r = await api<{ status: SettingsStatus }>(`/api/b/${slug}/settings/status`)
+    setStatus(r.status)
+  }
+
+  async function refreshAll() {
+    await Promise.all([refreshSecrets(), refreshStatus()])
+  }
 
   useEffect(() => {
     if (!slug) return
     let cancelled = false
-    api<{ business: { name: string; logoPath?: string | null } }>(`/api/b/${slug}`)
-      .then((r) => {
-        if (!cancelled) setCompanyMeta({ name: r.business.name, logoPath: r.business.logoPath })
+    Promise.all([
+      api<{ business: { name: string; logoPath?: string | null; status: string } }>(
+        `/api/b/${slug}`,
+      ),
+      api<{ secrets: SecretRow[] }>(`/api/b/${slug}/settings/secrets`).catch(() => ({
+        secrets: [] as SecretRow[],
+      })),
+      api<{ status: SettingsStatus }>(`/api/b/${slug}/settings/status`),
+      api<{ members: unknown[] }>(`/api/b/${slug}/members`).catch(() => ({ members: [] })),
+    ])
+      .then(([biz, sec, st, mem]) => {
+        if (cancelled) return
+        setCompanyMeta({
+          name: biz.business.name,
+          logoPath: biz.business.logoPath,
+          status: biz.business.status,
+        })
+        setSecrets(sec.secrets)
+        setStatus(st.status)
+        setMemberCount(mem.members.length)
       })
-      .catch((e) => console.error(e))
+      .catch(console.error)
     return () => {
       cancelled = true
     }
   }, [slug])
 
-  async function save(provider: string) {
-    const apiKey = keys[provider]
-    if (!apiKey) return
-    const r = await api<{ valid: boolean; detail: string }>(`/api/b/${slug}/settings/secrets`, {
-      method: 'PUT',
-      body: JSON.stringify({ provider, apiKey }),
-    })
-    setMsg(`${provider}: ${r.valid ? 'OK' : 'invalid'} — ${r.detail}`)
-    setKeys((k) => ({ ...k, [provider]: '' }))
-    await refresh()
-  }
-
-  async function invite() {
-    const r = await api<{ acceptToken: string }>(`/api/b/${slug}/invites`, {
-      method: 'POST',
-      body: JSON.stringify({ email: inviteEmail, role: 'editor' }),
-    })
-    setInviteToken(r.acceptToken)
-  }
-
-  function onFile(file: File) {
-    const reader = new FileReader()
-    reader.onload = () => {
-      const img = new Image()
-      img.onload = () => {
-        const size = Math.min(img.width, img.height)
-        const canvas = document.createElement('canvas')
-        canvas.width = 256
-        canvas.height = 256
-        const ctx = canvas.getContext('2d')!
-        const sx = (img.width - size) / 2
-        const sy = (img.height - size) / 2
-        ctx.drawImage(img, sx, sy, size, size, 0, 0, 256, 256)
-        setPreview(canvas.toDataURL('image/png'))
-      }
-      img.src = String(reader.result)
+  async function archive() {
+    if (!slug || !confirm(t('archiveConfirm'))) return
+    try {
+      await api(`/api/b/${slug}/archive`, { method: 'POST', body: '{}' })
+      setCompanyMeta((c) => (c ? { ...c, status: 'archived' } : c))
+      setDangerMsg(t('archivedOk'))
+    } catch (e) {
+      setDangerMsg(String(e))
     }
-    reader.readAsDataURL(file)
   }
 
-  async function uploadLogo() {
-    if (!preview) return
-    const r = await api<{ logoPath: string }>(`/api/b/${slug}/settings/logo`, {
-      method: 'POST',
-      body: JSON.stringify({ dataUrl: preview }),
-    })
-    setMsg(`Logo saved: ${r.logoPath}`)
+  async function reactivate() {
+    if (!slug) return
+    try {
+      await api(`/api/b/${slug}/reactivate`, { method: 'POST', body: '{}' })
+      setCompanyMeta((c) => (c ? { ...c, status: 'active' } : c))
+      setDangerMsg(t('reactivatedOk'))
+    } catch (e) {
+      setDangerMsg(String(e))
+    }
+  }
+
+  if (!slug) return null
+
+  const tabLabels: Record<SettingsTab, string> = {
+    overview: t('overview'),
+    connections: t('connections'),
+    funnel: t('funnelAssignment'),
+    team: t('team'),
+    logo: t('companyLogo'),
   }
 
   return (
-    <div className="stack">
-      <h1 style={{ margin: 0 }}>{t('settings')}</h1>
-      <p className="muted">{t('disabledUntilKey')}</p>
+    <div className="stack co-settings">
+      <SettingsHeader
+        name={companyMeta?.name ?? slug}
+        slug={slug}
+        logoPath={companyMeta?.logoPath}
+        status={status}
+        companyStatus={companyMeta?.status ?? 'active'}
+        onJump={setTabAndHash}
+      />
 
-      <div className="panel stack">
-        <h3 style={{ margin: 0 }}>{t('businesses')}</h3>
-        <CompanySwitcher
-          variant="panel"
-          activeSlug={slug}
-          activeName={companyMeta?.name ?? slug}
-          activeLogoPath={companyMeta?.logoPath}
-        />
+      <div className="co-settings-subnav" role="tablist" aria-label={t('settings')}>
+        {SETTINGS_TABS.map((id) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            className={`co-settings-subtab ${tab === id ? 'active' : ''}`}
+            aria-selected={tab === id}
+            onClick={() => setTabAndHash(id)}
+          >
+            {tabLabels[id]}
+          </button>
+        ))}
       </div>
 
-      <div className="panel stack" id="connections">
-        <h3 style={{ margin: 0 }}>{t('connections')}</h3>
-        {PROVIDERS.map((p) => {
-          const st = statuses.find((s) => s.provider === p)
-          return (
-            <div key={p} className="stack" style={{ borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
-              <div className="row" style={{ justifyContent: 'space-between' }}>
-                <strong>{p}</strong>
-                <span className={`badge ${st?.valid ? 'ok' : 'warn'}`}>{st?.valid ? `valid ${st.keyHint ?? ''}` : 'missing'}</span>
-              </div>
-              <div className="row">
-                <input className="input" style={{ flex: 1 }} type="password" placeholder="API key" value={keys[p] ?? ''} onChange={(e) => setKeys({ ...keys, [p]: e.target.value })} />
-                <button className="btn primary" onClick={() => save(p)}>{t('save')}</button>
-              </div>
-            </div>
-          )
-        })}
-        {msg && <p className="muted">{msg}</p>}
-      </div>
-
-      <div className="panel stack">
-        <h3 style={{ margin: 0 }}>{t('invite')}</h3>
-        <input className="input" placeholder="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} />
-        <button className="btn" onClick={invite}>{t('invite')}</button>
-        {inviteToken && <p className="kpi">accept token: {inviteToken}</p>}
-      </div>
-
-      <div className="panel stack">
-        <h3 style={{ margin: 0 }}>{t('logoCrop')}</h3>
-        <input ref={fileRef} type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
-        <div className="crop-stage">{preview ? <img src={preview} alt="crop" width={256} height={256} /> : <span className="muted">1:1 crop preview</span>}</div>
-        <button className="btn primary" disabled={!preview} onClick={uploadLogo}>{t('upload')}</button>
+      <div className="co-settings-pane" role="tabpanel">
+        {tab === 'overview' ? (
+          <SettingsOverviewTab
+            slug={slug}
+            name={companyMeta?.name ?? slug}
+            logoPath={companyMeta?.logoPath}
+            status={status}
+            companyStatus={companyMeta?.status ?? 'active'}
+            memberCount={memberCount}
+            msg={dangerMsg}
+            onJump={setTabAndHash}
+            onArchive={archive}
+            onReactivate={reactivate}
+          />
+        ) : null}
+        {tab === 'connections' ? (
+          <SettingsConnectionsTab
+            slug={slug}
+            secrets={secrets}
+            onSecretsChanged={() => {
+              refreshAll().catch(console.error)
+            }}
+          />
+        ) : null}
+        {tab === 'funnel' ? (
+          <SettingsFunnelTab
+            slug={slug}
+            onSaved={() => {
+              refreshStatus().catch(console.error)
+            }}
+          />
+        ) : null}
+        {tab === 'team' ? (
+          <SettingsTeamTab slug={slug} onMembersChanged={setMemberCount} />
+        ) : null}
+        {tab === 'logo' ? (
+          <SettingsLogoTab
+            slug={slug}
+            name={companyMeta?.name ?? slug}
+            logoPath={companyMeta?.logoPath}
+            onChanged={(logoPath) =>
+              setCompanyMeta((c) => (c ? { ...c, logoPath } : c))
+            }
+          />
+        ) : null}
       </div>
     </div>
   )

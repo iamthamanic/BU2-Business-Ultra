@@ -3,6 +3,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -298,3 +299,44 @@ export const brevoCampaigns = pgTable('brevo_campaigns', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
+
+/** Linked provider brands / projects (e.g. Metricool blogId). */
+export const businessIntegrations = pgTable(
+  'business_integrations',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    businessId: uuid('business_id')
+      .notNull()
+      .references(() => businesses.id, { onDelete: 'cascade' }),
+    provider: varchar('provider', { length: 40 }).notNull(),
+    externalId: varchar('external_id', { length: 120 }).notNull(),
+    label: varchar('label', { length: 160 }),
+    config: jsonb('config').$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('business_integrations_biz_provider_ext_uidx').on(
+      t.businessId,
+      t.provider,
+      t.externalId,
+    ),
+  ],
+)
+
+/** Per-surface data source (Metricool brand vs Direct API). */
+export const funnelBindings = pgTable(
+  'funnel_bindings',
+  {
+    businessId: uuid('business_id')
+      .notNull()
+      .references(() => businesses.id, { onDelete: 'cascade' }),
+    surface: varchar('surface', { length: 80 }).notNull(),
+    provider: varchar('provider', { length: 40 }).notNull().default('metricool'),
+    integrationId: uuid('integration_id').references(() => businessIntegrations.id, {
+      onDelete: 'set null',
+    }),
+    status: varchar('status', { length: 24 }).notNull().default('active'),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.businessId, t.surface] })],
+)

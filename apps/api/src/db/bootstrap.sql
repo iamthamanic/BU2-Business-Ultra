@@ -231,3 +231,24 @@ CREATE TABLE IF NOT EXISTS brevo_campaigns (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS business_integrations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  business_id uuid NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+  provider varchar(40) NOT NULL,
+  external_id varchar(120) NOT NULL,
+  label varchar(160),
+  config jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (business_id, provider, external_id)
+);
+
+CREATE TABLE IF NOT EXISTS funnel_bindings (
+  business_id uuid NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+  surface varchar(80) NOT NULL,
+  provider varchar(40) NOT NULL DEFAULT 'metricool',
+  integration_id uuid REFERENCES business_integrations(id) ON DELETE SET NULL,
+  status varchar(24) NOT NULL DEFAULT 'active',
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (business_id, surface)
+);

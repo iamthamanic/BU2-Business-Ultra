@@ -85,6 +85,12 @@ export async function listSecretStatuses(businessId: string) {
   return rows
 }
 
+export async function deleteBusinessSecret(businessId: string, provider: SecretProvider) {
+  await db
+    .delete(settingsSecrets)
+    .where(and(eq(settingsSecrets.businessId, businessId), eq(settingsSecrets.provider, provider)))
+}
+
 /** Lightweight validation stubs — real provider probes when keys present. */
 export async function validateProviderKey(
   provider: SecretProvider,

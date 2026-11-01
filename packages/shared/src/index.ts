@@ -252,3 +252,57 @@ export function canOpenSeo(role: Role, grantSeoOpen: boolean): boolean {
   if (role === 'editor' && grantSeoOpen) return true
   return false
 }
+
+/** Canonical funnel surfaces for company settings matrix (legacy parity). */
+export type FunnelSurfaceDef = {
+  key: string
+  label: string
+  group: 'Organic' | 'Paid'
+  direct: string
+  directProvider?: string
+  directReady?: boolean
+}
+
+export const FUNNEL_SURFACES: FunnelSurfaceDef[] = [
+  { key: 'organic.instagram', label: 'Instagram', group: 'Organic', direct: 'Meta Connector' },
+  { key: 'organic.facebook', label: 'Facebook', group: 'Organic', direct: 'Meta Connector' },
+  { key: 'organic.tiktok', label: 'TikTok', group: 'Organic', direct: 'TikTok Connector' },
+  { key: 'organic.linkedin', label: 'LinkedIn', group: 'Organic', direct: 'LinkedIn Connector' },
+  { key: 'organic.youtube', label: 'YouTube', group: 'Organic', direct: 'YouTube Connector' },
+  { key: 'paid.google', label: 'Google Ads', group: 'Paid', direct: 'Google Ads Connector' },
+  { key: 'paid.meta', label: 'Meta Ads', group: 'Paid', direct: 'Meta Ads Connector' },
+  { key: 'paid.tiktok', label: 'TikTok Ads', group: 'Paid', direct: 'TikTok Ads Connector' },
+  {
+    key: 'paid.chatgpt',
+    label: 'ChatGPT Ads',
+    group: 'Paid',
+    direct: 'ChatGPT Ads Connector',
+    directProvider: 'chatgpt_ads',
+    directReady: true,
+  },
+]
+
+export type FunnelSurfaceKey = (typeof FUNNEL_SURFACES)[number]['key']
+
+export const FunnelSurfaceKeySchema = z.enum([
+  'organic.instagram',
+  'organic.facebook',
+  'organic.tiktok',
+  'organic.linkedin',
+  'organic.youtube',
+  'paid.google',
+  'paid.meta',
+  'paid.tiktok',
+  'paid.chatgpt',
+])
+
+export const FunnelBindingSchema = z.object({
+  surface: FunnelSurfaceKeySchema,
+  provider: z.string().min(1).max(40),
+  status: z.enum(['active', 'disabled', 'unavailable']).default('active'),
+  integrationId: z.string().uuid().nullable().optional(),
+})
+
+export const FunnelBindingsPutSchema = z.object({
+  bindings: z.array(FunnelBindingSchema).max(FUNNEL_SURFACES.length),
+})
