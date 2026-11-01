@@ -98,6 +98,11 @@ export function formatDisplayRange(from: string, to: string): string {
   return `${fmtDe(from)} – ${fmtDe(to)}`
 }
 
+/** Single ISO date → DE display `dd.mm.yyyy`. */
+export function formatDisplayDate(iso: string): string {
+  return fmtDe(iso)
+}
+
 function fmtDe(iso: string): string {
   if (!iso || iso.length < 10) return iso
   return `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`

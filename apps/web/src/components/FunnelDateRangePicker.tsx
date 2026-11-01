@@ -6,7 +6,9 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { ArrowsLeftRight, CalendarBlank, CaretDown } from '@phosphor-icons/react'
 import { useI18n } from '../lib/i18n'
 import type { MessageKey } from '../i18n/messages'
+import { formatIsoDate } from '../lib/funnelExport'
 import {
+  formatDisplayDate,
   formatDisplayRange,
   isValidRange,
   previousPeriod,
@@ -124,8 +126,7 @@ export function FunnelDateRangePicker({ value, onChange, presets, dates }: Props
     draft.compare === 'off' ? draft : withResolvedPrimary(draft.preset, draft, dates),
   )
 
-  const summaryFrom = draft.from === 'all' ? '—' : draft.from
-  const summaryTo = draft.to === 'all' ? '—' : draft.to
+  const todayIso = formatIsoDate(new Date())
   const canApply =
     isValidRange(draft.from, draft.to) &&
     (draft.compare !== 'custom' ||
@@ -198,10 +199,8 @@ export function FunnelDateRangePicker({ value, onChange, presets, dates }: Props
               <div className="funnel-dr-summary" aria-live="polite">
                 <CalendarBlank size={16} weight="duotone" aria-hidden />
                 <span className="funnel-dr-summary-text">
-                  {formatDisplayRange(
-                    summaryFrom === '—' ? draft.from : summaryFrom,
-                    summaryTo === '—' ? draft.to : summaryTo,
-                  )}
+                  <span className="funnel-dr-summary-today-lbl">{t('dateToday')}</span>
+                  <span className="funnel-dr-summary-today-val">{formatDisplayDate(todayIso)}</span>
                 </span>
                 {draft.preset !== 'custom' ? (
                   <span className="funnel-dr-summary-badge">
