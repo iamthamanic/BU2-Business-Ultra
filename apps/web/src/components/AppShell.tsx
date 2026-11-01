@@ -1,6 +1,6 @@
 /**
  * AppShell — legacy-parity chrome: collapsible sidebar + header.
- * Logo-only BrandMark in topbar; company switcher replaces wordmark in sidebar sb-head
+ * BrandMark (logo + Business Ultra) in topbar; company switcher in sidebar sb-head
  * (Settings keeps panel); account chip right.
  * Location: apps/web/src/components/AppShell.tsx
  */
@@ -83,7 +83,7 @@ export function AppShell({
           >
             {drawerOpen ? <X size={18} weight="regular" /> : <List size={18} weight="regular" />}
           </button>
-          <BrandMark to="/" showName={false} size="sm" />
+          <BrandMark to="/" showName size="sm" />
           {company?.status === 'archived' ? <span className="badge warn">archived</span> : null}
           {!company?.slug && subtitle ? (
             <div className="hdr-chip hdr-context" title={typeof subtitle === 'string' ? subtitle : undefined}>
