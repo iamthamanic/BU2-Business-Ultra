@@ -1,9 +1,9 @@
 /**
- * FunnelDateRangePicker — Google-Ads-style period control with presets, custom from/to, and compare.
+ * FunnelDateRangePicker — premium Google-Ads-style period + compare popover (Dark-Ops).
  * Location: apps/web/src/components/FunnelDateRangePicker.tsx
  */
 import { useEffect, useId, useRef, useState } from 'react'
-import { CalendarBlank, CaretDown } from '@phosphor-icons/react'
+import { ArrowsLeftRight, CalendarBlank, CaretDown } from '@phosphor-icons/react'
 import { useI18n } from '../lib/i18n'
 import type { MessageKey } from '../i18n/messages'
 import {
@@ -23,7 +23,6 @@ type Props = {
   value: DateRangeValue
   onChange: (next: DateRangeValue) => void
   presets: DateRangePreset[]
-  /** Optional known row dates for `all` span. */
   dates?: string[]
 }
 
@@ -70,11 +69,15 @@ export function FunnelDateRangePicker({ value, onChange, presets, dates }: Props
     return formatDisplayRange(value.from, value.to)
   }
 
+  function commit(next: DateRangeValue) {
+    onChange(next)
+    setOpen(false)
+  }
+
   function pickPreset(preset: DateRangePreset) {
     const next = withResolvedPrimary(preset, { ...draft, preset }, dates)
     setDraft(next)
-    onChange(next)
-    setOpen(false)
+    commit(next)
   }
 
   function setCompare(mode: CompareMode) {
@@ -101,23 +104,30 @@ export function FunnelDateRangePicker({ value, onChange, presets, dates }: Props
     })
   }
 
-  function applyCustom() {
+  function applyDraft() {
     if (!isValidRange(draft.from, draft.to)) return
     if (draft.compare === 'custom') {
       if (!draft.compareFrom || !draft.compareTo || !isValidRange(draft.compareFrom, draft.compareTo)) {
         return
       }
     }
-    const next = withResolvedPrimary('custom', { ...draft, preset: 'custom' }, dates)
-    onChange(next)
-    setOpen(false)
+    const next = withResolvedPrimary(draft.preset, draft, dates)
+    setDraft(next)
+    commit(next)
   }
 
   const compareResolved = resolveCompareRange(
-    draft.compare === 'off'
-      ? draft
-      : withResolvedPrimary(draft.preset, draft, dates),
+    draft.compare === 'off' ? draft : withResolvedPrimary(draft.preset, draft, dates),
   )
+
+  const summaryFrom = draft.from === 'all' ? '—' : draft.from
+  const summaryTo = draft.to === 'all' ? '—' : draft.to
+  const canApply =
+    isValidRange(draft.from, draft.to) &&
+    (draft.compare !== 'custom' ||
+      (!!draft.compareFrom &&
+        !!draft.compareTo &&
+        isValidRange(draft.compareFrom, draft.compareTo)))
 
   return (
     <div className="funnel-filter-row funnel-dr" ref={rootRef}>
@@ -127,146 +137,186 @@ export function FunnelDateRangePicker({ value, onChange, presets, dates }: Props
       </span>
       <button
         type="button"
-        className="funnel-dr-trigger chip"
+        className={`funnel-dr-trigger${open ? ' is-open' : ''}${value.compare !== 'off' ? ' has-compare' : ''}`}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? titleId : undefined}
         onClick={() => setOpen((v) => !v)}
       >
-        <span className="funnel-dr-trigger-label">{triggerLabel()}</span>
-        {value.compare !== 'off' ? (
-          <span className="funnel-dr-vs muted">{t('dateCompareShort')}</span>
-        ) : null}
-        <CaretDown size={12} weight="bold" aria-hidden />
+        <span className="funnel-dr-trigger-main">
+          <span className="funnel-dr-trigger-label">{triggerLabel()}</span>
+          {value.compare !== 'off' ? (
+            <span className="funnel-dr-vs">{t('dateCompareShort')}</span>
+          ) : null}
+        </span>
+        <CaretDown size={12} weight="bold" className="funnel-dr-caret" aria-hidden />
       </button>
 
       {open ? (
         <div className="funnel-dr-popover" role="dialog" aria-labelledby={titleId} id={titleId}>
           <div className="funnel-dr-grid">
-            <div className="funnel-dr-presets">
-              <div className="funnel-dr-section-title">{t('timeWindow')}</div>
-              {presets.map((p) => (
+            <aside className="funnel-dr-presets" aria-label={t('timeWindow')}>
+              <div className="funnel-dr-rail-title" id={titleId}>
+                {t('timeWindow')}
+              </div>
+              <div className="funnel-dr-rail-list" role="listbox">
+                {presets.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    role="option"
+                    aria-selected={draft.preset === p}
+                    className={`funnel-dr-preset${draft.preset === p ? ' is-active' : ''}`}
+                    onClick={() => pickPreset(p)}
+                  >
+                    {t(PRESET_LABEL[p as Exclude<DateRangePreset, 'custom'>])}
+                  </button>
+                ))}
                 <button
-                  key={p}
                   type="button"
-                  className={`funnel-dr-preset${draft.preset === p ? ' is-active' : ''}`}
-                  onClick={() => pickPreset(p)}
+                  role="option"
+                  aria-selected={draft.preset === 'custom'}
+                  className={`funnel-dr-preset${draft.preset === 'custom' ? ' is-active' : ''}`}
+                  onClick={() => {
+                    const r = rangeFromPreset('custom', {
+                      customFrom: draft.from === 'all' ? undefined : draft.from,
+                      customTo: draft.to === 'all' ? undefined : draft.to,
+                    })
+                    setDraft((d) => ({ ...d, preset: 'custom', from: r.from, to: r.to }))
+                  }}
                 >
-                  {t(PRESET_LABEL[p as Exclude<DateRangePreset, 'custom'>])}
+                  {t('winCustom')}
                 </button>
-              ))}
-              <button
-                type="button"
-                className={`funnel-dr-preset${draft.preset === 'custom' ? ' is-active' : ''}`}
-                onClick={() => {
-                  const r = rangeFromPreset('custom', {
-                    customFrom: draft.from,
-                    customTo: draft.to,
-                  })
-                  setDraft((d) => ({ ...d, preset: 'custom', from: r.from, to: r.to }))
-                }}
-              >
-                {t('winCustom')}
-              </button>
-            </div>
+              </div>
+            </aside>
 
-            <div className="funnel-dr-custom">
-              <div className="funnel-dr-section-title">{t('winCustom')}</div>
-              <label className="funnel-dr-field">
-                <span className="label">{t('dateFrom')}</span>
-                <input
-                  type="date"
-                  className="input"
-                  value={draft.from === 'all' ? '' : draft.from}
-                  onChange={(e) =>
-                    setDraft((d) => ({ ...d, preset: 'custom', from: e.target.value }))
-                  }
-                />
-              </label>
-              <label className="funnel-dr-field">
-                <span className="label">{t('dateTo')}</span>
-                <input
-                  type="date"
-                  className="input"
-                  value={draft.to === 'all' ? '' : draft.to}
-                  onChange={(e) =>
-                    setDraft((d) => ({ ...d, preset: 'custom', to: e.target.value }))
-                  }
-                />
-              </label>
+            <div className="funnel-dr-panel">
+              <div className="funnel-dr-summary" aria-live="polite">
+                <CalendarBlank size={16} weight="duotone" aria-hidden />
+                <span className="funnel-dr-summary-text">
+                  {formatDisplayRange(
+                    summaryFrom === '—' ? draft.from : summaryFrom,
+                    summaryTo === '—' ? draft.to : summaryTo,
+                  )}
+                </span>
+              </div>
 
-              <label className="funnel-dr-compare-toggle">
-                <input
-                  type="checkbox"
-                  checked={draft.compare !== 'off'}
-                  onChange={(e) => setCompare(e.target.checked ? 'previous' : 'off')}
-                />
-                <span>{t('dateCompare')}</span>
-              </label>
+              <div className="funnel-dr-dates">
+                <label className="funnel-dr-field">
+                  <span className="funnel-dr-field-lbl">{t('dateFrom')}</span>
+                  <input
+                    type="date"
+                    className="input funnel-dr-date"
+                    value={draft.from === 'all' ? '' : draft.from}
+                    onChange={(e) =>
+                      setDraft((d) => ({ ...d, preset: 'custom', from: e.target.value }))
+                    }
+                  />
+                </label>
+                <span className="funnel-dr-date-sep" aria-hidden>
+                  →
+                </span>
+                <label className="funnel-dr-field">
+                  <span className="funnel-dr-field-lbl">{t('dateTo')}</span>
+                  <input
+                    type="date"
+                    className="input funnel-dr-date"
+                    value={draft.to === 'all' ? '' : draft.to}
+                    onChange={(e) =>
+                      setDraft((d) => ({ ...d, preset: 'custom', to: e.target.value }))
+                    }
+                  />
+                </label>
+              </div>
 
-              {draft.compare !== 'off' ? (
-                <div className="funnel-dr-compare-modes">
-                  {(
-                    [
-                      ['previous', 'dateComparePrev'],
-                      ['previousYear', 'dateCompareYear'],
-                      ['custom', 'dateCompareCustom'],
-                    ] as const
-                  ).map(([mode, key]) => (
-                    <label key={mode} className="funnel-dr-compare-mode">
-                      <input
-                        type="radio"
-                        name="funnel-dr-compare"
-                        checked={draft.compare === mode}
-                        onChange={() => setCompare(mode)}
-                      />
-                      <span>{t(key)}</span>
-                    </label>
-                  ))}
-                  {draft.compare === 'custom' ? (
-                    <>
-                      <label className="funnel-dr-field">
-                        <span className="label">{t('dateFrom')}</span>
-                        <input
-                          type="date"
-                          className="input"
-                          value={draft.compareFrom || ''}
-                          onChange={(e) =>
-                            setDraft((d) => ({ ...d, compareFrom: e.target.value }))
-                          }
-                        />
-                      </label>
-                      <label className="funnel-dr-field">
-                        <span className="label">{t('dateTo')}</span>
-                        <input
-                          type="date"
-                          className="input"
-                          value={draft.compareTo || ''}
-                          onChange={(e) =>
-                            setDraft((d) => ({ ...d, compareTo: e.target.value }))
-                          }
-                        />
-                      </label>
-                    </>
-                  ) : compareResolved ? (
-                    <p className="muted funnel-dr-compare-hint">
-                      {formatDisplayRange(compareResolved.from, compareResolved.to)}
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
+              <div className="funnel-dr-compare">
+                <button
+                  type="button"
+                  className={`funnel-dr-compare-switch${draft.compare !== 'off' ? ' is-on' : ''}`}
+                  role="switch"
+                  aria-checked={draft.compare !== 'off'}
+                  onClick={() => setCompare(draft.compare === 'off' ? 'previous' : 'off')}
+                >
+                  <span className="funnel-dr-compare-switch-track" aria-hidden>
+                    <span className="funnel-dr-compare-switch-knob" />
+                  </span>
+                  <span className="funnel-dr-compare-switch-label">
+                    <ArrowsLeftRight size={14} weight="bold" aria-hidden />
+                    {t('dateCompare')}
+                  </span>
+                </button>
+
+                {draft.compare !== 'off' ? (
+                  <div className="funnel-dr-compare-body">
+                    <div className="funnel-dr-seg" role="radiogroup" aria-label={t('dateCompare')}>
+                      {(
+                        [
+                          ['previous', 'dateComparePrev'],
+                          ['previousYear', 'dateCompareYear'],
+                          ['custom', 'dateCompareCustom'],
+                        ] as const
+                      ).map(([mode, key]) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          role="radio"
+                          aria-checked={draft.compare === mode}
+                          className={`funnel-dr-seg-btn${draft.compare === mode ? ' is-active' : ''}`}
+                          onClick={() => setCompare(mode)}
+                        >
+                          {t(key)}
+                        </button>
+                      ))}
+                    </div>
+
+                    {draft.compare === 'custom' ? (
+                      <div className="funnel-dr-dates funnel-dr-dates--cmp">
+                        <label className="funnel-dr-field">
+                          <span className="funnel-dr-field-lbl">{t('dateFrom')}</span>
+                          <input
+                            type="date"
+                            className="input funnel-dr-date"
+                            value={draft.compareFrom || ''}
+                            onChange={(e) =>
+                              setDraft((d) => ({ ...d, compareFrom: e.target.value }))
+                            }
+                          />
+                        </label>
+                        <span className="funnel-dr-date-sep" aria-hidden>
+                          →
+                        </span>
+                        <label className="funnel-dr-field">
+                          <span className="funnel-dr-field-lbl">{t('dateTo')}</span>
+                          <input
+                            type="date"
+                            className="input funnel-dr-date"
+                            value={draft.compareTo || ''}
+                            onChange={(e) =>
+                              setDraft((d) => ({ ...d, compareTo: e.target.value }))
+                            }
+                          />
+                        </label>
+                      </div>
+                    ) : compareResolved ? (
+                      <p className="funnel-dr-compare-hint">
+                        {formatDisplayRange(compareResolved.from, compareResolved.to)}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
 
           <div className="funnel-dr-actions">
-            <button type="button" className="btn" onClick={() => setOpen(false)}>
+            <button type="button" className="btn ghost" onClick={() => setOpen(false)}>
               {t('dateRangeCancel')}
             </button>
             <button
               type="button"
               className="btn primary"
-              disabled={!isValidRange(draft.from, draft.to)}
-              onClick={applyCustom}
+              disabled={!canApply}
+              onClick={applyDraft}
             >
               {t('dateRangeApply')}
             </button>

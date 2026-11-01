@@ -2445,8 +2445,47 @@ select {
 }
 
 .funnel-dr-trigger {
+  appearance: none;
+  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(300px, 58vw);
+  height: 32px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color var(--dur) var(--ease-out),
+    background var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out);
+}
+
+.funnel-dr-trigger:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+
+.funnel-dr-trigger.is-open,
+.funnel-dr-trigger:focus-visible {
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
+  outline: none;
+}
+
+.funnel-dr-trigger.has-compare {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
+.funnel-dr-trigger-main {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
-  max-width: min(280px, 55vw);
+  min-width: 0;
 }
 
 .funnel-dr-trigger-label {
@@ -2456,40 +2495,89 @@ select {
 }
 
 .funnel-dr-vs {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: color-mix(in srgb, var(--accent) 85%, #fff);
   font-size: 10px;
-  text-transform: lowercase;
-  letter-spacing: 0.02em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.funnel-dr-caret {
+  flex-shrink: 0;
+  color: var(--dim);
+  transition: transform 0.16s var(--ease-out);
+}
+
+.funnel-dr-trigger.is-open .funnel-dr-caret {
+  transform: rotate(180deg);
 }
 
 .funnel-dr-popover {
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(100% + 8px);
   left: 0;
   z-index: 50;
-  width: min(520px, calc(100vw - 48px));
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--panel);
-  box-shadow: 0 12px 32px #00000077;
+  width: min(580px, calc(100vw - 40px));
+  padding: 0;
+  border: 1px solid var(--border-strong, var(--border));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--panel) 96%, #0a1018);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, #fff 4%, transparent),
+    0 18px 48px #00000088;
+  overflow: hidden;
+  animation: funnel-dr-in 0.16s var(--ease-out);
+}
+
+@keyframes funnel-dr-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .funnel-dr-popover {
+    animation: none;
+  }
+  .funnel-dr-caret {
+    transition: none;
+  }
 }
 
 .funnel-dr-grid {
   display: grid;
-  grid-template-columns: 140px 1fr;
-  gap: 12px 16px;
-}
-
-.funnel-dr-section-title {
-  font-size: 11px;
-  font-weight: 650;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--dim);
-  margin-bottom: 6px;
+  grid-template-columns: 168px 1fr;
+  min-height: 280px;
 }
 
 .funnel-dr-presets {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 14px 10px;
+  border-right: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel2) 70%, transparent);
+}
+
+.funnel-dr-rail-title {
+  padding: 0 8px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.funnel-dr-rail-list {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -2498,73 +2586,242 @@ select {
 .funnel-dr-preset {
   appearance: none;
   font: inherit;
+  position: relative;
   text-align: left;
-  padding: 7px 8px;
+  padding: 9px 10px 9px 12px;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text);
+  color: color-mix(in srgb, var(--text) 88%, var(--dim));
   font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
+  transition: background 0.12s var(--ease-out), color 0.12s var(--ease-out);
 }
 
-.funnel-dr-preset:hover,
+.funnel-dr-preset:hover {
+  background: color-mix(in srgb, var(--panel) 55%, transparent);
+  color: var(--text);
+}
+
 .funnel-dr-preset.is-active {
-  background: color-mix(in srgb, var(--accent) 14%, var(--panel2));
+  background: color-mix(in srgb, var(--accent) 16%, var(--panel));
+  color: var(--text);
+  font-weight: 650;
 }
 
-.funnel-dr-custom {
+.funnel-dr-preset.is-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 7px;
+  bottom: 7px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.funnel-dr-panel {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 14px;
+  padding: 16px 16px 4px;
   min-width: 0;
+}
+
+.funnel-dr-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel2));
+  color: var(--dim);
+}
+
+.funnel-dr-summary-text {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.funnel-dr-dates {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 8px;
+  align-items: end;
+}
+
+.funnel-dr-dates--cmp {
+  margin-top: 2px;
+}
+
+.funnel-dr-date-sep {
+  padding-bottom: 10px;
+  color: var(--dim);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .funnel-dr-field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
+  min-width: 0;
 }
 
-.funnel-dr-compare-toggle {
+.funnel-dr-field-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.funnel-dr-date {
+  width: 100%;
+  min-height: 36px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color-scheme: dark;
+}
+
+.funnel-dr-compare {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.funnel-dr-compare-switch {
+  appearance: none;
+  font: inherit;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 4px;
-  font-size: 13px;
+  gap: 10px;
+  width: fit-content;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
   cursor: pointer;
 }
 
-.funnel-dr-compare-modes {
+.funnel-dr-compare-switch-track {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  transition: background 0.15s var(--ease-out), border-color 0.15s var(--ease-out);
+}
+
+.funnel-dr-compare-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--dim);
+  transition: transform 0.15s var(--ease-out), background 0.15s var(--ease-out);
+}
+
+.funnel-dr-compare-switch.is-on .funnel-dr-compare-switch-track {
+  background: color-mix(in srgb, var(--accent) 35%, var(--panel2));
+  border-color: var(--accent-border);
+}
+
+.funnel-dr-compare-switch.is-on .funnel-dr-compare-switch-knob {
+  transform: translateX(14px);
+  background: #fff;
+}
+
+.funnel-dr-compare-switch-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.funnel-dr-compare-body {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 8px;
+  gap: 10px;
+  padding: 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--panel2);
 }
 
-.funnel-dr-compare-mode {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12.5px;
+.funnel-dr-seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 4px;
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--panel) 80%, #000);
+  border: 1px solid var(--border);
+}
+
+.funnel-dr-seg-btn {
+  appearance: none;
+  font: inherit;
+  padding: 7px 6px;
+  border: 0;
+  border-radius: calc(var(--radius-sm) - 1px);
+  background: transparent;
+  color: var(--dim);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.2;
   cursor: pointer;
+  transition: background 0.12s var(--ease-out), color 0.12s var(--ease-out);
+}
+
+.funnel-dr-seg-btn:hover {
+  color: var(--text);
+}
+
+.funnel-dr-seg-btn.is-active {
+  background: color-mix(in srgb, var(--accent) 22%, var(--panel));
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 .funnel-dr-compare-hint {
   margin: 0;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--panel) 55%, transparent);
+  color: var(--dim);
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 .funnel-dr-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 12px;
-  padding-top: 10px;
+  padding: 12px 16px 14px;
   border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel2) 45%, transparent);
+}
+
+.funnel-dr-actions .btn.ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--dim);
+}
+
+.funnel-dr-actions .btn.ghost:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--panel2) 70%, transparent);
 }
 
 .funnel-kpi-delta {
@@ -2588,6 +2845,23 @@ select {
 
 @media (max-width: 640px) {
   .funnel-dr-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .funnel-dr-presets {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .funnel-dr-dates {
+    grid-template-columns: 1fr;
+  }
+
+  .funnel-dr-date-sep {
+    display: none;
+  }
+
+  .funnel-dr-seg {
     grid-template-columns: 1fr;
   }
 }
