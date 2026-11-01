@@ -128,17 +128,13 @@ export function MarketingPage() {
           <h1 className="page-title" style={{ margin: 0 }}>
             {channelLabel}
           </h1>
-          <p className="muted page-lede">
-            {isCustom ? t('navCustom') : t('navOrganic')} · Master draft + {t('variants')} · Metricool /
-            Brevo
-          </p>
         </div>
         <div className="row funnel-gates">
           <span className={`badge ${gate ? 'ok' : 'warn'}`}>
-            Metricool {gate ? 'ready' : t('keyRequired')}
+            Metricool {gate ? t('statusReady') : t('keyRequired')}
           </span>
           <span className={`badge ${brevoGate ? 'ok' : 'warn'}`}>
-            Brevo {brevoGate ? 'ready' : t('keyRequired')}
+            Brevo {brevoGate ? t('statusReady') : t('keyRequired')}
           </span>
         </div>
       </header>

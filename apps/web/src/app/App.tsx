@@ -16,7 +16,7 @@ import { VerifyPage } from '../features/auth/VerifyPage'
 import { HomePage } from '../features/business/HomePage'
 import { BusinessShell } from '../components/BusinessShell'
 import { CatalogPage } from '../features/catalog/CatalogPage'
-import { MarketingHubPage } from '../features/marketing/MarketingHubPage'
+import { MarketingShell } from '../features/marketing/MarketingShell'
 import { MarketingPage } from '../features/marketing/MarketingPage'
 import { AdsPage } from '../features/ads/AdsPage'
 import { CmbPage } from '../features/cmb/CmbPage'
@@ -105,23 +105,27 @@ export function App() {
       <Route path="/b/:slug/*" element={<LegacyBu2Redirect />} />
 
       <Route path="/co/:slug" element={authedShell}>
-        {/* Default company landing = Marketing Hub */}
+        {/* Default company landing = Marketing */}
         <Route index element={<CoRedirect to="marketing" />} />
         <Route path="catalog" element={<CatalogPage />} />
 
-        <Route path="marketing" element={<MarketingHubPage />} />
-        <Route path="marketing/funnel/organic/:channel" element={<MarketingPage />} />
-        <Route
-          path="marketing/funnel/organic"
-          element={<CoRedirect to={`marketing/funnel/organic/${DEFAULT_ORGANIC_CHANNEL}`} />}
-        />
-        <Route path="marketing/funnel/custom/:channel" element={<MarketingPage />} />
-        <Route path="marketing/funnel/custom" element={<CoRedirect to="marketing/funnel/custom/email" />} />
-        <Route path="marketing/funnel/paid/:channel" element={<AdsPage />} />
-        <Route
-          path="marketing/funnel/paid"
-          element={<CoRedirect to={`marketing/funnel/paid/${DEFAULT_PAID_CHANNEL}`} />}
-        />
+        <Route path="marketing" element={<MarketingShell />}>
+          <Route
+            index
+            element={<Navigate to={`funnel/organic/${DEFAULT_ORGANIC_CHANNEL}`} replace />}
+          />
+          <Route path="personas" element={<PersonasPage />} />
+          <Route path="funnel/organic/website" element={<OpenSeoPage />} />
+          <Route path="funnel/organic/:channel" element={<MarketingPage />} />
+          <Route
+            path="funnel/organic"
+            element={<Navigate to={DEFAULT_ORGANIC_CHANNEL} replace />}
+          />
+          <Route path="funnel/custom/:channel" element={<MarketingPage />} />
+          <Route path="funnel/custom" element={<Navigate to="email" replace />} />
+          <Route path="funnel/paid/:channel" element={<AdsPage />} />
+          <Route path="funnel/paid" element={<Navigate to={DEFAULT_PAID_CHANNEL} replace />} />
+        </Route>
 
         <Route path="tools/cmb/*" element={<CmbPage />} />
         <Route path="tools/cmb" element={<CmbPage />} />
@@ -130,14 +134,20 @@ export function App() {
         <Route path="tools/checkmap/m/:mapId" element={<CheckMapPage />} />
         <Route path="tools/checkmap/*" element={<CheckMapPage />} />
         <Route path="tools/checkmap" element={<CheckMapPage />} />
-        <Route path="tools/persona-journey/*" element={<PersonasPage />} />
-        <Route path="tools/persona-journey" element={<PersonasPage />} />
-        <Route path="tools/personas/*" element={<CoRedirect to="tools/persona-journey" />} />
-        <Route path="tools/personas" element={<CoRedirect to="tools/persona-journey" />} />
-        <Route path="tools/seo/*" element={<OpenSeoPage />} />
-        <Route path="tools/seo" element={<OpenSeoPage />} />
-        <Route path="tools/geo/*" element={<OpenSeoPage />} />
-        <Route path="tools/geo" element={<OpenSeoPage />} />
+        <Route path="tools/persona-journey/*" element={<CoRedirect to="marketing/personas" />} />
+        <Route path="tools/persona-journey" element={<CoRedirect to="marketing/personas" />} />
+        <Route path="tools/personas/*" element={<CoRedirect to="marketing/personas" />} />
+        <Route path="tools/personas" element={<CoRedirect to="marketing/personas" />} />
+        <Route path="tools/seo/*" element={<CoRedirect to="marketing/funnel/organic/website" />} />
+        <Route path="tools/seo" element={<CoRedirect to="marketing/funnel/organic/website" />} />
+        <Route
+          path="tools/geo/*"
+          element={<CoRedirect to="marketing/funnel/organic/website?surface=geo" />}
+        />
+        <Route
+          path="tools/geo"
+          element={<CoRedirect to="marketing/funnel/organic/website?surface=geo" />}
+        />
 
         <Route path="settings" element={<SettingsPage />} />
 
@@ -147,9 +157,9 @@ export function App() {
         <Route path="c/:channel" element={<CoRedirectOrganic />} />
         <Route path="cmb" element={<CoRedirect to="tools/cmb" />} />
         <Route path="checkmap" element={<CoRedirect to="tools/checkmap" />} />
-        <Route path="personas" element={<CoRedirect to="tools/persona-journey" />} />
+        <Route path="personas" element={<CoRedirect to="marketing/personas" />} />
         <Route path="sortanize" element={<CoRedirect to="tools/sortanize" />} />
-        <Route path="openseo" element={<CoRedirect to="tools/seo" />} />
+        <Route path="openseo" element={<CoRedirect to="marketing/funnel/organic/website" />} />
         <Route path="overview" element={<CoRedirect to="marketing" />} />
       </Route>
 

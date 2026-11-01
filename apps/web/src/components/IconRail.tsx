@@ -1,7 +1,7 @@
 /**
  * IconRail / Sidebar — legacy-parity collapsible left nav (slim icons ↔ expanded labels).
- * Supports department groups + nested funnel subgroups (Organic/Paid/Custom) with session persistence;
- * collapse toggle + wordmark in sb-head; settings/admin/lang/logout in footer. Logo stays in topbar.
+ * Supports department groups (e.g. Tools) with session persistence; Marketing is a flat rail item.
+ * Collapse toggle + wordmark in sb-head; settings/admin/lang/logout in footer. Logo stays in topbar.
  * Location: apps/web/src/components/IconRail.tsx
  */
 import { useEffect, useState } from 'react'

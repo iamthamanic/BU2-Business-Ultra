@@ -4,10 +4,10 @@
  */
 
 export const DEFAULT_ORGANIC_CHANNEL = 'instagram'
-export const DEFAULT_PAID_CHANNEL = 'google'
+export const DEFAULT_PAID_CHANNEL = 'meta'
 export const DEFAULT_CUSTOM_CHANNEL = 'email'
 
-/** Legacy organic channel order (sidebar Organic Funnel). */
+/** Organic social channels (Website is separate tab key `website`). */
 export const ORGANIC_CHANNELS = [
   'instagram',
   'facebook',
@@ -16,31 +16,48 @@ export const ORGANIC_CHANNELS = [
   'youtube',
 ] as const
 
-/** Legacy paid channel keys used in `/marketing/funnel/paid/:channel`. */
-export const PAID_CHANNELS = ['google', 'meta', 'tiktok', 'chatgpt'] as const
+/** Organic tertiary tabs including Website (SEO surface). */
+export const ORGANIC_TABS = [...ORGANIC_CHANNELS, 'website'] as const
+
+/**
+ * Paid channel order for Marketing tabs.
+ * Route segment → provider id mapped in AdsPage.
+ */
+export const PAID_CHANNELS = [
+  'meta',
+  'google',
+  'tiktok',
+  'linkedin',
+  'chatgpt',
+  'microsoft',
+] as const
 
 /** Legacy custom funnel channels. */
 export const CUSTOM_CHANNELS = ['email', 'offline'] as const
 
 export type OrganicChannel = (typeof ORGANIC_CHANNELS)[number]
+export type OrganicTab = (typeof ORGANIC_TABS)[number]
 export type PaidChannel = (typeof PAID_CHANNELS)[number]
 export type CustomChannel = (typeof CUSTOM_CHANNELS)[number]
+export type FunnelKind = 'organic' | 'paid' | 'custom'
+export type MarketingTopTab = 'funnel' | 'personas'
 
 /** Build `/co/:slug` base (no trailing slash). */
 export function companyBase(slug: string) {
   return `/co/${encodeURIComponent(slug)}`
 }
 
-/** Canonical user-facing paths under a company (Marketing Hub default landing). */
+/** Canonical user-facing paths under a company (Marketing default landing). */
 export function companyRoutes(slug: string) {
   const base = companyBase(slug)
   return {
-    /** Marketing Hub — default company landing */
+    /** Marketing shell — default company landing */
     hub: `${base}/marketing`,
     /** Alias kept for older call sites; same as hub */
     overview: `${base}/marketing`,
     catalog: `${base}/catalog`,
     marketing: `${base}/marketing`,
+    marketingPersonas: `${base}/marketing/personas`,
     organic: (ch: string) => `${base}/marketing/funnel/organic/${ch}`,
     ads: `${base}/marketing/funnel/paid/${DEFAULT_PAID_CHANNEL}`,
     paid: (ch: string) => `${base}/marketing/funnel/paid/${ch}`,
@@ -49,13 +66,60 @@ export function companyRoutes(slug: string) {
     cmb: `${base}/tools/cmb`,
     sortanize: `${base}/tools/sortanize`,
     checkmap: `${base}/tools/checkmap`,
-    personas: `${base}/tools/persona-journey`,
-    /** SEO/GEO keep tools/* URLs for API/bookmark compatibility; nav under Marketing */
-    openseo: `${base}/tools/seo`,
-    geo: `${base}/tools/geo`,
+    /** Persona Journey lives under Marketing tabs */
+    personas: `${base}/marketing/personas`,
+    /** Website / SEO under Organic → Website */
+    openseo: `${base}/marketing/funnel/organic/website`,
+    geo: `${base}/marketing/funnel/organic/website?surface=geo`,
     settings: `${base}/settings`,
     settingsConnections: `${base}/settings#connections`,
   } as const
+}
+
+/**
+ * Parse `/co/:slug/marketing/...` into tab state for MarketingShell.
+ */
+export function parseMarketingLocation(pathname: string): {
+  top: MarketingTopTab
+  funnel: FunnelKind
+  channel: string
+} {
+  const m = pathname.match(/\/co\/[^/]+\/marketing(?:\/(.*))?$/)
+  const rest = (m?.[1] || '').replace(/\/+$/, '')
+  if (!rest || rest === '') {
+    return { top: 'funnel', funnel: 'organic', channel: DEFAULT_ORGANIC_CHANNEL }
+  }
+  if (rest === 'personas' || rest.startsWith('personas/')) {
+    return { top: 'personas', funnel: 'organic', channel: DEFAULT_ORGANIC_CHANNEL }
+  }
+  const parts = rest.split('/')
+  if (parts[0] === 'funnel' && parts[1] && parts[2]) {
+    const funnel = parts[1] as FunnelKind
+    if (funnel === 'organic' || funnel === 'paid' || funnel === 'custom') {
+      return { top: 'funnel', funnel, channel: parts[2].toLowerCase() }
+    }
+  }
+  return { top: 'funnel', funnel: 'organic', channel: DEFAULT_ORGANIC_CHANNEL }
+}
+
+/** Build path for a Marketing tab selection. */
+export function marketingPath(
+  slug: string,
+  sel: { top: MarketingTopTab; funnel?: FunnelKind; channel?: string },
+): string {
+  const routes = companyRoutes(slug)
+  if (sel.top === 'personas') return routes.marketingPersonas
+  const funnel = sel.funnel ?? 'organic'
+  const channel =
+    sel.channel ??
+    (funnel === 'paid'
+      ? DEFAULT_PAID_CHANNEL
+      : funnel === 'custom'
+        ? DEFAULT_CUSTOM_CHANNEL
+        : DEFAULT_ORGANIC_CHANNEL)
+  if (funnel === 'paid') return routes.paid(channel)
+  if (funnel === 'custom') return routes.customCh(channel)
+  return routes.organic(channel)
 }
 
 /**

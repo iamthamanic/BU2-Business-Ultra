@@ -666,7 +666,8 @@ select {
   color: var(--sb-ic, var(--dim));
 }
 
-.sb-item[data-ic='overview'] {
+.sb-item[data-ic='overview'],
+.sb-item[data-ic='marketing'] {
   --sb-ic: #60a5fa;
 }
 .sb-item[data-ic='instagram'] {
@@ -1952,6 +1953,86 @@ select {
 }
 
 .co-settings-pane {
+  min-width: 0;
+}
+
+/* Marketing tab shell — Dark-Ops layered tabs */
+.mkt-shell {
+  gap: 12px;
+}
+
+.mkt-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: flex-end;
+}
+
+.mkt-tabs-l1 {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0;
+}
+
+.mkt-tabs-l2 {
+  gap: 6px;
+}
+
+.mkt-tabs-l3,
+.mkt-tabs-surface {
+  gap: 4px;
+  padding: 2px;
+  background: color-mix(in srgb, var(--panel) 80%, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  width: fit-content;
+  max-width: 100%;
+}
+
+.mkt-tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--dim);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mkt-tabs-l1 .mkt-tab {
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.mkt-tab:hover {
+  color: var(--text);
+}
+
+.mkt-tab.active {
+  color: var(--text);
+}
+
+.mkt-tabs-l1 .mkt-tab.active {
+  border-bottom-color: var(--accent);
+}
+
+.mkt-tabs-l2 .mkt-tab.active {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--text);
+}
+
+.mkt-tabs-l3 .mkt-tab.active,
+.mkt-tabs-surface .mkt-tab.active {
+  background: var(--panel-2, var(--panel));
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.mkt-pane {
   min-width: 0;
 }
 
