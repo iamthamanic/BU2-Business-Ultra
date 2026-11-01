@@ -23,6 +23,12 @@ import {
 } from '../../lib/integrations/metricool.js'
 import { createEmailCampaign, sendEmailCampaignNow } from '../../lib/integrations/brevo.js'
 import { loadEnv } from '../../lib/env.js'
+import {
+  emptyOrganicPosts,
+  isOrganicChannel,
+  organicSurface,
+  resolveFunnelSource,
+} from '../../lib/funnel-source.js'
 
 export async function marketingRoutes(app: FastifyInstance) {
   app.get('/api/b/:slug/marketing/capabilities', async (req, reply) => {
@@ -31,6 +37,50 @@ export async function marketingRoutes(app: FastifyInstance) {
     const m = await loadMembership(user.id, slug)
     if (!m) return reply.code(404).send({ error: 'not_found' })
     return { networks: NETWORK_CAPABILITIES }
+  })
+
+  /**
+   * Funnel connector status for a surface (`organic.instagram`, `paid.meta`, …).
+   * Response: { surface, provider, status, implemented, keyReady, brandsLinked,
+   *   blogIds, integrationId, brandLabel, contentReady, needs, message? }
+   */
+  app.get('/api/b/:slug/marketing/funnel-source/:surface', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug, surface } = req.params as { slug: string; surface: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m) return reply.code(404).send({ error: 'not_found' })
+    const decoded = decodeURIComponent(surface)
+    return resolveFunnelSource(m.businessId, decoded)
+  })
+
+  /**
+   * Organic channel depth — connector + posts table payload (Legacy IA).
+   * Posts array is empty stub until live Metricool analytics sync exists;
+   * shape matches Legacy dashboard columns so the UI stays honest.
+   * Response: { channel, surface, connector, posts, window, mode, generatedAt }
+   */
+  app.get('/api/b/:slug/marketing/funnel/organic/:channel', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug, channel } = req.params as { slug: string; channel: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m) return reply.code(404).send({ error: 'not_found' })
+    const ch = channel.toLowerCase()
+    if (!isOrganicChannel(ch)) {
+      return reply.code(400).send({ error: 'unknown_channel', channel: ch })
+    }
+    const surface = organicSurface(ch)
+    const connector = await resolveFunnelSource(m.businessId, surface)
+    const q = req.query as { window?: string }
+    const window = ['24h', '7d', '30d', 'all'].includes(q.window || '') ? q.window! : '30d'
+    return {
+      channel: ch,
+      surface,
+      connector,
+      posts: emptyOrganicPosts(),
+      window,
+      mode: 'stub' as const,
+      generatedAt: new Date().toISOString(),
+    }
   })
 
   app.get('/api/b/:slug/marketing/brands', async (req, reply) => {

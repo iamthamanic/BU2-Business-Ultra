@@ -1,41 +1,94 @@
 /**
- * MarketingPage — organic + custom funnel surface; channel from route params.
- * Empty/list chrome aligned with legacy funnel panels (gates, drafts, Brevo).
- * Location: apps/web/src/features/marketing/MarketingPage.tsx
+ * MarketingPage — organic + custom funnel channel depth (Legacy IA).
+ * Missing integrations → FunnelConnectGate; connected → posts/campaigns tables.
+ * Netzwerk-Fähigkeiten demoted to secondary disclosure. Location: apps/web/src/features/marketing/MarketingPage.tsx
  */
-import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { api } from '../../lib/api'
+import { companyRoutes } from '../../lib/companyPaths'
 import { useI18n } from '../../lib/i18n'
+import { FunnelConnectGate } from './FunnelConnectGate'
+import { OrganicPostsPanel, type OrganicPost } from './OrganicPostsPanel'
+
+type Connector = {
+  surface: string
+  provider: string
+  status: string
+  implemented: boolean
+  keyReady: boolean
+  brandsLinked: number
+  blogIds: string[]
+  integrationId: string | null
+  brandLabel: string | null
+  contentReady: boolean
+  needs: 'key' | 'brand' | null
+  message?: string
+}
+
+type OrganicPayload = {
+  channel: string
+  surface: string
+  connector: Connector
+  posts: OrganicPost[]
+  window: string
+  mode: 'live' | 'stub'
+  generatedAt: string
+}
 
 export function MarketingPage() {
   const { slug, channel } = useParams()
+  const { pathname } = useLocation()
   const { t } = useI18n()
   const ch = (channel || 'instagram').toLowerCase()
+  const isCustom = pathname.includes('/funnel/custom/')
+  const isEmail = isCustom && ch === 'email'
+  const isOffline = isCustom && ch === 'offline'
+
+  const [organic, setOrganic] = useState<OrganicPayload | null>(null)
   const [drafts, setDrafts] = useState<any[]>([])
   const [title, setTitle] = useState('')
   const [text, setText] = useState('')
-  const [gate, setGate] = useState(false)
   const [brevoGate, setBrevoGate] = useState(false)
   const [campaigns, setCampaigns] = useState<any[]>([])
   const [caps, setCaps] = useState<any[]>([])
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(true)
+  const [win, setWin] = useState<'24h' | '7d' | '30d' | 'all'>('30d')
+
+  const settingsHref = slug ? companyRoutes(slug).settingsConnections : '#'
+  const channelLabel = channelDisplay(ch, t, isCustom)
+
+  async function refreshOrganic(windowKey = win) {
+    if (!slug || isCustom) return
+    const r = await api<OrganicPayload>(
+      `/api/b/${slug}/marketing/funnel/organic/${ch}?window=${windowKey}`,
+    )
+    setOrganic(r)
+  }
 
   async function refresh() {
     setLoading(true)
     try {
-      const [d, g, b, c, cap] = await Promise.all([
+      if (isOffline) {
+        setOrganic(null)
+        return
+      }
+      if (isEmail) {
+        const [b, c] = await Promise.all([
+          api<{ ready: boolean }>(`/api/b/${slug}/integrations/brevo/ready`),
+          api<{ campaigns: any[] }>(`/api/b/${slug}/marketing/brevo`),
+        ])
+        setBrevoGate(b.ready)
+        setCampaigns(c.campaigns)
+        return
+      }
+      const [d, cap] = await Promise.all([
         api<{ drafts: any[] }>(`/api/b/${slug}/marketing/drafts`),
-        api<{ ready: boolean }>(`/api/b/${slug}/integrations/metricool/ready`),
-        api<{ ready: boolean }>(`/api/b/${slug}/integrations/brevo/ready`),
-        api<{ campaigns: any[] }>(`/api/b/${slug}/marketing/brevo`),
         api<{ networks: any[] }>(`/api/b/${slug}/marketing/capabilities`),
       ])
+      await refreshOrganic(win)
       setDrafts(d.drafts)
-      setGate(g.ready)
-      setBrevoGate(b.ready)
-      setCampaigns(c.campaigns)
       setCaps(cap.networks)
     } finally {
       setLoading(false)
@@ -44,7 +97,16 @@ export function MarketingPage() {
 
   useEffect(() => {
     refresh().catch(console.error)
-  }, [slug])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh on route/window
+  }, [slug, ch, isCustom, isEmail, isOffline, win])
+
+  const connectorLabel = useMemo(() => {
+    if (!organic?.connector) return 'Metricool'
+    const c = organic.connector
+    if (!c.contentReady) return c.message || 'Metricool'
+    const blog = c.blogIds[0]
+    return blog ? `Metricool · ${c.brandLabel || blog}` : 'Metricool'
+  }, [organic])
 
   async function createDraft() {
     await api(`/api/b/${slug}/marketing/drafts`, {
@@ -52,12 +114,15 @@ export function MarketingPage() {
       body: JSON.stringify({
         title,
         masterText: text,
-        variants: caps.filter((c) => c.canSchedule).slice(0, 5).map((c) => ({
-          network: c.network,
-          text,
-          enabled: true,
-          mediaKind: c.supportsVideo && !c.supportsImage ? 'video' : 'text',
-        })),
+        variants: caps
+          .filter((c) => c.canSchedule)
+          .slice(0, 5)
+          .map((c) => ({
+            network: c.network,
+            text,
+            enabled: true,
+            mediaKind: c.supportsVideo && !c.supportsImage ? 'video' : 'text',
+          })),
       }),
     })
     setTitle('')
@@ -115,27 +180,230 @@ export function MarketingPage() {
     }
   }
 
+  if (isOffline) {
+    return (
+      <div className="stack funnel-page">
+        <FunnelConnectGate
+          providerLabel={t('offlineFlyer')}
+          need="stub"
+          settingsHref={settingsHref}
+          channelLabel={channelLabel}
+          hint={t('offlineStubBody')}
+        />
+      </div>
+    )
+  }
+
+  if (isEmail) {
+    if (loading) {
+      return (
+        <div className="stack funnel-page">
+          <p className="muted">{t('loading')}</p>
+        </div>
+      )
+    }
+    if (!brevoGate) {
+      return (
+        <div className="stack funnel-page">
+          <FunnelConnectGate
+            providerLabel="Brevo"
+            need="key"
+            settingsHref={settingsHref}
+            channelLabel={channelLabel}
+          />
+        </div>
+      )
+    }
+    return (
+      <div className="stack funnel-page">
+        <div className="mkt-pane-toolbar">
+          <p className="muted page-lede" style={{ margin: 0 }}>
+            Connector: Brevo
+          </p>
+          <span className="badge ok">Brevo {t('statusReady')}</span>
+        </div>
+        <div className="panel stack">
+          <input
+            className="input"
+            placeholder={t('draftTitlePh')}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+          <textarea
+            className="textarea"
+            placeholder={t('draftTextPh')}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+          <button className="btn primary" type="button" onClick={createBrevo}>
+            {t('saveDraft')}
+          </button>
+        </div>
+        <div className="panel">
+          <h3 className="section-title" style={{ marginTop: 0 }}>
+            Brevo
+          </h3>
+          {campaigns.length === 0 ? (
+            <div className="state-block empty-state funnel-empty">
+              <p className="muted">{t('noCampaigns')}</p>
+              <p className="muted" style={{ fontSize: 13 }}>
+                {t('funnelEmptyHint')}
+              </p>
+            </div>
+          ) : (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>{t('name')}</th>
+                  <th>{t('status')}</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {campaigns.map((c) => (
+                  <tr key={c.id}>
+                    <td>{c.name}</td>
+                    <td>{c.status}</td>
+                    <td>
+                      <button className="btn danger" type="button" onClick={() => sendBrevo(c.id)}>
+                        {t('send')}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        {msg ? <pre className="panel muted">{msg}</pre> : null}
+      </div>
+    )
+  }
+
+  // Organic channels
+  const need = organic?.connector.needs
+  const contentReady = !!organic?.connector.contentReady
+
+  if (loading && !organic) {
+    return (
+      <div className="stack funnel-page">
+        <p className="muted">{t('loading')}</p>
+      </div>
+    )
+  }
+
+  if (need === 'key' || need === 'brand') {
+    return (
+      <div className="stack funnel-page">
+        <FunnelConnectGate
+          providerLabel="Metricool"
+          need={need}
+          settingsHref={settingsHref}
+          channelLabel={channelLabel}
+        />
+      </div>
+    )
+  }
+
+  const emptyHint =
+    organic?.connector.brandsLinked === 0
+      ? t('postsEmptyNeedBrand')
+      : t('postsEmptyWindow')
+
   return (
     <div className="stack funnel-page">
       <div className="mkt-pane-toolbar">
+        <p className="muted page-lede" style={{ margin: 0 }}>
+          Connector: {connectorLabel}
+        </p>
         <div className="row funnel-gates">
-          <span className={`badge ${gate ? 'ok' : 'warn'}`}>
-            Metricool {gate ? t('statusReady') : t('keyRequired')}
+          <span className={`badge ${contentReady ? 'ok' : 'warn'}`}>
+            Metricool {contentReady ? t('statusReady') : t('keyRequired')}
           </span>
-          <span className={`badge ${brevoGate ? 'ok' : 'warn'}`}>
-            Brevo {brevoGate ? t('statusReady') : t('keyRequired')}
-          </span>
+          <Link className="btn" to={settingsHref} style={{ fontSize: 12, padding: '4px 10px' }}>
+            {t('openConnections')}
+          </Link>
         </div>
       </div>
 
-      <div className="panel">
-        <h3 className="section-title" style={{ marginTop: 0 }}>
-          {t('capabilities')}
-        </h3>
+      <OrganicPostsPanel
+        channel={ch}
+        posts={organic?.posts ?? []}
+        emptyHint={emptyHint}
+        initialWindow={win}
+        onWindowChange={(w) => setWin(w)}
+      />
+
+      <details className="panel funnel-secondary">
+        <summary className="funnel-secondary-summary">{t('composeDrafts')}</summary>
+        <div className="stack" style={{ marginTop: 12 }}>
+          <input
+            className="input"
+            placeholder={t('draftTitlePh')}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+          <textarea
+            className="textarea"
+            placeholder={t('draftTextPh')}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+          <button className="btn primary" type="button" onClick={createDraft}>
+            {t('saveDraft')}
+          </button>
+          {!loading && drafts.length === 0 ? (
+            <p className="muted">{t('funnelEmpty')}</p>
+          ) : (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>{t('name')}</th>
+                  <th>Remote</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {drafts.map((d) => (
+                  <tr key={d.id}>
+                    <td>{d.title}</td>
+                    <td className="kpi" style={{ maxWidth: 280, overflow: 'hidden' }}>
+                      {JSON.stringify(d.remoteStatus ?? {})}
+                    </td>
+                    <td className="row">
+                      <button
+                        className="btn"
+                        type="button"
+                        disabled={!contentReady}
+                        onClick={() => schedule(d.id)}
+                      >
+                        {t('schedule')}
+                      </button>
+                      <button
+                        className="btn"
+                        type="button"
+                        disabled={!contentReady}
+                        onClick={() => retry(d.id)}
+                      >
+                        {t('retry')}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </details>
+
+      <details className="panel funnel-secondary">
+        <summary className="funnel-secondary-summary">{t('capabilities')}</summary>
         {caps.length === 0 ? (
-          <p className="muted">{loading ? t('loading') : '—'}</p>
+          <p className="muted" style={{ marginTop: 12 }}>
+            —
+          </p>
         ) : (
-          <table className="table">
+          <table className="table" style={{ marginTop: 12 }}>
             <thead>
               <tr>
                 <th>Network</th>
@@ -156,105 +424,24 @@ export function MarketingPage() {
             </tbody>
           </table>
         )}
-      </div>
+      </details>
 
-      <div className="panel stack">
-        <input
-          className="input"
-          placeholder={t('draftTitlePh')}
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-        <textarea
-          className="textarea"
-          placeholder={t('draftTextPh')}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-        />
-        <div className="row">
-          <button className="btn primary" onClick={createDraft}>
-            {t('saveDraft')}
-          </button>
-          <button className="btn" onClick={createBrevo}>
-            Brevo draft
-          </button>
-        </div>
-      </div>
-
-      <div className="panel">
-        <h3 className="section-title" style={{ marginTop: 0 }}>
-          {t('draftsList')}
-        </h3>
-        {!loading && drafts.length === 0 ? (
-          <div className="state-block empty-state funnel-empty">
-            <p className="muted">{t('funnelEmpty')}</p>
-            <p className="muted" style={{ fontSize: 13 }}>
-              {t('funnelEmptyHint')}
-            </p>
-          </div>
-        ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Title</th>
-                <th>Remote</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {drafts.map((d) => (
-                <tr key={d.id}>
-                  <td>{d.title}</td>
-                  <td className="kpi" style={{ maxWidth: 280, overflow: 'hidden' }}>
-                    {JSON.stringify(d.remoteStatus ?? {})}
-                  </td>
-                  <td className="row">
-                    <button className="btn" disabled={!gate} onClick={() => schedule(d.id)}>
-                      {t('schedule')}
-                    </button>
-                    <button className="btn" disabled={!gate} onClick={() => retry(d.id)}>
-                      {t('retry')}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      <div className="panel">
-        <h3 className="section-title" style={{ marginTop: 0 }}>
-          Brevo
-        </h3>
-        {!loading && campaigns.length === 0 ? (
-          <p className="muted">{t('noCampaigns')}</p>
-        ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {campaigns.map((c) => (
-                <tr key={c.id}>
-                  <td>{c.name}</td>
-                  <td>{c.status}</td>
-                  <td>
-                    <button className="btn danger" disabled={!brevoGate} onClick={() => sendBrevo(c.id)}>
-                      {t('send')}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-      {msg && <pre className="panel muted">{msg}</pre>}
+      {msg ? <pre className="panel muted">{msg}</pre> : null}
     </div>
   )
+}
+
+function channelDisplay(
+  ch: string,
+  t: (k: 'ch_instagram' | 'ch_facebook' | 'ch_tiktok' | 'ch_linkedin' | 'ch_youtube' | 'emailMarketing' | 'offlineFlyer') => string,
+  isCustom: boolean,
+) {
+  if (isCustom && ch === 'email') return t('emailMarketing')
+  if (isCustom && ch === 'offline') return t('offlineFlyer')
+  if (ch === 'instagram') return t('ch_instagram')
+  if (ch === 'facebook') return t('ch_facebook')
+  if (ch === 'tiktok') return t('ch_tiktok')
+  if (ch === 'linkedin') return t('ch_linkedin')
+  if (ch === 'youtube') return t('ch_youtube')
+  return ch
 }

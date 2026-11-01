@@ -2238,3 +2238,161 @@ select {
   min-width: 140px;
   font-size: 13px;
 }
+
+/* ——— Funnel channel depth (P3) ——— */
+
+.funnel-connect-gate {
+  min-height: 220px;
+  padding: var(--sp-6) var(--sp-5);
+  gap: var(--sp-3);
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--warn) 35%, var(--border));
+  background: color-mix(in srgb, var(--panel2) 88%, var(--warn));
+}
+
+.funnel-connect-eyebrow {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.funnel-connect-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.funnel-connect-body {
+  margin: 0;
+  max-width: 42rem;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.funnel-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-lbl {
+  font-size: 11px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.chip {
+  appearance: none;
+  font: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel2);
+  color: var(--text);
+  font-size: 12px;
+  transition: border-color var(--dur) var(--ease-out), background var(--dur) var(--ease-out);
+}
+
+.chip:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
+.chip.active {
+  border-color: var(--accent-border);
+  background: color-mix(in srgb, var(--accent) 18%, var(--panel));
+  color: var(--text);
+}
+
+.chip .n {
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+}
+
+.funnel-kpi-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.funnel-kpi {
+  min-width: 88px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+}
+
+.funnel-kpi-v {
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.funnel-kpi-l {
+  margin-top: 2px;
+  font-size: 11px;
+}
+
+.funnel-table-wrap {
+  overflow-x: auto;
+}
+
+.funnel-posts-table {
+  min-width: 960px;
+}
+
+.funnel-table-empty {
+  padding: 20px 8px !important;
+  text-align: left;
+}
+
+.funnel-thumb-cell {
+  width: 56px;
+}
+
+.funnel-thumb {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  display: block;
+}
+
+.funnel-secondary {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.funnel-secondary-summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--dim);
+  list-style: none;
+}
+
+.funnel-secondary-summary::-webkit-details-marker {
+  display: none;
+}
+
+.funnel-secondary-summary::before {
+  content: '▸ ';
+  color: var(--dim);
+}
+
+.funnel-secondary[open] > .funnel-secondary-summary::before {
+  content: '▾ ';
+}
