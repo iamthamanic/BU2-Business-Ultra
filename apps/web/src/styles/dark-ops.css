@@ -2845,6 +2845,7 @@ select {
   font-size: 11px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 .funnel-kpi-delta.is-up {
@@ -3138,6 +3139,7 @@ select {
   border: 1px solid var(--border);
   background: var(--panel);
   overflow: hidden;
+  text-align: center;
 }
 
 .funnel-kpi--accent {
@@ -3148,6 +3150,7 @@ select {
 .funnel-kpi-head {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   margin-bottom: 4px;
   min-width: 0;
@@ -3169,16 +3172,18 @@ select {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: center;
 }
 
 .funnel-kpi-l {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   font-size: 11px;
   line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: center;
 }
 
 .funnel-kpi-head .funnel-tip {
