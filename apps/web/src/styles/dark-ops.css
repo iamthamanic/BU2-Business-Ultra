@@ -2670,16 +2670,37 @@ select {
 }
 
 .funnel-top5 {
-  padding: 12px 14px;
+  padding: 10px 14px;
 }
 
-.funnel-top5-title {
-  margin: 0 0 10px;
+.funnel-top5-summary {
+  cursor: pointer;
+  list-style: none;
+  margin: 0;
   font-size: 13px;
   font-weight: 650;
   letter-spacing: 0.02em;
   text-transform: uppercase;
   color: var(--dim);
+  user-select: none;
+}
+
+.funnel-top5-summary::-webkit-details-marker {
+  display: none;
+}
+
+.funnel-top5-summary::before {
+  content: '▸ ';
+  display: inline-block;
+  width: 1em;
+}
+
+.funnel-top5[open] > .funnel-top5-summary::before {
+  content: '▾ ';
+}
+
+.funnel-top5[open] > .funnel-top5-summary {
+  margin-bottom: 10px;
 }
 
 .funnel-top5-table {

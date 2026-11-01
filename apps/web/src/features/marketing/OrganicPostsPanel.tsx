@@ -147,10 +147,10 @@ export function OrganicPostsPanel({
 
   return (
     <div className="stack organic-posts-panel">
-      <div className="panel funnel-top5">
-        <h3 className="section-title funnel-top5-title">
+      <details className="panel funnel-top5">
+        <summary className="funnel-top5-summary">
           <FunnelTip tip={t('tipTop5')}>{t('top5Title')}</FunnelTip>
-        </h3>
+        </summary>
         <div className="funnel-table-wrap">
           <table className="table funnel-grid-table funnel-top5-table">
             <thead>
@@ -211,7 +211,7 @@ export function OrganicPostsPanel({
             </tbody>
           </table>
         </div>
-      </div>
+      </details>
 
       <div className="funnel-filters-bar">
         <div className="funnel-filter-row" role="toolbar" aria-label={t('timeWindow')}>
