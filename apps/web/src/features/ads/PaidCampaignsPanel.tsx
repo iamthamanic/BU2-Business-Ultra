@@ -165,16 +165,16 @@ export function PaidCampaignsPanel({
               <span className="n">{w.key === win ? filtered.length : '·'}</span>
             </button>
           ))}
-          <label className="paid-search">
-            <span className="sr-only">{t('adsSearchPh')}</span>
-            <input
-              className="input paid-search-input"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder={t('adsSearchPh')}
-            />
-          </label>
         </div>
+        <label className="paid-search">
+          <span className="sr-only">{t('adsSearchPh')}</span>
+          <input
+            className="input paid-search-input"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder={t('adsSearchPh')}
+          />
+        </label>
         <FunnelExportMenu getPayload={getExportPayload} />
       </div>
 
