@@ -306,7 +306,7 @@ select {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 2px;
-  padding: 3px;
+  padding: 2px;
   background: var(--panel2);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -317,12 +317,13 @@ select {
   border: none;
   background: transparent;
   color: var(--dim);
-  padding: 8px 10px;
+  padding: 5px 8px;
   border-radius: calc(var(--radius) - 1px);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.02em;
+  line-height: 1.25;
 }
 
 .login-mode-toggle button:hover {
