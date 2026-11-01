@@ -62,12 +62,19 @@ async function createSession(userId: string, reply: { setCookie: (name: string, 
   })
   await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, userId))
   reply.setCookie('bu2_session', token, {
-    path: '/',
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: loadEnv().NODE_ENV === 'production',
+    ...sessionCookieOpts(),
     maxAge: SESSION_DAYS * 24 * 60 * 60,
   })
+}
+
+/** Shared cookie attrs so set + clear always match (path/SameSite/Secure). */
+function sessionCookieOpts() {
+  return {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax' as const,
+    secure: loadEnv().NODE_ENV === 'production',
+  }
 }
 
 export async function authRoutes(app: FastifyInstance) {
@@ -193,7 +200,8 @@ export async function authRoutes(app: FastifyInstance) {
         .set({ revokedAt: new Date() })
         .where(eq(sessions.tokenHash, hashToken(token)))
     }
-    reply.clearCookie('bu2_session', { path: '/' })
+    // Match setCookie attributes exactly so browsers drop bu2_session
+    reply.clearCookie('bu2_session', sessionCookieOpts())
     return { ok: true }
   })
 

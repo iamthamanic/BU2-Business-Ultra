@@ -66,7 +66,11 @@ export function App() {
   }
 
   async function logout() {
-    await api('/api/auth/logout', { method: 'POST' })
+    try {
+      await api('/api/auth/logout', { method: 'POST' })
+    } catch {
+      // Always clear client session even if revoke/cookie clear fails
+    }
     setUser(null)
     navigate('/login', { replace: true })
   }
