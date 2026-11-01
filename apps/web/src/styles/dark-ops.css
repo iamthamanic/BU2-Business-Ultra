@@ -221,7 +221,15 @@ select {
 .login-card .brand {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: var(--sp-3);
+  text-align: center;
+}
+
+.login-card .btn {
+  width: 100%;
+  justify-content: center;
+  text-align: center;
 }
 
 .brand-mark {
