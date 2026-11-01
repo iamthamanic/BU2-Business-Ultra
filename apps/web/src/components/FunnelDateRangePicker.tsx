@@ -75,9 +75,13 @@ export function FunnelDateRangePicker({ value, onChange, presets, dates }: Props
   }
 
   function pickPreset(preset: DateRangePreset) {
-    const next = withResolvedPrimary(preset, { ...draft, preset }, dates)
-    setDraft(next)
-    commit(next)
+    // Draft only — Apply commits. Keeps popover open so summary + Von/Bis update live.
+    setDraft(withResolvedPrimary(preset, { ...draft, preset }, dates))
+  }
+
+  function cancelDraft() {
+    setDraft(value)
+    setOpen(false)
   }
 
   function setCompare(mode: CompareMode) {
@@ -199,6 +203,11 @@ export function FunnelDateRangePicker({ value, onChange, presets, dates }: Props
                     summaryTo === '—' ? draft.to : summaryTo,
                   )}
                 </span>
+                {draft.preset !== 'custom' ? (
+                  <span className="funnel-dr-summary-badge">
+                    {t(PRESET_LABEL[draft.preset])}
+                  </span>
+                ) : null}
               </div>
 
               <div className="funnel-dr-dates">
@@ -309,7 +318,7 @@ export function FunnelDateRangePicker({ value, onChange, presets, dates }: Props
           </div>
 
           <div className="funnel-dr-actions">
-            <button type="button" className="btn ghost" onClick={() => setOpen(false)}>
+            <button type="button" className="btn ghost" onClick={cancelDraft}>
               {t('dateRangeCancel')}
             </button>
             <button

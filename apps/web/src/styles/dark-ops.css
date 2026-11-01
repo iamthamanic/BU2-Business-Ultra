@@ -2646,6 +2646,22 @@ select {
   color: var(--text);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
+  min-width: 0;
+  flex: 1;
+}
+
+.funnel-dr-summary-badge {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
 .funnel-dr-dates {
