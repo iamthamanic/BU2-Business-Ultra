@@ -1,6 +1,12 @@
 import type { FastifyInstance } from 'fastify'
 import { and, eq } from 'drizzle-orm'
-import { CreateBusinessSchema, InviteSchema, canManageMembers } from '@bu2/shared'
+import {
+  CreateBusinessSchema,
+  InviteSchema,
+  canManageMembers,
+  resolveEntitledTabs,
+  type Role,
+} from '@bu2/shared'
 import { db } from '../../db/client.js'
 import { businesses, invites, memberships, socialDrafts, users } from '../../db/schema.js'
 import { hashToken, randomToken } from '../../lib/crypto.js'
@@ -67,7 +73,14 @@ export async function businessRoutes(app: FastifyInstance) {
     const rows = await db.select().from(businesses).where(eq(businesses.slug, slug)).limit(1)
     const biz = rows[0]
     if (!biz) return reply.code(404).send({ error: 'not_found' })
-    return { business: biz, membership: m }
+    // Legacy ME.tabs parity: owner/admin unrestricted (null); others get stub entitlements
+    const membership = m
+      ? {
+          ...m,
+          tabs: user.isSuperadmin ? null : resolveEntitledTabs(m.role as Role),
+        }
+      : null
+    return { business: biz, membership }
   })
 
   app.post('/api/b/:slug/invites', async (req, reply) => {

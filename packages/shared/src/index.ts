@@ -161,6 +161,74 @@ export const MODULE_KEYS = [
 ] as const
 export type ModuleKey = (typeof MODULE_KEYS)[number]
 
+/**
+ * Legacy `ME.tabs`-style nav keys (match shell `data-ic` / channel ids).
+ * `null` from resolveEntitledTabs = unrestricted (owner/admin).
+ */
+export const NAV_TAB_KEYS = [
+  'home',
+  'catalog',
+  'overview',
+  'instagram',
+  'facebook',
+  'tiktok',
+  'linkedin',
+  'youtube',
+  'google_ads',
+  'meta_ads',
+  'chatgpt_ads',
+  'email',
+  'offline',
+  'cmb',
+  'sortanize',
+  'personas',
+  'checkmap',
+  'seo',
+  'settings',
+] as const
+export type NavTabKey = (typeof NAV_TAB_KEYS)[number]
+
+/** Stub member entitlements until agency rights are stored on memberships. */
+export const STUB_MEMBER_NAV_TABS: NavTabKey[] = [
+  'home',
+  'catalog',
+  'overview',
+  'instagram',
+  'facebook',
+  'tiktok',
+  'linkedin',
+  'youtube',
+  'google_ads',
+  'meta_ads',
+  'chatgpt_ads',
+  'email',
+  'offline',
+  'cmb',
+  'sortanize',
+  'personas',
+  'checkmap',
+  // seo gated separately via grantSeoOpen; settings owner/admin only in shell
+]
+
+/**
+ * Resolve nav tabs for a membership role.
+ * - owner/admin → null (see all)
+ * - editor/viewer → stub list (or explicit `stored` when agency rights land)
+ */
+export function resolveEntitledTabs(
+  role: Role,
+  stored?: string[] | null,
+): string[] | null {
+  if (role === 'owner' || role === 'admin') return null
+  if (stored && stored.length) return stored
+  return [...STUB_MEMBER_NAV_TABS]
+}
+
+export function canSeeNavTab(tabs: string[] | null | undefined, tabKey: string): boolean {
+  if (tabs == null) return true
+  return tabs.includes(tabKey)
+}
+
 export function canManageMembers(role: Role): boolean {
   return role === 'owner' || role === 'admin'
 }

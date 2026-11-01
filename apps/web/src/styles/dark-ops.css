@@ -1046,7 +1046,7 @@ select {
 
 .home-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.75fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--sp-4);
   align-items: start;
 }
@@ -1057,6 +1057,142 @@ select {
   justify-content: space-between;
   gap: var(--sp-3);
   margin-bottom: var(--sp-3);
+}
+
+.home-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-shrink: 0;
+}
+
+/* ——— Create company modal ——— */
+
+.bu-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-4);
+  background: color-mix(in srgb, #05070b 72%, transparent);
+  backdrop-filter: blur(4px);
+}
+
+.bu-modal {
+  width: min(520px, 100%);
+  max-height: min(90vh, 720px);
+  overflow: auto;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--border);
+  animation: bu-modal-in 0.16s var(--ease-out);
+}
+
+@keyframes bu-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.bu-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-2);
+}
+
+.bu-modal-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-3);
+}
+
+.bu-modal-logo-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+}
+
+.bu-logo-thumb {
+  width: 72px;
+  height: 72px;
+  max-width: 72px;
+  aspect-ratio: 1;
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.bu-logo-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.bu-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+.icon-btn {
+  padding: 6px 8px;
+  min-width: 0;
+}
+
+.biz-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  display: inline-grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--dim);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.biz-logo.has-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.biz-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.funnel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+
+.funnel-gates {
+  flex-wrap: wrap;
+}
+
+.funnel-empty {
+  border-style: dashed;
+  padding: var(--sp-4);
 }
 
 .biz-list {
@@ -1089,8 +1225,9 @@ select {
 
 .biz-row-main {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--sp-3);
   min-width: 0;
 }
 
@@ -1284,8 +1421,12 @@ select {
 }
 
 @media (max-width: 960px) {
-  .home-layout {
+  .bu-modal-row-2 {
     grid-template-columns: 1fr;
+  }
+
+  .home-panel-head {
+    flex-wrap: wrap;
   }
 }
 

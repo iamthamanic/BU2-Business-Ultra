@@ -1,8 +1,9 @@
 /**
  * HomePage — logged-in companies console with collapsible sidebar shell.
+ * Create flow is a modal (+ Company); list rows show logo thumbnails.
  * Location: apps/web/src/features/business/HomePage.tsx
  */
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { companyBase } from '../../lib/companyPaths'
 import {
@@ -16,29 +17,26 @@ import { api } from '../../lib/api'
 import { useI18n } from '../../lib/i18n'
 import type { AuthUser } from '../../app/App'
 import { AppShell } from '../../components/AppShell'
+import { BizLogo } from '../../components/BizLogo'
+import { CreateCompanyModal } from '../../components/CreateCompanyModal'
 import type { RailItem } from '../../components/IconRail'
 
-type Biz = { id: string; name: string; slug: string; status: string; role: string }
-type LoadState = 'loading' | 'ready' | 'error'
-
-function slugify(value: string) {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 48)
+type Biz = {
+  id: string
+  name: string
+  slug: string
+  status: string
+  role: string
+  logoPath?: string | null
 }
+type LoadState = 'loading' | 'ready' | 'error'
 
 export function HomePage({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
   const { t } = useI18n()
   const [list, setList] = useState<Biz[]>([])
-  const [name, setName] = useState('')
-  const [slug, setSlug] = useState('')
-  const [slugTouched, setSlugTouched] = useState(false)
   const [err, setErr] = useState('')
   const [loadState, setLoadState] = useState<LoadState>('loading')
-  const [creating, setCreating] = useState(false)
+  const [modalOpen, setModalOpen] = useState(false)
 
   async function refresh() {
     setLoadState('loading')
@@ -62,32 +60,6 @@ export function HomePage({ user, onLogout }: { user: AuthUser; onLogout: () => v
     [t],
   )
 
-  async function create(e?: FormEvent) {
-    e?.preventDefault()
-    if (!name.trim() || !slug.trim()) return
-    setCreating(true)
-    setErr('')
-    try {
-      await api('/api/businesses', {
-        method: 'POST',
-        body: JSON.stringify({ name: name.trim(), slug: slug.trim() }),
-      })
-      setName('')
-      setSlug('')
-      setSlugTouched(false)
-      await refresh()
-    } catch (e) {
-      setErr(String(e))
-    } finally {
-      setCreating(false)
-    }
-  }
-
-  function onNameChange(value: string) {
-    setName(value)
-    if (!slugTouched) setSlug(slugify(value))
-  }
-
   return (
     <AppShell
       user={user}
@@ -104,7 +76,17 @@ export function HomePage({ user, onLogout }: { user: AuthUser; onLogout: () => v
               </h1>
               <p className="muted page-lede">{t('businessesLede')}</p>
             </div>
-            {loadState === 'ready' && <span className="badge">{list.length}</span>}
+            <div className="home-panel-actions">
+              {loadState === 'ready' && <span className="badge">{list.length}</span>}
+              <button
+                type="button"
+                className="btn primary"
+                onClick={() => setModalOpen(true)}
+              >
+                <Plus size={16} weight="bold" aria-hidden />
+                {t('createCompanyBtn')}
+              </button>
+            </div>
           </div>
 
           {loadState === 'loading' && (
@@ -130,6 +112,10 @@ export function HomePage({ user, onLogout }: { user: AuthUser; onLogout: () => v
             <div className="state-block empty-state">
               <Buildings size={28} weight="regular" aria-hidden />
               <p className="muted">{t('emptyStart')}</p>
+              <button type="button" className="btn primary" onClick={() => setModalOpen(true)}>
+                <Plus size={16} weight="bold" aria-hidden />
+                {t('createCompanyBtn')}
+              </button>
             </div>
           )}
 
@@ -138,8 +124,11 @@ export function HomePage({ user, onLogout }: { user: AuthUser; onLogout: () => v
               {list.map((b) => (
                 <li key={b.id} className="biz-row">
                   <div className="biz-row-main">
-                    <span className="biz-name">{b.name}</span>
-                    <span className="kpi biz-slug">{b.slug}</span>
+                    <BizLogo name={b.name} logoPath={b.logoPath} className="biz-logo" />
+                    <div className="biz-row-text">
+                      <span className="biz-name">{b.name}</span>
+                      <span className="kpi biz-slug">{b.slug}</span>
+                    </div>
                   </div>
                   <div className="biz-row-meta">
                     <span className={`badge ${b.status === 'active' ? 'ok' : 'warn'}`}>{b.status}</span>
@@ -154,56 +143,15 @@ export function HomePage({ user, onLogout }: { user: AuthUser; onLogout: () => v
             </ul>
           )}
         </section>
-
-        <section className="panel home-create-panel" aria-labelledby="create-heading">
-          <h2 id="create-heading" className="section-title">
-            {t('createBusiness')}
-          </h2>
-          <p className="muted page-lede">{t('createBusinessLede')}</p>
-          <form className="stack" onSubmit={create}>
-            <label>
-              <span className="label">{t('name')}</span>
-              <input
-                className="input"
-                value={name}
-                onChange={(e) => onNameChange(e.target.value)}
-                autoComplete="organization"
-                required
-              />
-            </label>
-            <label>
-              <span className="label">{t('slug')}</span>
-              <input
-                className="input kpi"
-                value={slug}
-                onChange={(e) => {
-                  setSlugTouched(true)
-                  setSlug(slugify(e.target.value))
-                }}
-                pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
-                required
-              />
-            </label>
-            <button
-              className="btn primary"
-              type="submit"
-              disabled={creating || !name.trim() || !slug.trim()}
-            >
-              {creating ? (
-                <CircleNotch className="spin" size={16} weight="regular" aria-hidden />
-              ) : (
-                <Plus size={16} weight="bold" aria-hidden />
-              )}
-              {t('createBusiness')}
-            </button>
-            {err && loadState !== 'error' && (
-              <p className="badge bad" role="alert">
-                {err}
-              </p>
-            )}
-          </form>
-        </section>
       </div>
+
+      <CreateCompanyModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onCreated={() => {
+          void refresh()
+        }}
+      />
     </AppShell>
   )
 }
