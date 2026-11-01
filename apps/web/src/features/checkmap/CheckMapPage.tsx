@@ -12,14 +12,20 @@ export function CheckMapPage() {
   const [title, setTitle] = useState('Roadmap')
   const [nodes, setNodes] = useState<Node[]>([])
   const [selected, setSelected] = useState<string | null>(null)
+  const [acl, setAcl] = useState<{ canEdit: boolean }>({ canEdit: true })
+  const [attachments, setAttachments] = useState<any[]>([])
   const drag = useRef<{ id: string; ox: number; oy: number } | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   async function refresh() {
-    const r = await api<{ boards: any[] }>(`/api/b/${slug}/checkmap`)
+    const r = await api<{ boards: any[]; acl: { canEdit: boolean } }>(`/api/b/${slug}/checkmap`)
+    setAcl(r.acl)
     if (r.boards[0]) {
       setBoardId(r.boards[0].id)
       setTitle(r.boards[0].title)
       setNodes(r.boards[0].nodes ?? [])
+      const a = await api<{ attachments: any[] }>(`/api/b/${slug}/checkmap/${r.boards[0].id}/attachments`)
+      setAttachments(a.attachments)
     }
   }
 
@@ -36,6 +42,7 @@ export function CheckMapPage() {
   }
 
   async function persist(next: Node[]) {
+    if (!acl.canEdit) return
     const id = await ensureBoard()
     await api(`/api/b/${slug}/checkmap/${id}`, {
       method: 'PUT',
@@ -59,6 +66,7 @@ export function CheckMapPage() {
   }
 
   function onPointerDown(e: React.PointerEvent, id: string) {
+    if (!acl.canEdit) return
     const n = nodes.find((x) => x.id === id)
     if (!n) return
     setSelected(id)
@@ -78,13 +86,23 @@ export function CheckMapPage() {
     persist(nodes)
   }
 
+  async function upload(file: File) {
+    const id = await ensureBoard()
+    const fd = new FormData()
+    fd.append('file', file)
+    if (selected) fd.append('nodeId', selected)
+    await fetch(`/api/b/${slug}/checkmap/${id}/attachments`, { method: 'POST', body: fd, credentials: 'include' })
+    await refresh()
+  }
+
   return (
     <div className="stack">
       <h1 style={{ margin: 0 }}>{t('checkmap')}</h1>
       <div className="row">
-        <input className="input" style={{ maxWidth: 280 }} value={title} onChange={(e) => setTitle(e.target.value)} />
-        <button className="btn primary" onClick={addNode}>+ Node</button>
-        <button className="btn" onClick={() => persist(nodes)}>{t('save')}</button>
+        <input className="input" style={{ maxWidth: 280 }} value={title} onChange={(e) => setTitle(e.target.value)} disabled={!acl.canEdit} />
+        <button className="btn primary" disabled={!acl.canEdit} onClick={addNode}>{t('addNode')}</button>
+        <button className="btn" disabled={!acl.canEdit} onClick={() => persist(nodes)}>{t('save')}</button>
+        <span className={`badge ${acl.canEdit ? 'ok' : 'warn'}`}>{acl.canEdit ? 'edit' : 'view'}</span>
       </div>
       <div className="canvas" onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
         {nodes.map((n) => (
@@ -93,11 +111,28 @@ export function CheckMapPage() {
             className={`canvas-node ${selected === n.id ? 'selected' : ''}`}
             style={{ left: n.x, top: n.y }}
             onPointerDown={(e) => onPointerDown(e, n.id)}
+            onDoubleClick={() => {
+              if (!acl.canEdit) return
+              const title = prompt('Title', n.title)
+              if (title == null) return
+              const next = nodes.map((x) => (x.id === n.id ? { ...x, title } : x))
+              setNodes(next)
+              persist(next)
+            }}
           >
-            <div className="muted">{n.type} · {n.priority}</div>
+            <div className="muted">{n.type} · {n.priority} · {n.status}</div>
             <strong>{n.title}</strong>
           </div>
         ))}
+      </div>
+      <div className="panel stack">
+        <h3 style={{ margin: 0 }}>{t('attachments')}</h3>
+        <input ref={fileRef} type="file" disabled={!acl.canEdit} onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
+        <ul>
+          {attachments.map((a) => (
+            <li key={a.id}><a href={a.url} target="_blank" rel="noreferrer">{a.filename}</a> <span className="muted">{a.mimeType}</span></li>
+          ))}
+        </ul>
       </div>
     </div>
   )

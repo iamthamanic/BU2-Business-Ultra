@@ -145,4 +145,26 @@ export async function authRoutes(app: FastifyInstance) {
     if (!user) return reply.code(401).send({ error: 'unauthorized' })
     return { user }
   })
+
+  /** Dev/test only — returns last OTP for an email (never enable in production). */
+  app.post('/api/auth/dev/last-otp', async (req, reply) => {
+    const env = loadEnv()
+    if (env.NODE_ENV === 'production') {
+      return reply.code(404).send({ error: 'not_found' })
+    }
+    const body = MagicLinkRequestSchema.parse(req.body)
+    const email = body.email.toLowerCase()
+    const rows = await db.select().from(authChallenges).where(eq(authChallenges.email, email))
+    const challenge = rows
+      .filter((c) => !c.consumedAt && c.expiresAt.getTime() >= Date.now())
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0]
+    if (!challenge) return reply.code(404).send({ error: 'no_challenge' })
+    // OTP itself is hashed — store plaintext otp in meta is avoided; re-issue for tests
+    const otp = randomOtp()
+    await db
+      .update(authChallenges)
+      .set({ otpHash: hashToken(otp) })
+      .where(eq(authChallenges.id, challenge.id))
+    return { code: otp, email }
+  })
 }

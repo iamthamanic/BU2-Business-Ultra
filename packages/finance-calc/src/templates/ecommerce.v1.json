@@ -1,0 +1,108 @@
+{
+  "id": "ecommerce",
+  "version": 1,
+  "industry": "ecommerce",
+  "labelDe": "E-Commerce",
+  "descriptionDe": "Online-Handel mit Warenkosten, Versand und Performance-Marketing.",
+  "defaultVolume": 200,
+  "layers": [
+    {
+      "key": "acquisition",
+      "labelDe": "Akquise",
+      "guidance": {
+        "generalDe": "Kosten und Kanäle, um zahlende Kunden zu gewinnen.",
+        "commonExamplesDe": ["Paid Ads", "Affiliate", "SEO"],
+        "industryDe": "Im E-Commerce oft ROAS-getriebene Paid Media und Retargeting.",
+        "industryExamplesDe": ["Meta Ads", "Google Shopping", "Influencer"]
+      }
+    },
+    {
+      "key": "operations",
+      "labelDe": "Betrieb",
+      "guidance": {
+        "generalDe": "Kosten für die Erbringung des verkauften Produkts oder der Dienstleistung.",
+        "commonExamplesDe": ["Waren", "Logistik", "Fulfillment"],
+        "industryDe": "Typisch: COGS, Versand und Retouren.",
+        "industryExamplesDe": ["Wareneinsatz", "Versand", "Verpackung"]
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "key": "revenue",
+      "kind": "revenue",
+      "labelDe": "Umsatz",
+      "required": true,
+      "suggested": true,
+      "inputs": { "price": 39.9 }
+    },
+    {
+      "key": "g_acquisition",
+      "kind": "group",
+      "labelDe": "Akquise",
+      "required": true,
+      "suggested": true,
+      "layerKey": "acquisition",
+      "inputs": {}
+    },
+    {
+      "key": "acq_ads",
+      "kind": "cost",
+      "labelDe": "Performance Ads",
+      "required": false,
+      "suggested": true,
+      "layerKey": "acquisition",
+      "costBehavior": "per_click",
+      "inputs": { "rate": 0.8, "quantity": 500 },
+      "allocation": { "rule": "direct" }
+    },
+    {
+      "key": "g_operations",
+      "kind": "group",
+      "labelDe": "Betrieb",
+      "required": true,
+      "suggested": true,
+      "layerKey": "operations",
+      "inputs": {}
+    },
+    {
+      "key": "ops_cogs",
+      "kind": "cost",
+      "labelDe": "Wareneinsatz",
+      "required": false,
+      "suggested": true,
+      "layerKey": "operations",
+      "costBehavior": "per_unit",
+      "inputs": { "rate": 12 },
+      "allocation": { "rule": "direct" }
+    },
+    {
+      "key": "ops_shipping",
+      "kind": "cost",
+      "labelDe": "Versand",
+      "required": false,
+      "suggested": true,
+      "layerKey": "operations",
+      "costBehavior": "per_order",
+      "inputs": { "rate": 4.9 },
+      "allocation": { "rule": "direct" }
+    },
+    {
+      "key": "contribution",
+      "kind": "result",
+      "labelDe": "Deckungsbeitrag",
+      "required": true,
+      "suggested": true,
+      "inputs": {}
+    }
+  ],
+  "edges": [
+    { "sourceKey": "revenue", "targetKey": "contribution", "relation": "feeds" },
+    { "sourceKey": "acq_ads", "targetKey": "contribution", "relation": "feeds" },
+    { "sourceKey": "ops_cogs", "targetKey": "contribution", "relation": "feeds" },
+    { "sourceKey": "ops_shipping", "targetKey": "contribution", "relation": "feeds" },
+    { "sourceKey": "acq_ads", "targetKey": "g_acquisition", "relation": "depends_on" },
+    { "sourceKey": "ops_cogs", "targetKey": "g_operations", "relation": "depends_on" },
+    { "sourceKey": "ops_shipping", "targetKey": "g_operations", "relation": "depends_on" }
+  ]
+}

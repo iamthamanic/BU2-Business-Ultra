@@ -23,6 +23,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
+      NODE_ENV: development
       DATABASE_URL: postgresql://bu2:bu2_ci@localhost:5432/bu2
       SECRETS_MASTER_KEY: ci-secrets-master-key-32bytes-min!!
       SESSION_SECRET: ci-session-secret-32bytes-minimum!
@@ -31,6 +32,8 @@ jobs:
       PUBLIC_WEB_URL: http://127.0.0.1:8741
       PUBLIC_API_URL: http://127.0.0.1:8742
       CORS_ORIGIN: http://127.0.0.1:8741
+      SORTANIZE_URL: http://127.0.0.1:8760
+      OPENSEO_SSO_SHARED_SECRET: ci-openseo-sso-secret-key
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -48,3 +51,8 @@ jobs:
       - run: pnpm --filter @bu2/api db:seed
       - run: pnpm typecheck
       - run: pnpm --filter @bu2/web build
+      - run: pnpm --filter @bu2/api exec tsx src/index.ts &
+      - run: pnpm --filter @bu2/web exec vite --port 8741 --host 127.0.0.1 &
+      - run: npx --yes wait-on http://127.0.0.1:8742/api/health http://127.0.0.1:8741
+      - run: pnpm --filter @bu2/e2e exec playwright install --with-deps chromium
+      - run: E2E_NO_SERVER=1 pnpm --filter @bu2/e2e test:core

@@ -1,0 +1,108 @@
+{
+  "id": "saas",
+  "version": 1,
+  "industry": "saas",
+  "labelDe": "SaaS",
+  "descriptionDe": "Software-as-a-Service mit Abo-Umsatz, Hosting und Support.",
+  "defaultVolume": 100,
+  "layers": [
+    {
+      "key": "acquisition",
+      "labelDe": "Akquise",
+      "guidance": {
+        "generalDe": "Kosten und Kanäle, um zahlende Kunden zu gewinnen.",
+        "commonExamplesDe": ["Paid Ads", "Content", "Sales Development"],
+        "industryDe": "Bei SaaS oft Trial-zu-Paid und Product-Led Growth.",
+        "industryExamplesDe": ["Google Ads", "Content SEO", "Partner-Referrals"]
+      }
+    },
+    {
+      "key": "operations",
+      "labelDe": "Betrieb",
+      "guidance": {
+        "generalDe": "Kosten für die Erbringung des verkauften Produkts oder der Dienstleistung.",
+        "commonExamplesDe": ["Personal", "Infrastruktur", "Subunternehmer"],
+        "industryDe": "Bei SaaS typischerweise Cloud, Observability und Customer Success.",
+        "industryExamplesDe": ["Cloud Hosting", "Support-Personal", "Onboarding"]
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "key": "revenue",
+      "kind": "revenue",
+      "labelDe": "Umsatz",
+      "required": true,
+      "suggested": true,
+      "inputs": { "price": 49 }
+    },
+    {
+      "key": "g_acquisition",
+      "kind": "group",
+      "labelDe": "Akquise",
+      "required": true,
+      "suggested": true,
+      "layerKey": "acquisition",
+      "inputs": {}
+    },
+    {
+      "key": "acq_ads",
+      "kind": "cost",
+      "labelDe": "Paid Ads",
+      "required": false,
+      "suggested": true,
+      "layerKey": "acquisition",
+      "costBehavior": "per_click",
+      "inputs": { "rate": 1.2, "quantity": 200 },
+      "allocation": { "rule": "direct" }
+    },
+    {
+      "key": "g_operations",
+      "kind": "group",
+      "labelDe": "Betrieb",
+      "required": true,
+      "suggested": true,
+      "layerKey": "operations",
+      "inputs": {}
+    },
+    {
+      "key": "ops_cloud",
+      "kind": "cost",
+      "labelDe": "Cloud Hosting",
+      "required": false,
+      "suggested": true,
+      "layerKey": "operations",
+      "costBehavior": "fixed_period",
+      "inputs": { "amount": 800 },
+      "allocation": { "rule": "direct" }
+    },
+    {
+      "key": "ops_support",
+      "kind": "cost",
+      "labelDe": "Support Personal",
+      "required": false,
+      "suggested": true,
+      "layerKey": "operations",
+      "costBehavior": "per_hour",
+      "inputs": { "rate": 45, "hoursPerOrder": 0.25 },
+      "allocation": { "rule": "direct" }
+    },
+    {
+      "key": "contribution",
+      "kind": "result",
+      "labelDe": "Deckungsbeitrag",
+      "required": true,
+      "suggested": true,
+      "inputs": {}
+    }
+  ],
+  "edges": [
+    { "sourceKey": "revenue", "targetKey": "contribution", "relation": "feeds" },
+    { "sourceKey": "acq_ads", "targetKey": "contribution", "relation": "feeds" },
+    { "sourceKey": "ops_cloud", "targetKey": "contribution", "relation": "feeds" },
+    { "sourceKey": "ops_support", "targetKey": "contribution", "relation": "feeds" },
+    { "sourceKey": "acq_ads", "targetKey": "g_acquisition", "relation": "depends_on" },
+    { "sourceKey": "ops_cloud", "targetKey": "g_operations", "relation": "depends_on" },
+    { "sourceKey": "ops_support", "targetKey": "g_operations", "relation": "depends_on" }
+  ]
+}

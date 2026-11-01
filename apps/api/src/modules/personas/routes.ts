@@ -90,6 +90,29 @@ export async function personasRoutes(app: FastifyInstance) {
     return { persona: row }
   })
 
+  app.put('/api/b/:slug/personas/:id', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug, id } = req.params as { slug: string; id: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    const body = PersonaSchema.parse(req.body)
+    const [row] = await db
+      .update(personas)
+      .set({
+        name: body.name,
+        summary: body.summary,
+        goals: body.goals,
+        pains: body.pains,
+        channels: body.channels,
+        journey: body.journey,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(personas.id, id), eq(personas.businessId, m.businessId)))
+      .returning()
+    if (!row) return reply.code(404).send({ error: 'not_found' })
+    return { persona: row }
+  })
+
   app.get('/api/b/:slug/personas/:id/pdf', async (req, reply) => {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }

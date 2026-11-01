@@ -1,0 +1,62 @@
+{
+  "id": "custom",
+  "version": 1,
+  "industry": "custom",
+  "labelDe": "Individuell",
+  "descriptionDe": "Leeres Modell mit Umsatz und Deckungsbeitrag — Positionen selbst ergänzen.",
+  "defaultVolume": 100,
+  "layers": [
+    {
+      "key": "operations",
+      "labelDe": "Betrieb",
+      "guidance": {
+        "generalDe": "Kosten für die Erbringung des verkauften Produkts oder der Dienstleistung.",
+        "commonExamplesDe": ["Personal", "Material", "Infrastruktur"],
+        "industryExamplesDe": []
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "key": "revenue",
+      "kind": "revenue",
+      "labelDe": "Umsatz",
+      "required": true,
+      "suggested": true,
+      "inputs": { "price": 0 }
+    },
+    {
+      "key": "g_operations",
+      "kind": "group",
+      "labelDe": "Betrieb",
+      "required": true,
+      "suggested": true,
+      "layerKey": "operations",
+      "inputs": {}
+    },
+    {
+      "key": "ops_labor",
+      "kind": "cost",
+      "labelDe": "Betrieb Personal",
+      "required": false,
+      "suggested": true,
+      "layerKey": "operations",
+      "costBehavior": "per_hour",
+      "inputs": { "rate": 40, "hoursPerOrder": 0.5 },
+      "allocation": { "rule": "direct" }
+    },
+    {
+      "key": "contribution",
+      "kind": "result",
+      "labelDe": "Deckungsbeitrag",
+      "required": true,
+      "suggested": true,
+      "inputs": {}
+    }
+  ],
+  "edges": [
+    { "sourceKey": "revenue", "targetKey": "contribution", "relation": "feeds" },
+    { "sourceKey": "ops_labor", "targetKey": "contribution", "relation": "feeds" },
+    { "sourceKey": "ops_labor", "targetKey": "g_operations", "relation": "depends_on" }
+  ]
+}

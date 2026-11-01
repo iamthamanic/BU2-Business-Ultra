@@ -1,0 +1,181 @@
+{
+  "id": "traffic-safety",
+  "version": 1,
+  "industry": "traffic-safety",
+  "labelDe": "Verkehrssicherung",
+  "descriptionDe": "Absperrung und Verkehrssicherung mit Fahrern, Fahrzeugen, Material und Genehmigungen.",
+  "defaultVolume": 50,
+  "layers": [
+    {
+      "key": "acquisition",
+      "labelDe": "Akquise",
+      "guidance": {
+        "generalDe": "Kosten und Kanäle, um zahlende Kunden zu gewinnen.",
+        "commonExamplesDe": ["Ausschreibungen", "Stammkunden", "Partner"],
+        "industryDe": "Oft kommunale Ausschreibungen und Bauleiter-Kontakte.",
+        "industryExamplesDe": ["Ausschreibungsaufwand", "Besichtigungsfahrten"]
+      }
+    },
+    {
+      "key": "operations",
+      "labelDe": "Betrieb",
+      "guidance": {
+        "generalDe": "Kosten für die Erbringung des verkauften Produkts oder der Dienstleistung.",
+        "commonExamplesDe": ["Personal", "Material", "Fahrzeuge", "Logistik", "Infrastruktur", "Subunternehmer"],
+        "industryDe": "In der Verkehrssicherung typisch: Fahrer, Fahrzeuge, Verkehrszeichen/-geräte, Genehmigungen, Lager, Auf-/Abbau und Nachunternehmer.",
+        "industryExamplesDe": [
+          "Fahrer",
+          "Fahrzeuge",
+          "Verkehrszeichen / Geräte",
+          "Genehmigungen / Behördengebühren",
+          "Lager",
+          "Aufbau / Abbau",
+          "Nachunternehmer"
+        ]
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "key": "revenue",
+      "kind": "revenue",
+      "labelDe": "Umsatz",
+      "required": true,
+      "suggested": true,
+      "inputs": { "price": 850 }
+    },
+    {
+      "key": "g_acquisition",
+      "kind": "group",
+      "labelDe": "Akquise",
+      "required": true,
+      "suggested": true,
+      "layerKey": "acquisition",
+      "inputs": {}
+    },
+    {
+      "key": "acq_tender",
+      "kind": "cost",
+      "labelDe": "Ausschreibungsaufwand",
+      "required": false,
+      "suggested": true,
+      "layerKey": "acquisition",
+      "costBehavior": "per_order",
+      "inputs": { "rate": 80 },
+      "allocation": { "rule": "direct" }
+    },
+    {
+      "key": "g_operations",
+      "kind": "group",
+      "labelDe": "Betrieb",
+      "required": true,
+      "suggested": true,
+      "layerKey": "operations",
+      "inputs": {}
+    },
+    {
+      "key": "ops_drivers",
+      "kind": "cost",
+      "labelDe": "Fahrer",
+      "required": false,
+      "suggested": true,
+      "layerKey": "operations",
+      "costBehavior": "per_hour",
+      "inputs": { "rate": 32, "hoursPerOrder": 6 },
+      "allocation": { "rule": "direct" }
+    },
+    {
+      "key": "ops_vehicles",
+      "kind": "cost",
+      "labelDe": "Fahrzeuge",
+      "required": false,
+      "suggested": true,
+      "layerKey": "operations",
+      "costBehavior": "per_km",
+      "inputs": { "rate": 0.55, "quantity": 80 },
+      "allocation": { "rule": "direct" }
+    },
+    {
+      "key": "ops_equipment",
+      "kind": "cost",
+      "labelDe": "Verkehrszeichen / Geräte",
+      "required": false,
+      "suggested": true,
+      "layerKey": "operations",
+      "costBehavior": "per_order",
+      "inputs": { "rate": 95 },
+      "allocation": { "rule": "direct" }
+    },
+    {
+      "key": "ops_permits",
+      "kind": "cost",
+      "labelDe": "Genehmigungen / Behördengebühren",
+      "required": false,
+      "suggested": true,
+      "layerKey": "operations",
+      "costBehavior": "per_order",
+      "inputs": { "rate": 120 },
+      "allocation": { "rule": "direct" }
+    },
+    {
+      "key": "ops_storage",
+      "kind": "cost",
+      "labelDe": "Lager",
+      "required": false,
+      "suggested": true,
+      "layerKey": "operations",
+      "costBehavior": "fixed_period",
+      "inputs": { "amount": 450 },
+      "allocation": { "rule": "direct" }
+    },
+    {
+      "key": "ops_setup_removal",
+      "kind": "cost",
+      "labelDe": "Aufbau / Abbau",
+      "required": false,
+      "suggested": true,
+      "layerKey": "operations",
+      "costBehavior": "per_hour",
+      "inputs": { "rate": 38, "hoursPerOrder": 3 },
+      "allocation": { "rule": "direct" }
+    },
+    {
+      "key": "ops_subcontractors",
+      "kind": "cost",
+      "labelDe": "Nachunternehmer",
+      "required": false,
+      "suggested": true,
+      "layerKey": "operations",
+      "costBehavior": "per_order",
+      "inputs": { "rate": 200 },
+      "allocation": { "rule": "direct" }
+    },
+    {
+      "key": "contribution",
+      "kind": "result",
+      "labelDe": "Deckungsbeitrag",
+      "required": true,
+      "suggested": true,
+      "inputs": {}
+    }
+  ],
+  "edges": [
+    { "sourceKey": "revenue", "targetKey": "contribution", "relation": "feeds" },
+    { "sourceKey": "acq_tender", "targetKey": "contribution", "relation": "feeds" },
+    { "sourceKey": "ops_drivers", "targetKey": "contribution", "relation": "feeds" },
+    { "sourceKey": "ops_vehicles", "targetKey": "contribution", "relation": "feeds" },
+    { "sourceKey": "ops_equipment", "targetKey": "contribution", "relation": "feeds" },
+    { "sourceKey": "ops_permits", "targetKey": "contribution", "relation": "feeds" },
+    { "sourceKey": "ops_storage", "targetKey": "contribution", "relation": "feeds" },
+    { "sourceKey": "ops_setup_removal", "targetKey": "contribution", "relation": "feeds" },
+    { "sourceKey": "ops_subcontractors", "targetKey": "contribution", "relation": "feeds" },
+    { "sourceKey": "acq_tender", "targetKey": "g_acquisition", "relation": "depends_on" },
+    { "sourceKey": "ops_drivers", "targetKey": "g_operations", "relation": "depends_on" },
+    { "sourceKey": "ops_vehicles", "targetKey": "g_operations", "relation": "depends_on" },
+    { "sourceKey": "ops_equipment", "targetKey": "g_operations", "relation": "depends_on" },
+    { "sourceKey": "ops_permits", "targetKey": "g_operations", "relation": "depends_on" },
+    { "sourceKey": "ops_storage", "targetKey": "g_operations", "relation": "depends_on" },
+    { "sourceKey": "ops_setup_removal", "targetKey": "g_operations", "relation": "depends_on" },
+    { "sourceKey": "ops_subcontractors", "targetKey": "g_operations", "relation": "depends_on" }
+  ]
+}

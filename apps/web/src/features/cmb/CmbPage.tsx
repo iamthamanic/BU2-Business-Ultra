@@ -7,19 +7,28 @@ export function CmbPage() {
   const { slug } = useParams()
   const { t } = useI18n()
   const [models, setModels] = useState<any[]>([])
+  const [templates, setTemplates] = useState<any[]>([])
   const [snap, setSnap] = useState<any>(null)
 
   async function refresh() {
-    const r = await api<{ models: any[] }>(`/api/b/${slug}/cmb/models`)
-    setModels(r.models)
+    const [m, tpl] = await Promise.all([
+      api<{ models: any[] }>(`/api/b/${slug}/cmb/models`),
+      api<{ templates: any[] }>(`/api/b/${slug}/cmb/templates`),
+    ])
+    setModels(m.models)
+    setTemplates(tpl.templates)
   }
 
   useEffect(() => { refresh().catch(console.error) }, [slug])
 
-  async function createFixture() {
+  async function createFrom(template?: string) {
     await api(`/api/b/${slug}/cmb/models`, {
       method: 'POST',
-      body: JSON.stringify({ name: 'Simple Product', useSimpleFixture: true }),
+      body: JSON.stringify({
+        name: template ? `Template ${template}` : 'Simple Product',
+        useSimpleFixture: !template || template === 'simple',
+        template: template && template !== 'simple' ? template : undefined,
+      }),
     })
     await refresh()
   }
@@ -36,7 +45,11 @@ export function CmbPage() {
     <div className="stack">
       <h1 style={{ margin: 0 }}>{t('cmb')}</h1>
       <p className="muted">Internal net-basis simulation · immutable snapshots · not legal tax advice</p>
-      <button className="btn primary" onClick={createFixture}>Load simple-product golden</button>
+      <div className="row">
+        {templates.map((tpl) => (
+          <button key={tpl.key} className="btn" onClick={() => createFrom(tpl.key)}>{t('templates')}: {tpl.key}</button>
+        ))}
+      </div>
       <div className="panel">
         <table className="table">
           <thead><tr><th>Name</th><th></th></tr></thead>

@@ -186,6 +186,61 @@ export async function businessRoutes(app: FastifyInstance) {
     return { ok: true }
   })
 
+
+  app.post('/api/b/:slug/transfer-owner', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug } = req.params as { slug: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m) return reply.code(404).send({ error: 'not_found' })
+    requireRole(m, ['owner'])
+    const { newOwnerUserId } = (req.body as { newOwnerUserId: string })
+    if (!newOwnerUserId) return reply.code(400).send({ error: 'newOwnerUserId_required' })
+    const target = (
+      await db
+        .select()
+        .from(memberships)
+        .where(and(eq(memberships.businessId, m.businessId), eq(memberships.userId, newOwnerUserId)))
+        .limit(1)
+    )[0]
+    if (!target) return reply.code(400).send({ error: 'target_must_be_member' })
+    await db.update(memberships).set({ role: 'owner' }).where(eq(memberships.id, target.id))
+    await db.update(memberships).set({ role: 'admin' }).where(eq(memberships.id, (
+      await db.select().from(memberships).where(and(eq(memberships.businessId, m.businessId), eq(memberships.userId, user.id))).limit(1)
+    )[0]!.id))
+    await writeAudit({
+      businessId: m.businessId,
+      actorUserId: user.id,
+      action: 'business.owner_transferred',
+      resourceRef: newOwnerUserId,
+    })
+    return { ok: true }
+  })
+
+  app.delete('/api/b/:slug/members/:userId', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug, userId } = req.params as { slug: string; userId: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m || !canManageMembers(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    const owners = await db
+      .select()
+      .from(memberships)
+      .where(and(eq(memberships.businessId, m.businessId), eq(memberships.role, 'owner')))
+    const victim = owners.find((o) => o.userId === userId)
+    if (victim && owners.length <= 1) {
+      return reply.code(409).send({ error: 'last_owner_cannot_leave' })
+    }
+    await db
+      .delete(memberships)
+      .where(and(eq(memberships.businessId, m.businessId), eq(memberships.userId, userId)))
+    await writeAudit({
+      businessId: m.businessId,
+      actorUserId: user.id,
+      action: 'membership.removed',
+      resourceRef: userId,
+    })
+    return { ok: true }
+  })
+
   app.get('/api/b/:slug/members', async (req, reply) => {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }

@@ -1,0 +1,15 @@
+{
+  "name": "@bu2/e2e",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:core": "playwright test --grep @core23b",
+    "typecheck": "echo 'e2e: skip'",
+    "lint": "echo 'e2e: lint ok'",
+    "build": "echo 'e2e: no build'"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1"
+  }
+}

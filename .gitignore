@@ -19,6 +19,9 @@ drizzle/meta/
 .pnpm-store/
 data/
 postgres-data/
+backups/
+*.sql
+!apps/api/src/db/bootstrap.sql
 *.pem
 *.key
 secrets/

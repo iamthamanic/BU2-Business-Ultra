@@ -1,0 +1,108 @@
+{
+  "id": "service",
+  "version": 1,
+  "industry": "service",
+  "labelDe": "Dienstleistung",
+  "descriptionDe": "Projekt- oder stundenbasierte Dienstleistungen mit Personal und Akquise.",
+  "defaultVolume": 40,
+  "layers": [
+    {
+      "key": "acquisition",
+      "labelDe": "Akquise",
+      "guidance": {
+        "generalDe": "Kosten und Kanäle, um zahlende Kunden zu gewinnen.",
+        "commonExamplesDe": ["Netzwerk", "Outbound", "Partnerschaften"],
+        "industryDe": "Dienstleister oft über Referrals und Sales-Zeit.",
+        "industryExamplesDe": ["Outbound-Calls", "LinkedIn", "Partner-Provision"]
+      }
+    },
+    {
+      "key": "operations",
+      "labelDe": "Betrieb",
+      "guidance": {
+        "generalDe": "Kosten für die Erbringung des verkauften Produkts oder der Dienstleistung.",
+        "commonExamplesDe": ["Personal", "Travel", "Subunternehmer"],
+        "industryDe": "Kern: billable Stunden und Delivery-Personal.",
+        "industryExamplesDe": ["Beraterstunden", "Projektleitung", "Fahrtkosten"]
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "key": "revenue",
+      "kind": "revenue",
+      "labelDe": "Umsatz",
+      "required": true,
+      "suggested": true,
+      "inputs": { "price": 1200 }
+    },
+    {
+      "key": "g_acquisition",
+      "kind": "group",
+      "labelDe": "Akquise",
+      "required": true,
+      "suggested": true,
+      "layerKey": "acquisition",
+      "inputs": {}
+    },
+    {
+      "key": "acq_sales",
+      "kind": "cost",
+      "labelDe": "Sales-Zeit",
+      "required": false,
+      "suggested": true,
+      "layerKey": "acquisition",
+      "costBehavior": "per_hour",
+      "inputs": { "rate": 80, "hoursPerOrder": 2 },
+      "allocation": { "rule": "direct" }
+    },
+    {
+      "key": "g_operations",
+      "kind": "group",
+      "labelDe": "Betrieb",
+      "required": true,
+      "suggested": true,
+      "layerKey": "operations",
+      "inputs": {}
+    },
+    {
+      "key": "ops_labor",
+      "kind": "cost",
+      "labelDe": "Delivery Personal",
+      "required": false,
+      "suggested": true,
+      "layerKey": "operations",
+      "costBehavior": "per_hour",
+      "inputs": { "rate": 75, "hoursPerOrder": 8 },
+      "allocation": { "rule": "direct" }
+    },
+    {
+      "key": "ops_travel",
+      "kind": "cost",
+      "labelDe": "Reisekosten",
+      "required": false,
+      "suggested": true,
+      "layerKey": "operations",
+      "costBehavior": "per_order",
+      "inputs": { "rate": 120 },
+      "allocation": { "rule": "direct" }
+    },
+    {
+      "key": "contribution",
+      "kind": "result",
+      "labelDe": "Deckungsbeitrag",
+      "required": true,
+      "suggested": true,
+      "inputs": {}
+    }
+  ],
+  "edges": [
+    { "sourceKey": "revenue", "targetKey": "contribution", "relation": "feeds" },
+    { "sourceKey": "acq_sales", "targetKey": "contribution", "relation": "feeds" },
+    { "sourceKey": "ops_labor", "targetKey": "contribution", "relation": "feeds" },
+    { "sourceKey": "ops_travel", "targetKey": "contribution", "relation": "feeds" },
+    { "sourceKey": "acq_sales", "targetKey": "g_acquisition", "relation": "depends_on" },
+    { "sourceKey": "ops_labor", "targetKey": "g_operations", "relation": "depends_on" },
+    { "sourceKey": "ops_travel", "targetKey": "g_operations", "relation": "depends_on" }
+  ]
+}

@@ -1,7 +1,12 @@
 import type { FastifyInstance } from 'fastify'
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
-import { calculateModel, simpleProductFixture, type DomainModel } from '@bu2/finance-calc'
+import {
+    calculateModel,
+    simpleProductFixture,
+    TEMPLATES,
+    type DomainModel,
+  } from '@bu2/finance-calc'
 import { canMutateContent } from '@bu2/shared'
 import { db } from '../../db/client.js'
 import { cmbModels, cmbSnapshots } from '../../db/schema.js'
@@ -9,6 +14,21 @@ import { loadMembership, requireUser } from '../../plugins/auth.js'
 import { writeAudit } from '../../lib/audit.js'
 
 export async function cmbRoutes(app: FastifyInstance) {
+  app.get('/api/b/:slug/cmb/templates', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug } = req.params as { slug: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m) return reply.code(404).send({ error: 'not_found' })
+    return {
+      templates: Object.entries(TEMPLATES).map(([key, model]) => ({
+        key,
+        id: model.id,
+        name: key,
+        volume: model.volume,
+      })),
+    }
+  })
+
   app.get('/api/b/:slug/cmb/models', async (req, reply) => {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
@@ -28,11 +48,16 @@ export async function cmbRoutes(app: FastifyInstance) {
         name: z.string().min(1),
         model: z.record(z.unknown()).optional(),
         useSimpleFixture: z.boolean().optional(),
+        template: z.enum(['simple', 'saas', 'service']).optional(),
       })
       .parse(req.body)
-    const model = (body.useSimpleFixture
-      ? simpleProductFixture
-      : (body.model as unknown as DomainModel)) as DomainModel
+    const model = (
+      body.template
+        ? TEMPLATES[body.template]
+        : body.useSimpleFixture
+          ? simpleProductFixture
+          : (body.model as unknown as DomainModel)
+    ) as DomainModel
     const [row] = await db
       .insert(cmbModels)
       .values({
