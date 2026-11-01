@@ -8,10 +8,13 @@ import {
   Article,
   BookmarkSimple,
   ChatCircle,
+  Clock,
   Eye,
   Heart,
   Lightning,
   ShareNetwork,
+  SquaresFour,
+  Storefront,
   UsersThree,
 } from '@phosphor-icons/react'
 import { FunnelTip } from '../../components/FunnelTip'
@@ -213,6 +216,7 @@ export function OrganicPostsPanel({
       <div className="funnel-filters-bar">
         <div className="funnel-filter-row" role="toolbar" aria-label={t('timeWindow')}>
           <span className="filter-lbl muted">
+            <Clock className="filter-lbl-ic" size={14} weight="duotone" aria-hidden />
             <FunnelTip tip={t('tipWin')}>{t('timeWindow')}</FunnelTip>
           </span>
           {WINDOWS.map((w) => (
@@ -230,6 +234,7 @@ export function OrganicPostsPanel({
 
         <div className="funnel-filter-row" role="toolbar" aria-label={t('filterBrand')}>
           <span className="filter-lbl muted">
+            <Storefront className="filter-lbl-ic" size={14} weight="duotone" aria-hidden />
             <FunnelTip tip={t('tipBrand')}>{t('filterBrand')}</FunnelTip>
           </span>
           <button
@@ -244,6 +249,7 @@ export function OrganicPostsPanel({
 
         <div className="funnel-filter-row" role="toolbar" aria-label={t('filterPostType')}>
           <span className="filter-lbl muted">
+            <SquaresFour className="filter-lbl-ic" size={14} weight="duotone" aria-hidden />
             <FunnelTip tip={t('tipPostType')}>{t('filterPostType')}</FunnelTip>
           </span>
           <button

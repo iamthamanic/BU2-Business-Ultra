@@ -7,6 +7,7 @@ import { useMemo, useState } from 'react'
 import type { Icon } from '@phosphor-icons/react'
 import {
   ChartLineUp,
+  Clock,
   Coin,
   CurrencyEur,
   CursorClick,
@@ -97,6 +98,7 @@ export function PaidCampaignsPanel({
     <div className="stack paid-campaigns-panel">
       <div className="funnel-filter-row paid-filter-row" role="toolbar" aria-label={t('timeWindow')}>
         <span className="filter-lbl muted">
+          <Clock className="filter-lbl-ic" size={14} weight="duotone" aria-hidden />
           <FunnelTip tip={t('tipWin')}>{t('timeWindow')}</FunnelTip>
         </span>
         {WINDOWS.map((w) => (
