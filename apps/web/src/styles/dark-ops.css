@@ -2241,36 +2241,36 @@ select {
 
 /* ——— Funnel channel depth (P3) ——— */
 
-.funnel-connect-gate {
-  min-height: 220px;
-  padding: var(--sp-6) var(--sp-5);
-  gap: var(--sp-3);
-  border-style: dashed;
-  border-color: color-mix(in srgb, var(--warn) 35%, var(--border));
-  background: color-mix(in srgb, var(--panel2) 88%, var(--warn));
+.funnel-connect-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--dim);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: var(--panel2);
 }
 
-.funnel-connect-eyebrow {
-  margin: 0;
-  font-size: 11px;
+.funnel-connect-hint-text {
+  flex: 1;
+  min-width: 12rem;
+}
+
+.funnel-connect-hint-link {
+  color: var(--accent);
   font-weight: 650;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
 }
 
-.funnel-connect-title {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+.funnel-connect-hint-link:hover {
   color: var(--text);
-}
-
-.funnel-connect-body {
-  margin: 0;
-  max-width: 42rem;
-  font-size: 14px;
-  line-height: 1.5;
 }
 
 .funnel-filter-row {

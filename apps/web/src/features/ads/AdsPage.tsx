@@ -1,13 +1,14 @@
 /**
  * AdsPage — paid funnel campaigns; provider synced from `/marketing/funnel/paid/:channel`.
- * Missing key → FunnelConnectGate; LinkedIn/Microsoft remain stub. Location: apps/web/src/features/ads/AdsPage.tsx
+ * Campaigns table always visible; soft connect banner when key missing.
+ * Location: apps/web/src/features/ads/AdsPage.tsx
  */
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { companyRoutes } from '../../lib/companyPaths'
 import { useI18n } from '../../lib/i18n'
-import { FunnelConnectGate } from '../marketing/FunnelConnectGate'
+import { FunnelConnectHint } from '../marketing/FunnelConnectHint'
 
 const LIVE_PROVIDERS = ['google_ads', 'meta_ads', 'tiktok_ads', 'chatgpt_ads'] as const
 const STUB_PROVIDERS = ['linkedin_ads', 'microsoft_ads'] as const
@@ -73,7 +74,7 @@ export function AdsPage() {
   }, [slug, provider])
 
   async function create() {
-    if (isStub(provider)) return
+    if (isStub(provider) || !ready) return
     try {
       await api(`/api/b/${slug}/ads`, {
         method: 'POST',
@@ -107,50 +108,32 @@ export function AdsPage() {
   }
 
   const title = providerLabel(provider, t)
-
-  if (isStub(provider)) {
-    return (
-      <div className="stack funnel-page">
-        <FunnelConnectGate
-          providerLabel={title}
-          need="stub"
-          settingsHref={settingsHref}
-          channelLabel={title}
-          hint={t('adsStubBody')}
-        />
-      </div>
-    )
-  }
-
-  if (loading) {
-    return (
-      <div className="stack funnel-page">
-        <p className="muted">{t('loading')}</p>
-      </div>
-    )
-  }
-
-  if (!ready) {
-    return (
-      <div className="stack funnel-page">
-        <FunnelConnectGate
-          providerLabel={title}
-          need="key"
-          settingsHref={settingsHref}
-          channelLabel={title}
-        />
-      </div>
-    )
-  }
+  const stub = isStub(provider)
+  const showConnect = stub || (!loading && !ready)
+  const emptyRow = stub
+    ? t('adsStubBody')
+    : !ready
+      ? t('campaignsEmptyNeedKey')
+      : t('noCampaigns')
 
   return (
     <div className="stack funnel-page">
+      {showConnect ? (
+        <FunnelConnectHint
+          need={stub ? 'stub' : 'key'}
+          settingsHref={settingsHref}
+          message={stub ? t('adsStubBody') : t('connectBannerAds').replace('{provider}', title)}
+        />
+      ) : null}
+
       <div className="mkt-pane-toolbar">
         <p className="muted page-lede" style={{ margin: 0 }}>
           Connector: {title}
         </p>
         <div className="row funnel-gates">
-          <span className="badge ok">{t('statusReady')}</span>
+          <span className={`badge ${ready && !stub ? 'ok' : 'warn'}`}>
+            {ready && !stub ? t('statusReady') : t('keyRequired')}
+          </span>
           <Link className="btn" to={settingsHref} style={{ fontSize: 12, padding: '4px 10px' }}>
             {t('openConnections')}
           </Link>
@@ -163,8 +146,9 @@ export function AdsPage() {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder={t('campaignNamePh')}
+          disabled={!ready || stub}
         />
-        <button className="btn primary" type="button" onClick={create}>
+        <button className="btn primary" type="button" onClick={create} disabled={!ready || stub}>
           {t('save')}
         </button>
       </div>
@@ -173,25 +157,30 @@ export function AdsPage() {
         <h3 className="section-title" style={{ marginTop: 0 }}>
           {t('adsCampaigns')}
         </h3>
-        {campaigns.length === 0 ? (
-          <div className="state-block empty-state funnel-empty">
-            <p className="muted">{t('noCampaigns')}</p>
-            <p className="muted" style={{ fontSize: 13 }}>
-              {t('adsEmptyHint')}
-            </p>
-          </div>
-        ) : (
-          <table className="table">
-            <thead>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>{t('name')}</th>
+              <th>Provider</th>
+              <th>{t('status')}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
               <tr>
-                <th>{t('name')}</th>
-                <th>Provider</th>
-                <th>{t('status')}</th>
-                <th></th>
+                <td colSpan={4} className="funnel-table-empty muted">
+                  {t('loading')}
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {campaigns.map((c) => (
+            ) : campaigns.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="funnel-table-empty muted">
+                  {emptyRow}
+                </td>
+              </tr>
+            ) : (
+              campaigns.map((c) => (
                 <tr key={c.id}>
                   <td>{c.name}</td>
                   <td>{c.provider}</td>
@@ -202,10 +191,10 @@ export function AdsPage() {
                     </button>
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
       {msg ? <pre className="panel muted">{msg}</pre> : null}
     </div>
