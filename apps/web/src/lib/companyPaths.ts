@@ -31,13 +31,16 @@ export function companyBase(slug: string) {
   return `/co/${encodeURIComponent(slug)}`
 }
 
-/** Canonical user-facing paths under a company (legacy shell map). */
+/** Canonical user-facing paths under a company (Marketing Hub default landing). */
 export function companyRoutes(slug: string) {
   const base = companyBase(slug)
   return {
-    overview: base,
+    /** Marketing Hub — default company landing */
+    hub: `${base}/marketing`,
+    /** Alias kept for older call sites; same as hub */
+    overview: `${base}/marketing`,
     catalog: `${base}/catalog`,
-    marketing: `${base}/marketing/funnel/organic/${DEFAULT_ORGANIC_CHANNEL}`,
+    marketing: `${base}/marketing`,
     organic: (ch: string) => `${base}/marketing/funnel/organic/${ch}`,
     ads: `${base}/marketing/funnel/paid/${DEFAULT_PAID_CHANNEL}`,
     paid: (ch: string) => `${base}/marketing/funnel/paid/${ch}`,
@@ -47,8 +50,11 @@ export function companyRoutes(slug: string) {
     sortanize: `${base}/tools/sortanize`,
     checkmap: `${base}/tools/checkmap`,
     personas: `${base}/tools/persona-journey`,
+    /** SEO/GEO keep tools/* URLs for API/bookmark compatibility; nav under Marketing */
     openseo: `${base}/tools/seo`,
+    geo: `${base}/tools/geo`,
     settings: `${base}/settings`,
+    settingsConnections: `${base}/settings#connections`,
   } as const
 }
 
@@ -60,9 +66,9 @@ export function mapOldBu2FrontendPath(slug: string, rest: string): string {
   const r = (rest || '').replace(/^\/+|\/+$/g, '')
   const routes = companyRoutes(slug)
   const map: Record<string, string> = {
-    '': routes.overview,
+    '': routes.hub,
     catalog: routes.catalog,
-    marketing: routes.marketing,
+    marketing: routes.hub,
     ads: routes.ads,
     cmb: routes.cmb,
     checkmap: routes.checkmap,
@@ -73,5 +79,5 @@ export function mapOldBu2FrontendPath(slug: string, rest: string): string {
   }
   if (r in map) return map[r]!
   // Unknown remainder: keep under /co with same suffix
-  return r ? `${companyBase(slug)}/${r}` : companyBase(slug)
+  return r ? `${companyBase(slug)}/${r}` : routes.hub
 }

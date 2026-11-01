@@ -12,23 +12,36 @@ User-facing SPA paths only. **API remains `/api/b/:slug/...`** (BU2 contract).
 
 Admin stays **global** (no company prefix): `/admin`. Auth: `/login`, `/login/verify`. Company picker home: `/`.
 
+## Shell IA (nav)
+
+| Department | Nav items |
+|---|---|
+| **Marketing** | Hub · Organic (channels) · Paid (channels) · Custom (channels) · Persona Journey · SEO · GEO |
+| **Tools** | CostMyBusiness · Sortanize · CheckMap |
+| Footer | Einstellungen · language · logout |
+| Topbar | Company switcher (unchanged) |
+
+Default company landing after select: **Marketing Hub** (`/co/:slug` → `/co/:slug/marketing`).
+
+SEO/GEO stay under Marketing in the sidebar; URLs remain `/tools/seo` and `/tools/geo` for bookmark/API compatibility.
+
 ## Route map
 
 | Area | Legacy | BU2 now | Notes |
 |---|---|---|---|
-| Overview | `/co/:slug/` | `/co/:slug/` | Same |
-| Organic marketing | `/co/:slug/marketing/funnel/organic/:channel` | same | Channels: instagram, facebook, tiktok, linkedin, youtube. Default nav → `instagram` |
-| Paid ads | `/co/:slug/marketing/funnel/paid/:channel` | same | Channels: google, meta, tiktok, chatgpt. Default → `google` |
-| Custom funnel | `/co/:slug/marketing/funnel/custom/:channel` | same | email, offline → Marketing page (Brevo/custom) |
-| CostMyBusiness | `/co/:slug/tools/cmb` | same | |
-| Sortanize | `/co/:slug/tools/sortanize` | same | |
-| CheckMap | `/co/:slug/tools/checkmap` (+ `/m/:mapId`) | same | Deep `mapId` accepted; canvas SoR unchanged |
-| Personas / journey | `/co/:slug/tools/persona-journey` (+ `/p/:id/j/:id`) | same | Alias `/tools/personas` → persona-journey |
-| OpenSEO / SEO | `/co/:slug/tools/seo` | same | |
-| GEO | `/co/:slug/tools/geo` | → `/tools/seo` | **Deviation:** BU2 single OpenSEO module |
-| Catalog | _(none)_ | `/co/:slug/catalog` | **BU2-only** SoR for products |
-| Settings / keys | _(in-admin / overlays)_ | `/co/:slug/settings` | **BU2-only** dedicated settings |
-| Comments | `/comments` → overview | `/co/:slug/comments` → overview | Legacy removed tab |
+| Marketing Hub | Overview-ish | `/co/:slug/marketing` | Also `/co/:slug/` → redirect here |
+| Organic marketing | `/co/:slug/marketing/funnel/organic/:channel` | same | Channels: instagram, facebook, tiktok, linkedin, youtube |
+| Paid ads | `/co/:slug/marketing/funnel/paid/:channel` | same | Channels: google, meta, tiktok, chatgpt |
+| Custom funnel | `/co/:slug/marketing/funnel/custom/:channel` | same | email, offline |
+| CostMyBusiness | `/co/:slug/tools/cmb` | same | Tools dept |
+| Sortanize | `/co/:slug/tools/sortanize` | same | Tools dept |
+| CheckMap | `/co/:slug/tools/checkmap` (+ `/m/:mapId`) | same | Tools dept |
+| Personas / journey | `/co/:slug/tools/persona-journey` | same | Marketing dept (nav); alias `/tools/personas` |
+| OpenSEO / SEO | `/co/:slug/tools/seo` | same | Marketing dept (nav) |
+| GEO | `/co/:slug/tools/geo` | same page family as SEO | Marketing dept; AI Visibility surface |
+| Catalog | _(none)_ | `/co/:slug/catalog` | Top-level SoR |
+| Settings / keys | _(in-admin / overlays)_ | `/co/:slug/settings` (+ `#connections`) | Footer |
+| Comments | `/comments` → overview | → marketing hub | |
 | Short `/ads` | → paid/google | redirect under `/co` | |
 | Short `/c/:channel` | → organic channel | redirect under `/co` | |
 | Superadmin | `/admin` | `/admin` | Same |
@@ -41,5 +54,6 @@ Admin stays **global** (no company prefix): `/admin`. Auth: `/login`, `/login/ve
 
 1. **API** still `/api/b/:slug` — do not rename without a versioned migration.
 2. **Catalog** + **Settings** are first-class BU2 routes (not in legacy shell URL table).
-3. **GEO** collapses to SEO/OpenSEO.
+3. **GEO** shares OpenSEO module UI with a distinct nav entry and surface hint.
 4. Channel segment is in the URL for shareability; module UIs may not yet filter by channel.
+5. No separate **Website** sidebar department — SEO/GEO live under Marketing.

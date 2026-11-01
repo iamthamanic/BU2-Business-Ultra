@@ -163,6 +163,7 @@ export type ModuleKey = (typeof MODULE_KEYS)[number]
 
 /**
  * Legacy `ME.tabs`-style nav keys (match shell `data-ic` / channel ids).
+ * Marketing Hub uses `overview` (or `home`); SEO/GEO under Marketing department.
  * `null` from resolveEntitledTabs = unrestricted (owner/admin).
  */
 export const NAV_TAB_KEYS = [
@@ -184,6 +185,7 @@ export const NAV_TAB_KEYS = [
   'personas',
   'checkmap',
   'seo',
+  'geo',
   'settings',
 ] as const
 export type NavTabKey = (typeof NAV_TAB_KEYS)[number]
@@ -207,7 +209,7 @@ export const STUB_MEMBER_NAV_TABS: NavTabKey[] = [
   'sortanize',
   'personas',
   'checkmap',
-  // seo gated separately via grantSeoOpen; settings owner/admin only in shell
+  // seo/geo gated separately via grantSeoOpen; settings owner/admin only in shell
 ]
 
 /**

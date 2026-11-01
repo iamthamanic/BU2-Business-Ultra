@@ -37,8 +37,8 @@ Primary auth is **email + password**. Magic Link / OTP remains as a secondary/de
 1. `pnpm db:migrate && pnpm db:seed` (seeds/refreshes the bootstrap password hash)
 2. Open `/login` → email + password → **Anmelden**
 3. Optional: expand Magic Link / OTP; without `BREVO_API_KEY`, codes print to the API console
-4. Create first company (empty start) → opens under `/co/:slug/`
-5. Settings → paste provider keys (features stay gated until valid)
+4. Create first company (empty start) → Marketing Hub at `/co/:slug/marketing`
+5. Settings → Verbindungen → paste provider keys (features stay gated until valid)
 
 Change password while logged in: `POST /api/auth/password` with `{ "currentPassword": "…", "newPassword": "…" }`.
 
@@ -86,6 +86,7 @@ scripts/           backup/restore
 
 ## Recent changes
 
+- **2026-11-01** — Shell IA: Marketing (Hub/Organic/Paid/Custom/Persona/SEO/GEO) + Tools; Marketing Hub default landing; no Website dept ([docs/ROUTING.md](./docs/ROUTING.md))
 - **2026-11-01** — Topbar company switcher restored (legacy-style dropdown); sidebar Companies nav removed; `/` + post-login land on `bu2_last_company`; create-first when empty
 - **2026-11-01** — Topbar chips sharper (`--radius-sm`)
 - **2026-11-01** — Topbar logo only; "Business Ultra" wordmark in sidebar `sb-head` (hidden when slim/collapsed)

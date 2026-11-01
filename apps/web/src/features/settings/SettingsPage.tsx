@@ -106,7 +106,8 @@ export function SettingsPage() {
         />
       </div>
 
-      <div className="panel stack">
+      <div className="panel stack" id="connections">
+        <h3 style={{ margin: 0 }}>{t('connections')}</h3>
         {PROVIDERS.map((p) => {
           const st = statuses.find((s) => s.provider === p)
           return (

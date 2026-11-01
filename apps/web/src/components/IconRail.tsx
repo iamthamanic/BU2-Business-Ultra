@@ -1,7 +1,7 @@
 /**
  * IconRail / Sidebar — legacy-parity collapsible left nav (slim icons ↔ expanded labels).
- * Supports grouped funnel sections (details) with session persistence; collapse toggle + wordmark in sb-head
- * (wordmark hidden when slim); settings/admin/lang/logout in footer. Logo stays in topbar. Mobile: overlay drawer.
+ * Supports department groups + nested funnel subgroups (Organic/Paid/Custom) with session persistence;
+ * collapse toggle + wordmark in sb-head; settings/admin/lang/logout in footer. Logo stays in topbar.
  * Location: apps/web/src/components/IconRail.tsx
  */
 import { useEffect, useState } from 'react'
@@ -23,7 +23,12 @@ export type RailItem = {
 export type RailGroup = {
   id: string
   label: string
-  items: RailItem[]
+  /** Links rendered before nested subgroups (e.g. Hub) */
+  items?: RailItem[]
+  /** Nested subgroups (e.g. Organic channels under Marketing) */
+  groups?: RailGroup[]
+  /** Links rendered after nested subgroups (e.g. Persona / SEO / GEO) */
+  afterItems?: RailItem[]
 }
 
 const SB_SLIM_KEY = 'sb_slim'
@@ -63,6 +68,12 @@ function writeGroupOpen(id: string, open: boolean) {
 function pathMatches(pathname: string, to: string, end?: boolean) {
   if (end) return pathname === to
   return pathname === to || pathname.startsWith(`${to}/`)
+}
+
+function groupHasActive(group: RailGroup, pathname: string): boolean {
+  if (group.items?.some((it) => pathMatches(pathname, it.to, it.end))) return true
+  if (group.afterItems?.some((it) => pathMatches(pathname, it.to, it.end))) return true
+  return group.groups?.some((g) => groupHasActive(g, pathname)) ?? false
 }
 
 type Props = {
@@ -111,21 +122,27 @@ function RailLink({
 function GroupBlock({
   group,
   onNavigate,
+  nested = false,
 }: {
   group: RailGroup
   onNavigate?: () => void
+  nested?: boolean
 }) {
   const location = useLocation()
-  const childActive = group.items.some((it) => pathMatches(location.pathname, it.to, it.end))
-  const [open, setOpen] = useState(() => readGroupOpen(group.id, childActive))
+  const childActive = groupHasActive(group, location.pathname)
+  const [open, setOpen] = useState(() => readGroupOpen(group.id, childActive || !nested))
 
   useEffect(() => {
     if (childActive) setOpen(true)
   }, [childActive, location.pathname])
 
+  const items = group.items ?? []
+  const afterItems = group.afterItems ?? []
+  const subgroups = group.groups ?? []
+
   return (
     <details
-      className="sb-group"
+      className={`sb-group${nested ? ' sb-group-nested' : ''}`}
       open={open}
       data-sb-group={group.id}
       onToggle={(e) => {
@@ -140,7 +157,13 @@ function GroupBlock({
         </span>
         {group.label}
       </summary>
-      {group.items.map((item) => (
+      {items.map((item) => (
+        <RailLink key={item.key} item={item} onNavigate={onNavigate} />
+      ))}
+      {subgroups.map((g) => (
+        <GroupBlock key={g.id} group={g} onNavigate={onNavigate} nested />
+      ))}
+      {afterItems.map((item) => (
         <RailLink key={item.key} item={item} onNavigate={onNavigate} />
       ))}
     </details>

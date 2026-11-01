@@ -1,7 +1,7 @@
 /**
- * BusinessShell — `/co/:slug` layout with collapsible module sidebar (legacy URL + IA parity).
- * Grouped Organic / Paid / Custom / Tools / Website nav; settings in footer; company switcher in topbar.
- * Nav filtered by membership.tabs (legacy ME.tabs); owner/admin see all (tabs null).
+ * BusinessShell — `/co/:slug` layout with department sidebar IA.
+ * Marketing (Hub, Organic/Paid/Custom nested, Persona Journey, SEO, GEO) · Tools (CMB, Sortanize, CheckMap).
+ * Settings in footer; company switcher in topbar. Nav filtered by membership.tabs.
  * API calls remain `/api/b/:slug`. Location: apps/web/src/components/BusinessShell.tsx
  */
 import { useEffect, useMemo, useState } from 'react'
@@ -25,6 +25,7 @@ import {
   MagnifyingGlass,
   GearSix,
   Sparkle,
+  GlobeHemisphereWest,
 } from '@phosphor-icons/react'
 import { canOpenSeo, canSeeNavTab } from '@bu2/shared'
 import { api } from '../lib/api'
@@ -112,21 +113,22 @@ export function BusinessShell({
   const groups: RailGroup[] = useMemo(() => {
     if (!routes) return []
     const out: RailGroup[] = []
+    const role = membership?.role ?? (user.isSuperadmin ? 'owner' : 'viewer')
+    const grantSeo = membership?.grantSeoOpen ?? false
 
-    const overviewItems: RailItem[] = []
-    if (canSeeNavTab(tabs, 'overview')) {
-      overviewItems.push({
-        key: 'overview',
-        to: routes.overview,
+    const hubItems: RailItem[] = []
+    if (canSeeNavTab(tabs, 'overview') || canSeeNavTab(tabs, 'home')) {
+      hubItems.push({
+        key: 'hub',
+        to: routes.hub,
         end: true,
-        label: t('overview'),
+        label: t('marketingHub'),
         icon: SquaresFour,
         dataIc: 'overview',
       })
     }
-    if (overviewItems.length) {
-      out.push({ id: 'overview', label: t('navOverview'), items: overviewItems })
-    }
+
+    const marketingGroups: RailGroup[] = []
 
     const organicItems = ORGANIC_CHANNELS.filter((ch) => canSeeNavTab(tabs, ch)).map((ch) => ({
       key: `organic-${ch}`,
@@ -136,7 +138,7 @@ export function BusinessShell({
       dataIc: ch,
     }))
     if (organicItems.length) {
-      out.push({ id: 'organic', label: t('navOrganic'), items: organicItems })
+      marketingGroups.push({ id: 'organic', label: t('navOrganic'), items: organicItems })
     }
 
     const paidItems = PAID_CHANNELS.filter((ch) => canSeeNavTab(tabs, PAID_META[ch].dataIc)).map((ch) => ({
@@ -154,7 +156,7 @@ export function BusinessShell({
       dataIc: PAID_META[ch].dataIc,
     }))
     if (paidItems.length) {
-      out.push({ id: 'paid', label: t('navPaid'), items: paidItems })
+      marketingGroups.push({ id: 'paid', label: t('navPaid'), items: paidItems })
     }
 
     const customItems = CUSTOM_CHANNELS.filter((ch) => canSeeNavTab(tabs, CUSTOM_META[ch].dataIc)).map(
@@ -167,7 +169,46 @@ export function BusinessShell({
       }),
     )
     if (customItems.length) {
-      out.push({ id: 'custom', label: t('navCustom'), items: customItems })
+      marketingGroups.push({ id: 'custom', label: t('navCustom'), items: customItems })
+    }
+
+    const afterItems: RailItem[] = []
+    if (canSeeNavTab(tabs, 'personas')) {
+      afterItems.push({
+        key: 'personas',
+        to: routes.personas,
+        label: t('personaJourney'),
+        icon: UsersThree,
+        dataIc: 'personas',
+      })
+    }
+    if (canSeeNavTab(tabs, 'seo') && canOpenSeo(role, grantSeo)) {
+      afterItems.push({
+        key: 'seo',
+        to: routes.openseo,
+        label: t('seo'),
+        icon: MagnifyingGlass,
+        dataIc: 'seo',
+      })
+    }
+    if ((canSeeNavTab(tabs, 'geo') || canSeeNavTab(tabs, 'seo')) && canOpenSeo(role, grantSeo)) {
+      afterItems.push({
+        key: 'geo',
+        to: routes.geo,
+        label: t('geo'),
+        icon: GlobeHemisphereWest,
+        dataIc: 'geo',
+      })
+    }
+
+    if (hubItems.length || marketingGroups.length || afterItems.length) {
+      out.push({
+        id: 'marketing',
+        label: t('navMarketing'),
+        items: hubItems,
+        groups: marketingGroups,
+        afterItems,
+      })
     }
 
     const toolItems: RailItem[] = []
@@ -183,15 +224,6 @@ export function BusinessShell({
         dataIc: 'sortanize',
       })
     }
-    if (canSeeNavTab(tabs, 'personas')) {
-      toolItems.push({
-        key: 'personas',
-        to: routes.personas,
-        label: t('personaJourney'),
-        icon: UsersThree,
-        dataIc: 'personas',
-      })
-    }
     if (canSeeNavTab(tabs, 'checkmap')) {
       toolItems.push({
         key: 'checkmap',
@@ -203,22 +235,6 @@ export function BusinessShell({
     }
     if (toolItems.length) {
       out.push({ id: 'tools', label: t('navTools'), items: toolItems })
-    }
-
-    const role = membership?.role ?? (user.isSuperadmin ? 'owner' : 'viewer')
-    const grantSeo = membership?.grantSeoOpen ?? false
-    const websiteItems: RailItem[] = []
-    if (canSeeNavTab(tabs, 'seo') && canOpenSeo(role, grantSeo)) {
-      websiteItems.push({
-        key: 'seo',
-        to: routes.openseo,
-        label: t('seo'),
-        icon: MagnifyingGlass,
-        dataIc: 'seo',
-      })
-    }
-    if (websiteItems.length) {
-      out.push({ id: 'website', label: t('navWebsite'), items: websiteItems })
     }
 
     return out
