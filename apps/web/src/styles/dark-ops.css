@@ -217,6 +217,28 @@ select {
   letter-spacing: 0.04em;
 }
 
+/* Login hero brand: BU monogram + wordmark (mark PNG has transparent bg) */
+.login-card .brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.brand-mark {
+  display: block;
+  height: 48px;
+  width: auto;
+  max-width: 88px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.brand-name {
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 0.04em;
+}
+
 .content {
   padding: var(--sp-5);
   display: flex;

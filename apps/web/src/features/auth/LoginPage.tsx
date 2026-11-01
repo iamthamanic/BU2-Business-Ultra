@@ -44,7 +44,16 @@ export function LoginPage({ onAuthed }: { onAuthed: (u: AuthUser) => void }) {
   return (
     <div className="login-page">
       <div className="login-card stack">
-        <div className="brand">{t('brand')}</div>
+        <div className="brand">
+          <img
+            className="brand-mark"
+            src="/brand/bu-mark.png"
+            alt="Business Ultra"
+            width={80}
+            height={50}
+          />
+          <span className="brand-name">{t('brand')}</span>
+        </div>
         <p className="muted">Dark-Ops · Magic Link / OTP</p>
         <label>
           <span className="label">{t('email')}</span>
