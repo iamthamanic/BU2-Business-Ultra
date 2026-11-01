@@ -33,14 +33,21 @@ export async function businessRoutes(app: FastifyInstance) {
 
   app.post('/api/businesses', async (req, reply) => {
     const user = await requireUser(req)
-    // Existing owner may create; bootstrap superadmin may create first business (empty start)
+    // Superadmin, existing owner, or zero-membership bootstrap (create-first) may create.
     const owned = await db
       .select({ id: memberships.id })
       .from(memberships)
       .where(and(eq(memberships.userId, user.id), eq(memberships.role, 'owner')))
       .limit(1)
     if (!owned[0] && !user.isSuperadmin) {
-      return reply.code(403).send({ error: 'owner_required_to_create_business' })
+      const anyMembership = await db
+        .select({ id: memberships.id })
+        .from(memberships)
+        .where(eq(memberships.userId, user.id))
+        .limit(1)
+      if (anyMembership[0]) {
+        return reply.code(403).send({ error: 'owner_required_to_create_business' })
+      }
     }
     const body = CreateBusinessSchema.parse(req.body)
     const [biz] = await db

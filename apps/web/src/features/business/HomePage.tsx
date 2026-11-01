@@ -1,25 +1,18 @@
 /**
- * HomePage — logged-in companies console with collapsible sidebar shell.
- * Create flow is a modal (+ Company); list rows show logo thumbnails.
+ * HomePage — authenticated `/` gate: redirect to last (or first) company, else create-first.
+ * No Companies list nav; empty memberships open the create modal.
  * Location: apps/web/src/features/business/HomePage.tsx
  */
-import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { companyBase } from '../../lib/companyPaths'
-import {
-  Buildings,
-  ArrowRight,
-  Plus,
-  CircleNotch,
-  WarningCircle,
-} from '@phosphor-icons/react'
+import { pickLandingSlug, writeLastCompany } from '../../lib/lastCompany'
+import { Buildings, CircleNotch, Plus, WarningCircle } from '@phosphor-icons/react'
 import { api } from '../../lib/api'
 import { useI18n } from '../../lib/i18n'
 import type { AuthUser } from '../../app/App'
 import { AppShell } from '../../components/AppShell'
-import { BizLogo } from '../../components/BizLogo'
 import { CreateCompanyModal } from '../../components/CreateCompanyModal'
-import type { RailItem } from '../../components/IconRail'
 
 type Biz = {
   id: string
@@ -33,6 +26,7 @@ type LoadState = 'loading' | 'ready' | 'error'
 
 export function HomePage({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
   const { t } = useI18n()
+  const navigate = useNavigate()
   const [list, setList] = useState<Biz[]>([])
   const [err, setErr] = useState('')
   const [loadState, setLoadState] = useState<LoadState>('loading')
@@ -52,40 +46,35 @@ export function HomePage({ user, onLogout }: { user: AuthUser; onLogout: () => v
   }
 
   useEffect(() => {
-    refresh()
+    void refresh()
   }, [])
 
-  const railItems: RailItem[] = useMemo(
-    () => [{ key: 'home', to: '/', end: true, label: t('businesses'), icon: Buildings }],
-    [t],
-  )
+  const landing = loadState === 'ready' ? pickLandingSlug(list) : null
+
+  useEffect(() => {
+    if (loadState !== 'ready') return
+    if (landing) return
+    setModalOpen(true)
+  }, [loadState, landing])
+
+  useEffect(() => {
+    if (landing) writeLastCompany(landing)
+  }, [landing])
+
+  if (landing) {
+    return <Navigate to={companyBase(landing)} replace />
+  }
 
   return (
-    <AppShell
-      user={user}
-      railItems={railItems}
-      subtitle={<span>{t('businesses')}</span>}
-      onLogout={onLogout}
-    >
+    <AppShell user={user} railItems={[]} subtitle={<span>{t('businesses')}</span>} onLogout={onLogout}>
       <div className="home-layout">
         <section className="panel home-list-panel" aria-labelledby="biz-heading">
           <div className="home-panel-head">
             <div>
               <h1 id="biz-heading" className="page-title">
-                {t('businesses')}
+                {t('createBusiness')}
               </h1>
-              <p className="muted page-lede">{t('businessesLede')}</p>
-            </div>
-            <div className="home-panel-actions">
-              {loadState === 'ready' && <span className="badge">{list.length}</span>}
-              <button
-                type="button"
-                className="btn primary"
-                onClick={() => setModalOpen(true)}
-              >
-                <Plus size={16} weight="bold" aria-hidden />
-                {t('createCompanyBtn')}
-              </button>
+              <p className="muted page-lede">{t('emptyStart')}</p>
             </div>
           </div>
 
@@ -101,14 +90,14 @@ export function HomePage({ user, onLogout }: { user: AuthUser; onLogout: () => v
               <WarningCircle size={20} weight="regular" aria-hidden />
               <div className="stack" style={{ gap: 8 }}>
                 <span>{err || t('loadError')}</span>
-                <button type="button" className="btn" onClick={refresh}>
+                <button type="button" className="btn" onClick={() => void refresh()}>
                   {t('retry')}
                 </button>
               </div>
             </div>
           )}
 
-          {loadState === 'ready' && list.length === 0 && (
+          {loadState === 'ready' && (
             <div className="state-block empty-state">
               <Buildings size={28} weight="regular" aria-hidden />
               <p className="muted">{t('emptyStart')}</p>
@@ -118,38 +107,15 @@ export function HomePage({ user, onLogout }: { user: AuthUser; onLogout: () => v
               </button>
             </div>
           )}
-
-          {loadState === 'ready' && list.length > 0 && (
-            <ul className="biz-list" role="list">
-              {list.map((b) => (
-                <li key={b.id} className="biz-row">
-                  <div className="biz-row-main">
-                    <BizLogo name={b.name} logoPath={b.logoPath} className="biz-logo" />
-                    <div className="biz-row-text">
-                      <span className="biz-name">{b.name}</span>
-                      <span className="kpi biz-slug">{b.slug}</span>
-                    </div>
-                  </div>
-                  <div className="biz-row-meta">
-                    <span className={`badge ${b.status === 'active' ? 'ok' : 'warn'}`}>{b.status}</span>
-                    <span className="badge">{b.role}</span>
-                    <Link className="btn primary biz-open" to={companyBase(b.slug)}>
-                      {t('open')}
-                      <ArrowRight size={14} weight="bold" aria-hidden />
-                    </Link>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
         </section>
       </div>
 
       <CreateCompanyModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        onCreated={() => {
-          void refresh()
+        onCreated={(biz) => {
+          writeLastCompany(biz.slug)
+          navigate(companyBase(biz.slug), { replace: true })
         }}
       />
     </AppShell>

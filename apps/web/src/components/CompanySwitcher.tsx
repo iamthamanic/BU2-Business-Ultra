@@ -1,6 +1,5 @@
 /**
- * CompanySwitcher — switch / create / list companies.
- * Dropdown mode kept for reuse; Settings embeds `variant="panel"`.
+ * CompanySwitcher — switch / create companies (topbar dropdown + Settings panel).
  * Location: apps/web/src/components/CompanySwitcher.tsx
  */
 import { useEffect, useRef, useState } from 'react'
@@ -8,6 +7,7 @@ import { useNavigate } from 'react-router-dom'
 import { CaretDown } from '@phosphor-icons/react'
 import { api } from '../lib/api'
 import { companyBase } from '../lib/companyPaths'
+import { writeLastCompany } from '../lib/lastCompany'
 import { useI18n } from '../lib/i18n'
 
 type Biz = {
@@ -142,6 +142,7 @@ export function CompanySwitcher({
       setName('')
       setSlug('')
       setMsg('')
+      writeLastCompany(r.business.slug)
       navigate(companyBase(r.business.slug))
     } catch (e) {
       setMsg(String(e))
@@ -150,6 +151,7 @@ export function CompanySwitcher({
 
   function goCompany(nextSlug: string) {
     setOpen(false)
+    writeLastCompany(nextSlug)
     navigate(companyBase(nextSlug))
   }
 
@@ -185,17 +187,6 @@ export function CompanySwitcher({
           {t('createCompanyPlus')}
         </button>
       )}
-      <button
-        type="button"
-        className="hdr-company-item"
-        onClick={() => {
-          setOpen(false)
-          setCreating(false)
-          navigate('/')
-        }}
-      >
-        {t('allCompanies')}
-      </button>
     </>
   )
 

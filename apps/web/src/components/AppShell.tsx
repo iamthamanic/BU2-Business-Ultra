@@ -1,12 +1,13 @@
 /**
- * AppShell — legacy-parity chrome: collapsible sidebar + header context chip bar.
+ * AppShell — legacy-parity chrome: collapsible sidebar + header company switcher.
  * Logo-only BrandMark left in the topbar; wordmark lives in sidebar sb-head;
- * company shown as context text (switcher lives in Settings); account chip right.
+ * company switcher in topbar (Settings keeps panel); account chip right.
  * Location: apps/web/src/components/AppShell.tsx
  */
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { List, X } from '@phosphor-icons/react'
 import { BrandMark } from './BrandMark'
+import { CompanySwitcher } from './CompanySwitcher'
 import { IconRail, type RailGroup, type RailItem } from './IconRail'
 import { useI18n } from '../lib/i18n'
 import type { AuthUser } from '../app/App'
@@ -26,6 +27,8 @@ type Props = {
   /** Static subtitle chip (home/admin). Company pages use `company` instead. */
   subtitle?: ReactNode
   company?: CompanyCtx | null
+  /** Show create-company footer in topbar switcher (owner / superadmin). */
+  canCreateCompany?: boolean
   showAdmin?: boolean
   onLogout?: () => void
   children: ReactNode
@@ -38,6 +41,7 @@ export function AppShell({
   settingsItem,
   subtitle,
   company,
+  canCreateCompany,
   showAdmin,
   onLogout,
   children,
@@ -62,13 +66,8 @@ export function AppShell({
   const admin =
     showAdmin ?? (user.isSuperadmin || user.isBreakglassOperator)
 
-  const contextLabel = company?.name || company?.slug
-  const contextTitle =
-    company?.name && company?.slug
-      ? `${company.name} (${company.slug})`
-      : typeof subtitle === 'string'
-        ? subtitle
-        : undefined
+  const allowCreate =
+    canCreateCompany ?? (user.isSuperadmin || user.isBreakglassOperator)
 
   return (
     <div className="shell-root">
@@ -86,18 +85,23 @@ export function AppShell({
             {drawerOpen ? <X size={18} weight="regular" /> : <List size={18} weight="regular" />}
           </button>
           <BrandMark to="/" showName={false} size="sm" />
-          {contextLabel ? (
-            <div className="hdr-chip hdr-context" title={contextTitle}>
-              <span className="hdr-chip-kicker">{t('company')}</span>
-              <span className="hdr-chip-value">{contextLabel}</span>
-            </div>
+          {company?.slug ? (
+            <>
+              <CompanySwitcher
+                variant="dropdown"
+                activeSlug={company.slug}
+                activeName={company.name || company.slug}
+                activeLogoPath={company.logoPath}
+                canCreate={allowCreate}
+              />
+              {company.status === 'archived' ? <span className="badge warn">archived</span> : null}
+            </>
           ) : subtitle ? (
             <div className="hdr-chip hdr-context" title={typeof subtitle === 'string' ? subtitle : undefined}>
               <span className="hdr-chip-kicker">{t('workspaceHome')}</span>
               <span className="hdr-chip-value">{subtitle}</span>
             </div>
           ) : null}
-          {company?.status === 'archived' ? <span className="badge warn">archived</span> : null}
         </div>
         <div className="hdr-toolbar">
           <span className="hdr-chip" title={user.email}>

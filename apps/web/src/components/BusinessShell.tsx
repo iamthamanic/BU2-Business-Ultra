@@ -1,6 +1,6 @@
 /**
  * BusinessShell — `/co/:slug` layout with collapsible module sidebar (legacy URL + IA parity).
- * Grouped Organic / Paid / Custom / Tools / Website nav; settings in footer; company name in topbar (switcher on Settings).
+ * Grouped Organic / Paid / Custom / Tools / Website nav; settings in footer; company switcher in topbar.
  * Nav filtered by membership.tabs (legacy ME.tabs); owner/admin see all (tabs null).
  * API calls remain `/api/b/:slug`. Location: apps/web/src/components/BusinessShell.tsx
  */
@@ -24,7 +24,6 @@ import {
   ArrowsDownUp,
   MagnifyingGlass,
   GearSix,
-  Buildings,
   Sparkle,
 } from '@phosphor-icons/react'
 import { canOpenSeo, canSeeNavTab } from '@bu2/shared'
@@ -35,6 +34,7 @@ import {
   PAID_CHANNELS,
   CUSTOM_CHANNELS,
 } from '../lib/companyPaths'
+import { writeLastCompany } from '../lib/lastCompany'
 import { useI18n } from '../lib/i18n'
 import type { AuthUser } from '../app/App'
 import { AppShell } from './AppShell'
@@ -87,6 +87,7 @@ export function BusinessShell({
       .then((r) => {
         setBiz(r.business)
         setMembership(r.membership)
+        if (r.business.status !== 'archived') writeLastCompany(slug)
       })
       .catch(() => {
         setBiz(null)
@@ -102,9 +103,6 @@ export function BusinessShell({
   const topItems: RailItem[] = useMemo(() => {
     if (!routes) return []
     const items: RailItem[] = []
-    if (canSeeNavTab(tabs, 'home')) {
-      items.push({ key: 'home', to: '/', end: true, label: t('businesses'), icon: Buildings, dataIc: 'home' })
-    }
     if (canSeeNavTab(tabs, 'catalog')) {
       items.push({ key: 'catalog', to: routes.catalog, label: t('catalog'), icon: Package, dataIc: 'catalog' })
     }
@@ -231,6 +229,9 @@ export function BusinessShell({
       ? { key: 'settings', to: routes.settings, label: t('settings'), icon: GearSix, dataIc: 'settings' }
       : null
 
+  const canCreateCompany =
+    user.isSuperadmin || membership?.role === 'owner' || membership?.role === 'admin'
+
   return (
     <AppShell
       user={user}
@@ -243,6 +244,7 @@ export function BusinessShell({
         logoPath: biz?.logoPath,
         status: biz?.status,
       }}
+      canCreateCompany={canCreateCompany}
       onLogout={onLogout}
     >
       <Outlet context={{ slug: slug!, user }} />

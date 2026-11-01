@@ -2,13 +2,11 @@
  * AdminPage — superadmin / breakglass console inside AppShell.
  * Location: apps/web/src/features/admin/AdminPage.tsx
  */
-import { useEffect, useMemo, useState } from 'react'
-import { Buildings } from '@phosphor-icons/react'
+import { useEffect, useState } from 'react'
 import { api } from '../../lib/api'
 import { useI18n } from '../../lib/i18n'
 import type { AuthUser } from '../../app/App'
 import { AppShell } from '../../components/AppShell'
-import type { RailItem } from '../../components/IconRail'
 
 export function AdminPage({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
   const { t } = useI18n()
@@ -21,11 +19,6 @@ export function AdminPage({ user, onLogout }: { user: AuthUser; onLogout: () => 
   useEffect(() => {
     api('/api/admin/overview').then(setData).catch((e) => setMsg(String(e)))
   }, [])
-
-  const railItems: RailItem[] = useMemo(
-    () => [{ key: 'home', to: '/', end: true, label: t('businesses'), icon: Buildings }],
-    [t],
-  )
 
   async function restore() {
     try {
@@ -47,7 +40,7 @@ export function AdminPage({ user, onLogout }: { user: AuthUser; onLogout: () => 
   return (
     <AppShell
       user={user}
-      railItems={railItems}
+      railItems={[]}
       subtitle={<span>{t('admin')}</span>}
       showAdmin
       onLogout={onLogout}

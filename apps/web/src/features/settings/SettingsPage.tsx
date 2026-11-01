@@ -103,7 +103,6 @@ export function SettingsPage() {
           activeSlug={slug}
           activeName={companyMeta?.name ?? slug}
           activeLogoPath={companyMeta?.logoPath}
-          canCreate
         />
       </div>
 
