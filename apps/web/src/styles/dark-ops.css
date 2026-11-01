@@ -2647,6 +2647,55 @@ select {
   min-width: 960px;
 }
 
+.funnel-th-sortable {
+  white-space: nowrap;
+}
+
+.funnel-posts-table thead th {
+  vertical-align: middle;
+}
+
+.funnel-th-sortable {
+  display: table-cell;
+}
+
+.funnel-th-sortable .funnel-th-btn,
+.funnel-th-sortable .funnel-tip {
+  vertical-align: middle;
+}
+
+.funnel-th-btn {
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  font-weight: inherit;
+}
+
+.funnel-th-btn:hover {
+  color: var(--text);
+}
+
+.funnel-th-dir {
+  font-size: 10px;
+  opacity: 0.45;
+  line-height: 1;
+}
+
+.funnel-th-sortable.is-sorted .funnel-th-dir {
+  opacity: 0.95;
+  color: var(--accent);
+}
+
 .funnel-ads-table th,
 .funnel-ads-table td {
   white-space: nowrap;

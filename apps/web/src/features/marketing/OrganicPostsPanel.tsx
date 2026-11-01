@@ -75,6 +75,8 @@ export function OrganicPostsPanel({
   const [win, setWin] = useState<WindowKey>(initialWindow)
   const [brand, setBrand] = useState('__all__')
   const [postType, setPostType] = useState('__all__')
+  const [sortKey, setSortKey] = useState<string>('date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const showReach = META.has(channel)
 
   const cols = useMemo(() => {
@@ -127,6 +129,31 @@ export function OrganicPostsPanel({
       return true
     })
   }, [posts, postType])
+
+  const sorted = useMemo(() => {
+    const dir = sortDir === 'asc' ? 1 : -1
+    return [...filtered].sort((a, b) => {
+      const av = sortValue(a, sortKey, showReach)
+      const bv = sortValue(b, sortKey, showReach)
+      if (av == null && bv == null) return 0
+      if (av == null) return 1
+      if (bv == null) return -1
+      if (typeof av === 'string' && typeof bv === 'string') {
+        return av.localeCompare(bv, 'de') * dir
+      }
+      return ((av as number) - (bv as number)) * dir
+    })
+  }, [filtered, sortKey, sortDir, showReach])
+
+  function toggleSort(key: string) {
+    if (key === 'thumb') return
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+    setSortKey(key)
+    setSortDir(key === 'date' || key === 'title' || key === 'type' || key === 'bucket' ? 'asc' : 'desc')
+  }
 
   const top5 = useMemo(() => {
     return [...filtered]
@@ -311,22 +338,48 @@ export function OrganicPostsPanel({
         <table className="table funnel-grid-table funnel-posts-table">
           <thead>
             <tr>
-              {cols.map((c) => (
-                <th key={c.key}>
-                  {c.tip ? <FunnelTip tip={t(c.tip)}>{c.label}</FunnelTip> : c.label}
-                </th>
-              ))}
+              {cols.map((c) => {
+                const sortable = c.key !== 'thumb'
+                const active = sortKey === c.key
+                return (
+                  <th
+                    key={c.key}
+                    className={sortable ? `funnel-th-sortable${active ? ' is-sorted' : ''}` : undefined}
+                    aria-sort={
+                      sortable && active ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined
+                    }
+                  >
+                    {sortable ? (
+                      <button
+                        type="button"
+                        className="funnel-th-btn"
+                        onClick={() => toggleSort(c.key)}
+                      >
+                        <span>{c.label}</span>
+                        <span className="funnel-th-dir" aria-hidden>
+                          {active ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}
+                        </span>
+                      </button>
+                    ) : null}
+                    {c.tip ? (
+                      <FunnelTip tip={t(c.tip)} iconOnly>
+                        {c.label}
+                      </FunnelTip>
+                    ) : null}
+                  </th>
+                )
+              })}
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {sorted.length === 0 ? (
               <tr>
                 <td colSpan={cols.length} className="funnel-table-empty muted">
                   {emptyHint}
                 </td>
               </tr>
             ) : (
-              filtered.map((p) => (
+              sorted.map((p) => (
                 <tr key={p.id}>
                   <td className="funnel-thumb-cell">
                     {p.image ? (
@@ -437,4 +490,49 @@ function bucketLabel(b: string) {
   if (b === '7d') return '≤7d'
   if (b === '30d') return '≤30d'
   return b || 'alt'
+}
+
+function sortValue(
+  p: OrganicPost,
+  key: string,
+  showReach: boolean,
+): string | number | null {
+  switch (key) {
+    case 'date':
+      return p.date || ''
+    case 'type':
+      return p.type || ''
+    case 'bucket':
+      return p.bucket === '24h' ? 1 : p.bucket === '7d' ? 2 : p.bucket === '30d' ? 3 : 4
+    case 'title':
+      return (p.title || '').toLowerCase()
+    case 'views':
+      return p.views
+    case 'reach':
+      return p.reach
+    case 'shareRate':
+      return p.sharesPer1000
+    case 'saveRate':
+      return showReach ? p.savesPer1000 : p.savesPer100
+    case 'watch':
+      return p.watchPct
+    case 'duration':
+      return p.durationSec
+    case 'paid':
+      return p.paidShare
+    case 'likes':
+      return p.likes
+    case 'comments':
+      return p.comments
+    case 'shares':
+      return p.shares
+    case 'saves':
+      return p.saves
+    case 'er':
+      return p.engagement
+    case 'kpi':
+      return p.kpiHit === true ? 1 : p.kpiHit === false ? 0 : null
+    default:
+      return null
+  }
 }
