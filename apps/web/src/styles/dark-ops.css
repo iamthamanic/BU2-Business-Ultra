@@ -2439,6 +2439,159 @@ select {
   background: transparent;
 }
 
+.funnel-dr {
+  position: relative;
+  gap: 8px;
+}
+
+.funnel-dr-trigger {
+  gap: 6px;
+  max-width: min(280px, 55vw);
+}
+
+.funnel-dr-trigger-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.funnel-dr-vs {
+  font-size: 10px;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+
+.funnel-dr-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 50;
+  width: min(520px, calc(100vw - 48px));
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  box-shadow: 0 12px 32px #00000077;
+}
+
+.funnel-dr-grid {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 12px 16px;
+}
+
+.funnel-dr-section-title {
+  font-size: 11px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--dim);
+  margin-bottom: 6px;
+}
+
+.funnel-dr-presets {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.funnel-dr-preset {
+  appearance: none;
+  font: inherit;
+  text-align: left;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.funnel-dr-preset:hover,
+.funnel-dr-preset.is-active {
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel2));
+}
+
+.funnel-dr-custom {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.funnel-dr-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.funnel-dr-compare-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.funnel-dr-compare-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel2);
+}
+
+.funnel-dr-compare-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.funnel-dr-compare-hint {
+  margin: 0;
+  font-size: 12px;
+}
+
+.funnel-dr-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.funnel-kpi-delta {
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.funnel-kpi-delta.is-up {
+  color: #34d399;
+}
+
+.funnel-kpi-delta.is-down {
+  color: #f87171;
+}
+
+.funnel-kpi-delta.is-flat {
+  color: var(--dim);
+}
+
+@media (max-width: 640px) {
+  .funnel-dr-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .funnel-export-btn {
   appearance: none;
   font: inherit;

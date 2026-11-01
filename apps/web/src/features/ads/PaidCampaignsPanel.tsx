@@ -7,7 +7,6 @@ import { useMemo, useState } from 'react'
 import type { Icon } from '@phosphor-icons/react'
 import {
   ChartLineUp,
-  Clock,
   Coin,
   CurrencyEur,
   CursorClick,
@@ -18,14 +17,20 @@ import {
   TrendUp,
   Wallet,
 } from '@phosphor-icons/react'
+import { FunnelDateRangePicker } from '../../components/FunnelDateRangePicker'
 import { FunnelExportMenu } from '../../components/FunnelExportMenu'
 import { FunnelTip } from '../../components/FunnelTip'
 import { useI18n } from '../../lib/i18n'
 import type { MessageKey } from '../../i18n/messages'
 import {
-  windowToDateRange,
-  type FunnelExportPayload,
-} from '../../lib/funnelExport'
+  defaultDateRange,
+  formatPctDelta,
+  PAID_PRESETS,
+  pctDelta,
+  resolveCompareRange,
+  type DateRangeValue,
+} from '../../lib/dateRange'
+import { type FunnelExportPayload } from '../../lib/funnelExport'
 
 export type PaidCampaignRow = {
   id: string
@@ -47,13 +52,6 @@ export type PaidCampaignRow = {
 
 type WindowKey = '7d' | '30d' | '90d' | 'all'
 
-const WINDOWS: { key: WindowKey; labelKey: 'win7d' | 'win30d' | 'win90d' | 'winAll' }[] = [
-  { key: '7d', labelKey: 'win7d' },
-  { key: '30d', labelKey: 'win30d' },
-  { key: '90d', labelKey: 'win90d' },
-  { key: 'all', labelKey: 'winAll' },
-]
-
 type Props = {
   channel: string
   campaigns: PaidCampaignRow[]
@@ -70,7 +68,7 @@ export function PaidCampaignsPanel({
   onWindowChange,
 }: Props) {
   const { t } = useI18n()
-  const [win, setWin] = useState<WindowKey>(initialWindow)
+  const [range, setRange] = useState<DateRangeValue>(() => defaultDateRange(initialWindow))
   const [q, setQ] = useState('')
 
   const filtered = useMemo(() => {
@@ -80,10 +78,20 @@ export function PaidCampaignsPanel({
   }, [campaigns, q])
 
   const agg = useMemo(() => sumCampaigns(filtered), [filtered])
+  /** Without per-row dates yet, compare uses same filtered set (deltas 0 until sync lands). */
+  const cmpAgg = useMemo(() => {
+    if (range.compare === 'off') return null
+    return sumCampaigns(filtered)
+  }, [filtered, range.compare])
+  const showDelta = range.compare !== 'off' && cmpAgg != null
 
-  function pickWindow(w: WindowKey) {
-    setWin(w)
-    onWindowChange?.(w)
+  function onRangeChange(next: DateRangeValue) {
+    setRange(next)
+    if (next.preset === '7d' || next.preset === '30d' || next.preset === '90d' || next.preset === 'all') {
+      onWindowChange?.(next.preset)
+    } else {
+      onWindowChange?.('all')
+    }
   }
 
   const cols: { key: string; label: string; tip: MessageKey }[] = [
@@ -102,17 +110,18 @@ export function PaidCampaignsPanel({
   ]
 
   function getExportPayload(): FunnelExportPayload {
-    const range = windowToDateRange(win)
-    const winLabel = WINDOWS.find((w) => w.key === win)
+    const cmp = resolveCompareRange(range)
+    const filters = [
+      { label: t('timeWindow'), value: `${range.from} – ${range.to}` },
+      ...(q.trim() ? [{ label: t('exportSearch'), value: q.trim() }] : []),
+    ]
+    if (cmp) filters.push({ label: t('dateCompare'), value: `${cmp.from} – ${cmp.to}` })
     return {
       kind: 'Paid',
       channel,
       from: range.from,
       to: range.to,
-      filters: [
-        { label: t('timeWindow'), value: winLabel ? t(winLabel.labelKey) : win },
-        ...(q.trim() ? [{ label: t('exportSearch'), value: q.trim() }] : []),
-      ],
+      filters,
       kpis: [
         { label: t('colSpend'), value: fmtEur(agg.spendCents) },
         { label: t('colImpr'), value: fmtN(agg.impressions) },
@@ -149,23 +158,7 @@ export function PaidCampaignsPanel({
   return (
     <div className="stack paid-campaigns-panel">
       <div className="funnel-filters-bar">
-        <div className="funnel-filter-row paid-filter-row" role="toolbar" aria-label={t('timeWindow')}>
-          <span className="filter-lbl muted">
-            <Clock className="filter-lbl-ic" size={14} weight="duotone" aria-hidden />
-            <FunnelTip tip={t('tipWin')}>{t('timeWindow')}</FunnelTip>
-          </span>
-          {WINDOWS.map((w) => (
-            <button
-              key={w.key}
-              type="button"
-              className={`chip ${win === w.key ? 'active' : ''}`}
-              onClick={() => pickWindow(w.key)}
-            >
-              {t(w.labelKey)}
-              <span className="n">{w.key === win ? filtered.length : '·'}</span>
-            </button>
-          ))}
-        </div>
+        <FunnelDateRangePicker value={range} onChange={onRangeChange} presets={PAID_PRESETS} />
         <label className="paid-search">
           <span className="sr-only">{t('adsSearchPh')}</span>
           <input
@@ -179,16 +172,82 @@ export function PaidCampaignsPanel({
       </div>
 
       <div className="funnel-kpi-strip paid-kpi-strip" aria-label="KPIs">
-        <Kpi icon={CurrencyEur} label={t('colSpend')} value={fmtEur(agg.spendCents)} tip={t('tipSpend')} accent />
-        <Kpi icon={Eye} label={t('colImpr')} value={fmtN(agg.impressions)} tip={t('tipImpr')} />
-        <Kpi icon={CursorClick} label={t('colClicks')} value={fmtN(agg.clicks)} tip={t('tipClicks')} />
-        <Kpi icon={ChartLineUp} label={t('colCtr')} value={fmtPct(agg.ctr)} tip={t('tipCtr')} />
-        <Kpi icon={Coin} label={t('colCpc')} value={fmtEur(agg.cpcCents)} tip={t('tipCpc')} />
-        <Kpi icon={Target} label={t('colConv')} value={fmtN(agg.conv)} tip={t('tipConv')} />
-        <Kpi icon={Percent} label={t('colCvr')} value={fmtPct(agg.cvr)} tip={t('tipCvr')} />
-        <Kpi icon={Tag} label={t('colCpa')} value={fmtEur(agg.cpaCents)} tip={t('tipCpa')} />
-        <Kpi icon={TrendUp} label={t('colRoas')} value={fmtRoas(agg.roas)} tip={t('tipRoas')} accent />
-        <Kpi icon={Wallet} label={t('colRevenue')} value={fmtEur(agg.revenueCents)} tip={t('tipRevenue')} />
+        <Kpi
+          icon={CurrencyEur}
+          label={t('colSpend')}
+          value={fmtEur(agg.spendCents)}
+          tip={t('tipSpend')}
+          accent
+          delta={showDelta ? pctDelta(agg.spendCents, cmpAgg!.spendCents) : undefined}
+        />
+        <Kpi
+          icon={Eye}
+          label={t('colImpr')}
+          value={fmtN(agg.impressions)}
+          tip={t('tipImpr')}
+          delta={showDelta ? pctDelta(agg.impressions, cmpAgg!.impressions) : undefined}
+        />
+        <Kpi
+          icon={CursorClick}
+          label={t('colClicks')}
+          value={fmtN(agg.clicks)}
+          tip={t('tipClicks')}
+          delta={showDelta ? pctDelta(agg.clicks, cmpAgg!.clicks) : undefined}
+        />
+        <Kpi
+          icon={ChartLineUp}
+          label={t('colCtr')}
+          value={fmtPct(agg.ctr)}
+          tip={t('tipCtr')}
+          delta={showDelta ? pctDelta(agg.ctr ?? 0, cmpAgg!.ctr ?? 0) : undefined}
+        />
+        <Kpi
+          icon={Coin}
+          label={t('colCpc')}
+          value={fmtEur(agg.cpcCents)}
+          tip={t('tipCpc')}
+          delta={
+            showDelta ? pctDelta(agg.cpcCents ?? 0, cmpAgg!.cpcCents ?? 0) : undefined
+          }
+        />
+        <Kpi
+          icon={Target}
+          label={t('colConv')}
+          value={fmtN(agg.conv)}
+          tip={t('tipConv')}
+          delta={showDelta ? pctDelta(agg.conv, cmpAgg!.conv) : undefined}
+        />
+        <Kpi
+          icon={Percent}
+          label={t('colCvr')}
+          value={fmtPct(agg.cvr)}
+          tip={t('tipCvr')}
+          delta={showDelta ? pctDelta(agg.cvr ?? 0, cmpAgg!.cvr ?? 0) : undefined}
+        />
+        <Kpi
+          icon={Tag}
+          label={t('colCpa')}
+          value={fmtEur(agg.cpaCents)}
+          tip={t('tipCpa')}
+          delta={
+            showDelta ? pctDelta(agg.cpaCents ?? 0, cmpAgg!.cpaCents ?? 0) : undefined
+          }
+        />
+        <Kpi
+          icon={TrendUp}
+          label={t('colRoas')}
+          value={fmtRoas(agg.roas)}
+          tip={t('tipRoas')}
+          accent
+          delta={showDelta ? pctDelta(agg.roas ?? 0, cmpAgg!.roas ?? 0) : undefined}
+        />
+        <Kpi
+          icon={Wallet}
+          label={t('colRevenue')}
+          value={fmtEur(agg.revenueCents)}
+          tip={t('tipRevenue')}
+          delta={showDelta ? pctDelta(agg.revenueCents, cmpAgg!.revenueCents) : undefined}
+        />
       </div>
 
       <div className="panel funnel-table-wrap">
@@ -251,13 +310,17 @@ function Kpi({
   value,
   tip,
   accent,
+  delta,
 }: {
   icon: Icon
   label: string
   value: string
   tip: string
   accent?: boolean
+  delta?: number | null
 }) {
+  const deltaCls =
+    delta == null ? '' : delta > 0 ? 'is-up' : delta < 0 ? 'is-down' : 'is-flat'
   return (
     <div className={`funnel-kpi${accent ? ' funnel-kpi--accent' : ''}`}>
       <div className="funnel-kpi-head">
@@ -270,6 +333,9 @@ function Kpi({
         </FunnelTip>
       </div>
       <div className="funnel-kpi-v">{value}</div>
+      {delta !== undefined ? (
+        <div className={`funnel-kpi-delta ${deltaCls}`.trim()}>{formatPctDelta(delta)}</div>
+      ) : null}
     </div>
   )
 }

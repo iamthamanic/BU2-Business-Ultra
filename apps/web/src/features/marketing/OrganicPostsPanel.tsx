@@ -8,7 +8,6 @@ import {
   Article,
   BookmarkSimple,
   ChatCircle,
-  Clock,
   Eye,
   Heart,
   Lightning,
@@ -17,14 +16,21 @@ import {
   Storefront,
   UsersThree,
 } from '@phosphor-icons/react'
+import { FunnelDateRangePicker } from '../../components/FunnelDateRangePicker'
 import { FunnelExportMenu } from '../../components/FunnelExportMenu'
 import { FunnelTip } from '../../components/FunnelTip'
 import { useI18n } from '../../lib/i18n'
 import type { MessageKey } from '../../i18n/messages'
 import {
-  windowToDateRange,
-  type FunnelExportPayload,
-} from '../../lib/funnelExport'
+  dateInRange,
+  defaultDateRange,
+  formatPctDelta,
+  ORGANIC_PRESETS,
+  pctDelta,
+  resolveCompareRange,
+  type DateRangeValue,
+} from '../../lib/dateRange'
+import { type FunnelExportPayload } from '../../lib/funnelExport'
 
 export type OrganicPost = {
   id: string
@@ -50,23 +56,14 @@ export type OrganicPost = {
   kpiHit: boolean | null
 }
 
-type WindowKey = '24h' | '7d' | '30d' | 'all'
-
-const WINDOWS: { key: WindowKey; labelKey: 'win24h' | 'win7d' | 'win30d' | 'winAll' }[] = [
-  { key: '24h', labelKey: 'win24h' },
-  { key: '7d', labelKey: 'win7d' },
-  { key: '30d', labelKey: 'win30d' },
-  { key: 'all', labelKey: 'winAll' },
-]
-
 const META = new Set(['instagram', 'facebook'])
 
 type Props = {
   channel: string
   posts: OrganicPost[]
   emptyHint: string
-  initialWindow?: WindowKey
-  onWindowChange?: (w: WindowKey) => void
+  initialWindow?: '24h' | '7d' | '30d' | 'all'
+  onWindowChange?: (w: '24h' | '7d' | '30d' | 'all') => void
 }
 
 export function OrganicPostsPanel({
@@ -77,7 +74,7 @@ export function OrganicPostsPanel({
   onWindowChange,
 }: Props) {
   const { t } = useI18n()
-  const [win, setWin] = useState<WindowKey>(initialWindow)
+  const [range, setRange] = useState<DateRangeValue>(() => defaultDateRange(initialWindow))
   const [brand, setBrand] = useState('__all__')
   const [postType, setPostType] = useState('__all__')
   const [sortKey, setSortKey] = useState<string>('date')
@@ -118,9 +115,13 @@ export function OrganicPostsPanel({
     return base
   }, [showReach, t])
 
-  function pickWindow(w: WindowKey) {
-    setWin(w)
-    onWindowChange?.(w)
+  function onRangeChange(next: DateRangeValue) {
+    setRange(next)
+    if (next.preset === '24h' || next.preset === '7d' || next.preset === '30d' || next.preset === 'all') {
+      onWindowChange?.(next.preset)
+    } else {
+      onWindowChange?.('all')
+    }
   }
 
   const types = useMemo(() => {
@@ -131,9 +132,19 @@ export function OrganicPostsPanel({
   const filtered = useMemo(() => {
     return posts.filter((p) => {
       if (postType !== '__all__' && p.type !== postType) return false
+      if (range.preset !== 'all' && !dateInRange(p.date, range.from, range.to)) return false
       return true
     })
-  }, [posts, postType])
+  }, [posts, postType, range])
+
+  const compareRows = useMemo(() => {
+    const cmp = resolveCompareRange(range)
+    if (!cmp) return [] as OrganicPost[]
+    return posts.filter((p) => {
+      if (postType !== '__all__' && p.type !== postType) return false
+      return dateInRange(p.date, cmp.from, cmp.to)
+    })
+  }, [posts, postType, range])
 
   const sorted = useMemo(() => {
     const dir = sortDir === 'asc' ? 1 : -1
@@ -160,20 +171,22 @@ export function OrganicPostsPanel({
     setSortDir(key === 'date' || key === 'title' || key === 'type' || key === 'bucket' ? 'asc' : 'desc')
   }
 
-  const kpis = useMemo(() => {
-    const views = filtered.reduce((s, p) => s + (p.views || 0), 0)
-    const reach = filtered.reduce((s, p) => s + (p.reach || 0), 0)
-    const likes = filtered.reduce((s, p) => s + (p.likes || 0), 0)
-    const comments = filtered.reduce((s, p) => s + (p.comments || 0), 0)
-    const shares = filtered.reduce((s, p) => s + (p.shares || 0), 0)
-    const saves = filtered.reduce((s, p) => s + (p.saves || 0), 0)
+  function sumPosts(rows: OrganicPost[]) {
+    const views = rows.reduce((s, p) => s + (p.views || 0), 0)
+    const reach = rows.reduce((s, p) => s + (p.reach || 0), 0)
+    const likes = rows.reduce((s, p) => s + (p.likes || 0), 0)
+    const comments = rows.reduce((s, p) => s + (p.comments || 0), 0)
+    const shares = rows.reduce((s, p) => s + (p.shares || 0), 0)
+    const saves = rows.reduce((s, p) => s + (p.saves || 0), 0)
     const inter = likes + comments + shares + saves
-    return { posts: filtered.length, views, reach, inter, likes, comments, shares, saves }
-  }, [filtered])
+    return { posts: rows.length, views, reach, inter, likes, comments, shares, saves }
+  }
+
+  const kpis = useMemo(() => sumPosts(filtered), [filtered])
+  const cmpKpis = useMemo(() => sumPosts(compareRows), [compareRows])
+  const showDelta = range.compare !== 'off'
 
   function getExportPayload(): FunnelExportPayload {
-    const range = windowToDateRange(win, { dates: sorted.map((p) => p.date) })
-    const winLabel = WINDOWS.find((w) => w.key === win)
     const kpiList = [
       { label: t('kpiPosts'), value: fmtN(kpis.posts) },
       { label: t('colViews'), value: fmtN(kpis.views) },
@@ -186,16 +199,21 @@ export function OrganicPostsPanel({
       { label: t('colShares'), value: fmtN(kpis.shares) },
       { label: t('colSaves'), value: fmtN(kpis.saves) },
     )
+    const cmp = resolveCompareRange(range)
+    const filters = [
+      { label: t('timeWindow'), value: `${range.from} – ${range.to}` },
+      { label: t('filterBrand'), value: brand === '__all__' ? t('filterAll') : brand },
+      { label: t('filterPostType'), value: postType === '__all__' ? t('filterAll') : postType },
+    ]
+    if (cmp) {
+      filters.push({ label: t('dateCompare'), value: `${cmp.from} – ${cmp.to}` })
+    }
     return {
       kind: 'Organic',
       channel,
       from: range.from,
       to: range.to,
-      filters: [
-        { label: t('timeWindow'), value: winLabel ? t(winLabel.labelKey) : win },
-        { label: t('filterBrand'), value: brand === '__all__' ? t('filterAll') : brand },
-        { label: t('filterPostType'), value: postType === '__all__' ? t('filterAll') : postType },
-      ],
+      filters,
       kpis: kpiList,
       columns: cols.map((c) => ({ key: c.key, label: c.label })),
       rows: sorted.map((p, i) => exportOrganicRow(p, i + 1, showReach)),
@@ -205,23 +223,12 @@ export function OrganicPostsPanel({
   return (
     <div className="stack organic-posts-panel">
       <div className="funnel-filters-bar">
-        <div className="funnel-filter-row" role="toolbar" aria-label={t('timeWindow')}>
-          <span className="filter-lbl muted">
-            <Clock className="filter-lbl-ic" size={14} weight="duotone" aria-hidden />
-            <FunnelTip tip={t('tipWin')}>{t('timeWindow')}</FunnelTip>
-          </span>
-          {WINDOWS.map((w) => (
-            <button
-              key={w.key}
-              type="button"
-              className={`chip ${win === w.key ? 'active' : ''}`}
-              onClick={() => pickWindow(w.key)}
-            >
-              {t(w.labelKey)}
-              <span className="n">{w.key === win ? filtered.length : '·'}</span>
-            </button>
-          ))}
-        </div>
+        <FunnelDateRangePicker
+          value={range}
+          onChange={onRangeChange}
+          presets={ORGANIC_PRESETS}
+          dates={posts.map((p) => p.date)}
+        />
 
         <div className="funnel-filter-row" role="toolbar" aria-label={t('filterBrand')}>
           <span className="filter-lbl muted">
@@ -268,35 +275,63 @@ export function OrganicPostsPanel({
       </div>
 
       <div className="funnel-kpi-strip" aria-label="KPIs">
-        <Kpi icon={Article} label={t('kpiPosts')} value={fmtN(kpis.posts)} tip={t('tipKpiPosts')} />
-        <Kpi icon={Eye} label={t('colViews')} value={fmtN(kpis.views)} tip={t('tipKpiViews')} />
+        <Kpi
+          icon={Article}
+          label={t('kpiPosts')}
+          value={fmtN(kpis.posts)}
+          tip={t('tipKpiPosts')}
+          delta={showDelta ? pctDelta(kpis.posts, cmpKpis.posts) : undefined}
+        />
+        <Kpi
+          icon={Eye}
+          label={t('colViews')}
+          value={fmtN(kpis.views)}
+          tip={t('tipKpiViews')}
+          delta={showDelta ? pctDelta(kpis.views, cmpKpis.views) : undefined}
+        />
         {showReach ? (
-          <Kpi icon={UsersThree} label={t('colReach')} value={fmtN(kpis.reach)} tip={t('tipKpiReach')} />
+          <Kpi
+            icon={UsersThree}
+            label={t('colReach')}
+            value={fmtN(kpis.reach)}
+            tip={t('tipKpiReach')}
+            delta={showDelta ? pctDelta(kpis.reach, cmpKpis.reach) : undefined}
+          />
         ) : null}
         <Kpi
           icon={Lightning}
           label={t('kpiInteractions')}
           value={fmtN(kpis.inter)}
           tip={t('tipKpiInter')}
+          delta={showDelta ? pctDelta(kpis.inter, cmpKpis.inter) : undefined}
         />
-        <Kpi icon={Heart} label={t('colLikes')} value={fmtN(kpis.likes)} tip={t('tipKpiLikes')} />
+        <Kpi
+          icon={Heart}
+          label={t('colLikes')}
+          value={fmtN(kpis.likes)}
+          tip={t('tipKpiLikes')}
+          delta={showDelta ? pctDelta(kpis.likes, cmpKpis.likes) : undefined}
+        />
         <Kpi
           icon={ChatCircle}
           label={t('colComments')}
           value={fmtN(kpis.comments)}
           tip={t('tipKpiComments')}
+          delta={showDelta ? pctDelta(kpis.comments, cmpKpis.comments) : undefined}
         />
         <Kpi
           icon={ShareNetwork}
           label={t('colShares')}
           value={fmtN(kpis.shares)}
           tip={t('tipKpiShares')}
+          delta={showDelta ? pctDelta(kpis.shares, cmpKpis.shares) : undefined}
         />
         <Kpi
           icon={BookmarkSimple}
           label={t('colSaves')}
           value={fmtN(kpis.saves)}
           tip={t('tipKpiSaves')}
+          delta={showDelta ? pctDelta(kpis.saves, cmpKpis.saves) : undefined}
         />
       </div>
 
@@ -408,12 +443,22 @@ function Kpi({
   label,
   value,
   tip,
+  delta,
 }: {
   icon: Icon
   label: string
   value: string
   tip: string
+  delta?: number | null
 }) {
+  const deltaCls =
+    delta == null
+      ? ''
+      : delta > 0
+        ? 'is-up'
+        : delta < 0
+          ? 'is-down'
+          : 'is-flat'
   return (
     <div className="funnel-kpi">
       <div className="funnel-kpi-head">
@@ -426,6 +471,11 @@ function Kpi({
         </FunnelTip>
       </div>
       <div className="funnel-kpi-v">{value}</div>
+      {delta !== undefined ? (
+        <div className={`funnel-kpi-delta ${deltaCls}`.trim()}>
+          {formatPctDelta(delta)}
+        </div>
+      ) : null}
     </div>
   )
 }
