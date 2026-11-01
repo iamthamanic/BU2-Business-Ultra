@@ -2577,19 +2577,21 @@ select {
 
 .funnel-kpi-strip {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow-x: auto;
 }
 
 .paid-kpi-strip .funnel-kpi {
-  min-width: 96px;
-  flex: 1 1 96px;
-  max-width: 140px;
+  min-width: 0;
+  flex: 1 1 0;
+  max-width: none;
 }
 
 .funnel-kpi {
-  min-width: 88px;
-  padding: 10px 12px;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 8px 10px;
   border: 1px solid var(--border);
   background: var(--panel);
 }
