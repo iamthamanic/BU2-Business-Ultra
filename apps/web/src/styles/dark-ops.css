@@ -2411,11 +2411,62 @@ select {
   color: #fff;
 }
 
+.funnel-filters-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px 20px;
+}
+
+.funnel-filters-bar .funnel-filter-row {
+  flex: 0 1 auto;
+}
+
 .funnel-filter-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+
+.funnel-tip {
+  position: relative;
+  cursor: help;
+}
+
+.funnel-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 80;
+  width: max-content;
+  max-width: min(280px, 70vw);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: #0f1620;
+  color: var(--text);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  box-shadow: 0 12px 28px #00000088;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: opacity 0.12s var(--ease-out), transform 0.12s var(--ease-out);
+}
+
+.funnel-tip:hover::after,
+.funnel-tip:focus-visible::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+th .funnel-tip {
+  display: inline-block;
+  border-bottom: 1px dotted color-mix(in srgb, var(--dim) 55%, transparent);
 }
 
 .filter-lbl {

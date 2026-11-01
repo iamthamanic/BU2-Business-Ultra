@@ -14,7 +14,9 @@ import {
   ShareNetwork,
   UsersThree,
 } from '@phosphor-icons/react'
+import { FunnelTip } from '../../components/FunnelTip'
 import { useI18n } from '../../lib/i18n'
+import type { MessageKey } from '../../i18n/messages'
 
 export type OrganicPost = {
   id: string
@@ -73,27 +75,35 @@ export function OrganicPostsPanel({
   const showReach = META.has(channel)
 
   const cols = useMemo(() => {
-    const base: { key: string; label: string }[] = [
+    const base: { key: string; label: string; tip?: MessageKey }[] = [
       { key: 'thumb', label: '' },
-      { key: 'date', label: t('colDate') },
-      { key: 'type', label: t('colType') },
-      { key: 'bucket', label: t('colAge') },
-      { key: 'title', label: t('colPost') },
-      { key: 'views', label: t('colViews') },
+      { key: 'date', label: t('colDate'), tip: 'tipColDate' },
+      { key: 'type', label: t('colType'), tip: 'tipColType' },
+      { key: 'bucket', label: t('colAge'), tip: 'tipColAge' },
+      { key: 'title', label: t('colPost'), tip: 'tipColPost' },
+      { key: 'views', label: t('colViews'), tip: 'tipColViews' },
     ]
-    if (showReach) base.push({ key: 'reach', label: t('colReach') })
+    if (showReach) base.push({ key: 'reach', label: t('colReach'), tip: 'tipColReach' })
     base.push(
-      { key: 'shareRate', label: showReach ? t('colShareRate') : t('colShPer1k') },
-      { key: 'saveRate', label: showReach ? t('colSaveRate') : t('colSaPer100') },
-      { key: 'watch', label: t('colWatch') },
-      { key: 'duration', label: t('colDuration') },
-      { key: 'paid', label: t('colPaidShare') },
-      { key: 'likes', label: t('colLikes') },
-      { key: 'comments', label: t('colComments') },
-      { key: 'shares', label: t('colShares') },
-      { key: 'saves', label: t('colSaves') },
-      { key: 'er', label: t('colEr') },
-      { key: 'kpi', label: t('colKpi') },
+      {
+        key: 'shareRate',
+        label: showReach ? t('colShareRate') : t('colShPer1k'),
+        tip: showReach ? 'tipColShareRate' : 'tipColShPer1k',
+      },
+      {
+        key: 'saveRate',
+        label: showReach ? t('colSaveRate') : t('colSaPer100'),
+        tip: showReach ? 'tipColSaveRate' : 'tipColSaPer100',
+      },
+      { key: 'watch', label: t('colWatch'), tip: 'tipColWatch' },
+      { key: 'duration', label: t('colDuration'), tip: 'tipColDuration' },
+      { key: 'paid', label: t('colPaidShare'), tip: 'tipColPaid' },
+      { key: 'likes', label: t('colLikes'), tip: 'tipColLikes' },
+      { key: 'comments', label: t('colComments'), tip: 'tipColComments' },
+      { key: 'shares', label: t('colShares'), tip: 'tipColShares' },
+      { key: 'saves', label: t('colSaves'), tip: 'tipColSaves' },
+      { key: 'er', label: t('colEr'), tip: 'tipColEr' },
+      { key: 'kpi', label: t('colKpi'), tip: 'tipColKpi' },
     )
     return base
   }, [showReach, t])
@@ -135,20 +145,40 @@ export function OrganicPostsPanel({
   return (
     <div className="stack organic-posts-panel">
       <div className="panel funnel-top5">
-        <h3 className="section-title funnel-top5-title">{t('top5Title')}</h3>
+        <FunnelTip tip={t('tipTop5')} as="h3" className="section-title funnel-top5-title">
+          {t('top5Title')}
+        </FunnelTip>
         <div className="funnel-table-wrap">
           <table className="table funnel-top5-table">
             <thead>
               <tr>
                 <th>#</th>
-                <th>{t('colDate')}</th>
-                <th>{t('colType')}</th>
-                <th>{t('colPost')}</th>
-                <th>{t('colViews')}</th>
-                {showReach ? <th>{t('colReach')}</th> : null}
-                <th>{t('colLikes')}</th>
-                <th>{t('colShares')}</th>
-                <th>{t('colEr')}</th>
+                <th>
+                  <FunnelTip tip={t('tipColDate')}>{t('colDate')}</FunnelTip>
+                </th>
+                <th>
+                  <FunnelTip tip={t('tipColType')}>{t('colType')}</FunnelTip>
+                </th>
+                <th>
+                  <FunnelTip tip={t('tipColPost')}>{t('colPost')}</FunnelTip>
+                </th>
+                <th>
+                  <FunnelTip tip={t('tipColViews')}>{t('colViews')}</FunnelTip>
+                </th>
+                {showReach ? (
+                  <th>
+                    <FunnelTip tip={t('tipColReach')}>{t('colReach')}</FunnelTip>
+                  </th>
+                ) : null}
+                <th>
+                  <FunnelTip tip={t('tipColLikes')}>{t('colLikes')}</FunnelTip>
+                </th>
+                <th>
+                  <FunnelTip tip={t('tipColShares')}>{t('colShares')}</FunnelTip>
+                </th>
+                <th>
+                  <FunnelTip tip={t('tipColEr')}>{t('colEr')}</FunnelTip>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -180,65 +210,95 @@ export function OrganicPostsPanel({
         </div>
       </div>
 
-      <div className="funnel-filter-row" role="toolbar" aria-label={t('timeWindow')}>
-        <span className="filter-lbl muted">{t('timeWindow')}</span>
-        {WINDOWS.map((w) => (
-          <button
-            key={w.key}
-            type="button"
-            className={`chip ${win === w.key ? 'active' : ''}`}
-            onClick={() => pickWindow(w.key)}
-          >
-            {t(w.labelKey)}
-            <span className="n">{w.key === win ? filtered.length : '·'}</span>
-          </button>
-        ))}
-      </div>
+      <div className="funnel-filters-bar">
+        <div className="funnel-filter-row" role="toolbar" aria-label={t('timeWindow')}>
+          <FunnelTip tip={t('tipWin')} as="span" className="filter-lbl muted">
+            {t('timeWindow')}
+          </FunnelTip>
+          {WINDOWS.map((w) => (
+            <button
+              key={w.key}
+              type="button"
+              className={`chip ${win === w.key ? 'active' : ''}`}
+              onClick={() => pickWindow(w.key)}
+            >
+              {t(w.labelKey)}
+              <span className="n">{w.key === win ? filtered.length : '·'}</span>
+            </button>
+          ))}
+        </div>
 
-      <div className="funnel-filter-row" role="toolbar" aria-label={t('filterBrand')}>
-        <span className="filter-lbl muted">{t('filterBrand')}</span>
-        <button
-          type="button"
-          className={`chip ${brand === '__all__' ? 'active' : ''}`}
-          onClick={() => setBrand('__all__')}
-        >
-          {t('filterAll')}
-          <span className="n">{posts.length}</span>
-        </button>
-      </div>
-
-      <div className="funnel-filter-row" role="toolbar" aria-label={t('filterPostType')}>
-        <span className="filter-lbl muted">{t('filterPostType')}</span>
-        <button
-          type="button"
-          className={`chip ${postType === '__all__' ? 'active' : ''}`}
-          onClick={() => setPostType('__all__')}
-        >
-          {t('filterAll')}
-          <span className="n">{posts.length}</span>
-        </button>
-        {types.map((ty) => (
+        <div className="funnel-filter-row" role="toolbar" aria-label={t('filterBrand')}>
+          <FunnelTip tip={t('tipBrand')} as="span" className="filter-lbl muted">
+            {t('filterBrand')}
+          </FunnelTip>
           <button
-            key={ty}
             type="button"
-            className={`chip ${postType === ty ? 'active' : ''}`}
-            onClick={() => setPostType(ty)}
+            className={`chip ${brand === '__all__' ? 'active' : ''}`}
+            onClick={() => setBrand('__all__')}
           >
-            {ty}
-            <span className="n">{posts.filter((p) => p.type === ty).length}</span>
+            {t('filterAll')}
+            <span className="n">{posts.length}</span>
           </button>
-        ))}
+        </div>
+
+        <div className="funnel-filter-row" role="toolbar" aria-label={t('filterPostType')}>
+          <FunnelTip tip={t('tipPostType')} as="span" className="filter-lbl muted">
+            {t('filterPostType')}
+          </FunnelTip>
+          <button
+            type="button"
+            className={`chip ${postType === '__all__' ? 'active' : ''}`}
+            onClick={() => setPostType('__all__')}
+          >
+            {t('filterAll')}
+            <span className="n">{posts.length}</span>
+          </button>
+          {types.map((ty) => (
+            <button
+              key={ty}
+              type="button"
+              className={`chip ${postType === ty ? 'active' : ''}`}
+              onClick={() => setPostType(ty)}
+            >
+              {ty}
+              <span className="n">{posts.filter((p) => p.type === ty).length}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="funnel-kpi-strip" aria-label="KPIs">
-        <Kpi icon={Article} label={t('kpiPosts')} value={fmtN(kpis.posts)} />
-        <Kpi icon={Eye} label={t('colViews')} value={fmtN(kpis.views)} />
-        {showReach ? <Kpi icon={UsersThree} label={t('colReach')} value={fmtN(kpis.reach)} /> : null}
-        <Kpi icon={Lightning} label={t('kpiInteractions')} value={fmtN(kpis.inter)} />
-        <Kpi icon={Heart} label={t('colLikes')} value={fmtN(kpis.likes)} />
-        <Kpi icon={ChatCircle} label={t('colComments')} value={fmtN(kpis.comments)} />
-        <Kpi icon={ShareNetwork} label={t('colShares')} value={fmtN(kpis.shares)} />
-        <Kpi icon={BookmarkSimple} label={t('colSaves')} value={fmtN(kpis.saves)} />
+        <Kpi icon={Article} label={t('kpiPosts')} value={fmtN(kpis.posts)} tip={t('tipKpiPosts')} />
+        <Kpi icon={Eye} label={t('colViews')} value={fmtN(kpis.views)} tip={t('tipKpiViews')} />
+        {showReach ? (
+          <Kpi icon={UsersThree} label={t('colReach')} value={fmtN(kpis.reach)} tip={t('tipKpiReach')} />
+        ) : null}
+        <Kpi
+          icon={Lightning}
+          label={t('kpiInteractions')}
+          value={fmtN(kpis.inter)}
+          tip={t('tipKpiInter')}
+        />
+        <Kpi icon={Heart} label={t('colLikes')} value={fmtN(kpis.likes)} tip={t('tipKpiLikes')} />
+        <Kpi
+          icon={ChatCircle}
+          label={t('colComments')}
+          value={fmtN(kpis.comments)}
+          tip={t('tipKpiComments')}
+        />
+        <Kpi
+          icon={ShareNetwork}
+          label={t('colShares')}
+          value={fmtN(kpis.shares)}
+          tip={t('tipKpiShares')}
+        />
+        <Kpi
+          icon={BookmarkSimple}
+          label={t('colSaves')}
+          value={fmtN(kpis.saves)}
+          tip={t('tipKpiSaves')}
+        />
       </div>
 
       <div className="panel funnel-table-wrap">
@@ -246,7 +306,9 @@ export function OrganicPostsPanel({
           <thead>
             <tr>
               {cols.map((c) => (
-                <th key={c.key}>{c.label}</th>
+                <th key={c.key}>
+                  {c.tip ? <FunnelTip tip={t(c.tip)}>{c.label}</FunnelTip> : c.label}
+                </th>
               ))}
             </tr>
           </thead>
@@ -320,9 +382,19 @@ export function OrganicPostsPanel({
   )
 }
 
-function Kpi({ icon: Ic, label, value }: { icon: Icon; label: string; value: string }) {
+function Kpi({
+  icon: Ic,
+  label,
+  value,
+  tip,
+}: {
+  icon: Icon
+  label: string
+  value: string
+  tip: string
+}) {
   return (
-    <div className="funnel-kpi">
+    <FunnelTip tip={tip} as="div" className="funnel-kpi">
       <div className="funnel-kpi-head">
         <span className="funnel-kpi-ic" aria-hidden>
           <Ic size={16} weight="duotone" />
@@ -330,7 +402,7 @@ function Kpi({ icon: Ic, label, value }: { icon: Icon; label: string; value: str
         <div className="funnel-kpi-l muted">{label}</div>
       </div>
       <div className="funnel-kpi-v">{value}</div>
-    </div>
+    </FunnelTip>
   )
 }
 

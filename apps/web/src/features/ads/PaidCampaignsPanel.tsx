@@ -17,7 +17,9 @@ import {
   TrendUp,
   Wallet,
 } from '@phosphor-icons/react'
+import { FunnelTip } from '../../components/FunnelTip'
 import { useI18n } from '../../lib/i18n'
+import type { MessageKey } from '../../i18n/messages'
 
 export type PaidCampaignRow = {
   id: string
@@ -76,25 +78,27 @@ export function PaidCampaignsPanel({
     onWindowChange?.(w)
   }
 
-  const cols = [
-    { key: 'notes', label: t('colNotes') },
-    { key: 'manual', label: t('colManualAds') },
-    { key: 'name', label: t('colCampaign') },
-    { key: 'spend', label: t('colSpend') },
-    { key: 'impr', label: t('colImpr') },
-    { key: 'clicks', label: t('colClicks') },
-    { key: 'ctr', label: t('colCtr') },
-    { key: 'cpc', label: t('colCpc') },
-    { key: 'cvr', label: t('colCvr') },
-    { key: 'cpa', label: t('colCpa') },
-    { key: 'roas', label: t('colRoas') },
-    { key: 'revenue', label: t('colRevenue') },
-  ] as const
+  const cols: { key: string; label: string; tip: MessageKey }[] = [
+    { key: 'notes', label: t('colNotes'), tip: 'tipNotes' },
+    { key: 'manual', label: t('colManualAds'), tip: 'tipManualAds' },
+    { key: 'name', label: t('colCampaign'), tip: 'tipCampaign' },
+    { key: 'spend', label: t('colSpend'), tip: 'tipSpend' },
+    { key: 'impr', label: t('colImpr'), tip: 'tipImpr' },
+    { key: 'clicks', label: t('colClicks'), tip: 'tipClicks' },
+    { key: 'ctr', label: t('colCtr'), tip: 'tipCtr' },
+    { key: 'cpc', label: t('colCpc'), tip: 'tipCpc' },
+    { key: 'cvr', label: t('colCvr'), tip: 'tipCvr' },
+    { key: 'cpa', label: t('colCpa'), tip: 'tipCpa' },
+    { key: 'roas', label: t('colRoas'), tip: 'tipRoas' },
+    { key: 'revenue', label: t('colRevenue'), tip: 'tipRevenue' },
+  ]
 
   return (
     <div className="stack paid-campaigns-panel">
       <div className="funnel-filter-row paid-filter-row" role="toolbar" aria-label={t('timeWindow')}>
-        <span className="filter-lbl muted">{t('timeWindow')}</span>
+        <FunnelTip tip={t('tipWin')} as="span" className="filter-lbl muted">
+          {t('timeWindow')}
+        </FunnelTip>
         {WINDOWS.map((w) => (
           <button
             key={w.key}
@@ -118,16 +122,16 @@ export function PaidCampaignsPanel({
       </div>
 
       <div className="funnel-kpi-strip paid-kpi-strip" aria-label="KPIs">
-        <Kpi icon={CurrencyEur} label={t('colSpend')} value={fmtEur(agg.spendCents)} accent />
-        <Kpi icon={Eye} label={t('colImpr')} value={fmtN(agg.impressions)} />
-        <Kpi icon={CursorClick} label={t('colClicks')} value={fmtN(agg.clicks)} />
-        <Kpi icon={ChartLineUp} label={t('colCtr')} value={fmtPct(agg.ctr)} />
-        <Kpi icon={Coin} label={t('colCpc')} value={fmtEur(agg.cpcCents)} />
-        <Kpi icon={Target} label={t('colConv')} value={fmtN(agg.conv)} />
-        <Kpi icon={Percent} label={t('colCvr')} value={fmtPct(agg.cvr)} />
-        <Kpi icon={Tag} label={t('colCpa')} value={fmtEur(agg.cpaCents)} />
-        <Kpi icon={TrendUp} label={t('colRoas')} value={fmtRoas(agg.roas)} accent />
-        <Kpi icon={Wallet} label={t('colRevenue')} value={fmtEur(agg.revenueCents)} />
+        <Kpi icon={CurrencyEur} label={t('colSpend')} value={fmtEur(agg.spendCents)} tip={t('tipSpend')} accent />
+        <Kpi icon={Eye} label={t('colImpr')} value={fmtN(agg.impressions)} tip={t('tipImpr')} />
+        <Kpi icon={CursorClick} label={t('colClicks')} value={fmtN(agg.clicks)} tip={t('tipClicks')} />
+        <Kpi icon={ChartLineUp} label={t('colCtr')} value={fmtPct(agg.ctr)} tip={t('tipCtr')} />
+        <Kpi icon={Coin} label={t('colCpc')} value={fmtEur(agg.cpcCents)} tip={t('tipCpc')} />
+        <Kpi icon={Target} label={t('colConv')} value={fmtN(agg.conv)} tip={t('tipConv')} />
+        <Kpi icon={Percent} label={t('colCvr')} value={fmtPct(agg.cvr)} tip={t('tipCvr')} />
+        <Kpi icon={Tag} label={t('colCpa')} value={fmtEur(agg.cpaCents)} tip={t('tipCpa')} />
+        <Kpi icon={TrendUp} label={t('colRoas')} value={fmtRoas(agg.roas)} tip={t('tipRoas')} accent />
+        <Kpi icon={Wallet} label={t('colRevenue')} value={fmtEur(agg.revenueCents)} tip={t('tipRevenue')} />
       </div>
 
       <div className="panel funnel-table-wrap">
@@ -135,7 +139,9 @@ export function PaidCampaignsPanel({
           <thead>
             <tr>
               {cols.map((c) => (
-                <th key={c.key}>{c.label}</th>
+                <th key={c.key}>
+                  <FunnelTip tip={t(c.tip)}>{c.label}</FunnelTip>
+                </th>
               ))}
             </tr>
           </thead>
@@ -186,15 +192,17 @@ function Kpi({
   icon: Ic,
   label,
   value,
+  tip,
   accent,
 }: {
   icon: Icon
   label: string
   value: string
+  tip: string
   accent?: boolean
 }) {
   return (
-    <div className={`funnel-kpi${accent ? ' funnel-kpi--accent' : ''}`}>
+    <FunnelTip tip={tip} as="div" className={`funnel-kpi${accent ? ' funnel-kpi--accent' : ''}`}>
       <div className="funnel-kpi-head">
         <span className="funnel-kpi-ic" aria-hidden>
           <Ic size={16} weight="duotone" />
@@ -202,7 +210,7 @@ function Kpi({
         <div className="funnel-kpi-l muted">{label}</div>
       </div>
       <div className="funnel-kpi-v">{value}</div>
-    </div>
+    </FunnelTip>
   )
 }
 
