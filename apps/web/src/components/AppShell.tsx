@@ -1,10 +1,11 @@
 /**
  * AppShell — legacy-parity chrome: collapsible sidebar + header context chip bar.
- * Brand lives in sidebar; company switcher in topbar; account/logout/lang in sidebar footer.
+ * BrandMark lives left in the topbar; company switcher follows; account/logout/lang in sidebar footer.
  * Location: apps/web/src/components/AppShell.tsx
  */
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { List, X } from '@phosphor-icons/react'
+import { BrandMark } from './BrandMark'
 import { IconRail, type RailGroup, type RailItem } from './IconRail'
 import { CompanySwitcher } from './CompanySwitcher'
 import { useI18n } from '../lib/i18n'
@@ -76,6 +77,7 @@ export function AppShell({
           >
             {drawerOpen ? <X size={18} weight="regular" /> : <List size={18} weight="regular" />}
           </button>
+          <BrandMark to="/" showName size="sm" />
           {company ? (
             <CompanySwitcher
               activeSlug={company.slug}

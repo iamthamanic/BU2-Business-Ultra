@@ -307,21 +307,10 @@ select {
 }
 
 .sidebar.slim .sb-head {
-  flex-direction: column;
-  justify-content: flex-start;
+  justify-content: center;
   align-items: center;
   flex-wrap: nowrap;
   gap: 6px;
-}
-
-.sidebar.slim .sb-head .brand {
-  flex: 0 0 auto;
-  justify-content: center;
-  width: 100%;
-}
-
-.sidebar.slim .brand .brand-name {
-  display: none;
 }
 
 .sidebar.slim .sb-toggle {
@@ -333,16 +322,11 @@ select {
 .sb-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 8px;
   margin-bottom: 8px;
   flex-shrink: 0;
   min-height: 36px;
-}
-
-.sb-head .brand {
-  min-width: 0;
-  flex: 1;
 }
 
 .sb-toggle {
@@ -603,6 +587,15 @@ select {
   align-items: center;
   gap: var(--sp-3);
   min-width: 0;
+}
+
+.topbar-start .brand {
+  flex-shrink: 0;
+}
+
+.topbar-start .brand-name {
+  font-size: 0.88rem;
+  letter-spacing: 0.04em;
 }
 
 .hdr-toolbar {
@@ -1454,7 +1447,6 @@ select {
   /* Mobile overlay always shows labels (expanded drawer) */
   .sidebar.slim .sb-label,
   .sidebar.slim .sb-lang-label,
-  .sidebar.slim .brand .brand-name,
   .sidebar.slim .sb-group-title,
   .sidebar.slim .sb-toggle-arrow {
     display: initial;
@@ -1470,18 +1462,15 @@ select {
   }
 
   .sidebar.slim .sb-head {
-    flex-direction: row;
-    justify-content: space-between;
+    justify-content: flex-end;
     align-items: center;
   }
 
-  .sidebar.slim .sb-head .brand {
-    width: auto;
-    flex: 1;
-    justify-content: flex-start;
+  .sidebar .sb-toggle {
+    display: none;
   }
 
-  .sidebar .sb-toggle {
+  .topbar-start .brand-name {
     display: none;
   }
 

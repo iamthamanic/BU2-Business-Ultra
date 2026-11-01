@@ -1,14 +1,13 @@
 /**
  * IconRail / Sidebar — legacy-parity collapsible left nav (slim icons ↔ expanded labels).
- * Supports grouped funnel sections (details) with session persistence; brand + toggle in head;
- * settings/admin/lang/logout in footer. Mobile: overlay drawer.
+ * Supports grouped funnel sections (details) with session persistence; collapse toggle in head;
+ * settings/admin/lang/logout in footer. Brand lives in topbar. Mobile: overlay drawer.
  * Location: apps/web/src/components/IconRail.tsx
  */
 import { useEffect, useState } from 'react'
 import type { Icon } from '@phosphor-icons/react'
 import { CaretDown, SignOut, ShieldCheck } from '@phosphor-icons/react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { BrandMark } from './BrandMark'
 import { useI18n } from '../lib/i18n'
 
 export type RailItem = {
@@ -183,7 +182,6 @@ export function IconRail({
       data-expanded={expanded ? 'true' : 'false'}
     >
       <div className="sb-head">
-        <BrandMark to="/" showName={!slim || open} size="sm" />
         <button
           type="button"
           className="sb-toggle"
