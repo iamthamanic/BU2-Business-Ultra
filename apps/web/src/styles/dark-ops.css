@@ -2489,6 +2489,39 @@ select {
   background: color-mix(in srgb, var(--accent) 14%, var(--panel2));
 }
 
+.funnel-export-modal {
+  width: min(420px, 100%);
+}
+
+.funnel-export-formats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 12px 0 4px;
+}
+
+.funnel-export-fmt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel2);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.funnel-export-fmt input {
+  accent-color: var(--accent);
+}
+
+.funnel-export-fmt.is-active {
+  border-color: var(--accent-border);
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+}
+
 .funnel-filters-bar .funnel-filter-row {
   flex: 0 1 auto;
 }
