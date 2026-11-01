@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../../lib/api'
+import { writeLastCompany } from '../../lib/lastCompany'
 import { useI18n } from '../../lib/i18n'
 import { SettingsConnectionsTab } from './SettingsConnectionsTab'
 import { SettingsFunnelTab } from './SettingsFunnelTab'
@@ -115,6 +116,24 @@ export function SettingsPage() {
     }
   }
 
+  async function deleteCompany(confirmSlug: string) {
+    if (!slug) return
+    try {
+      await api(`/api/b/${slug}`, {
+        method: 'DELETE',
+        body: JSON.stringify({ confirmSlug }),
+      })
+      try {
+        writeLastCompany('')
+      } catch {
+        /* ignore */
+      }
+      navigate('/', { replace: true })
+    } catch (e) {
+      setDangerMsg(String(e))
+    }
+  }
+
   if (!slug) return null
 
   const tabLabels: Record<SettingsTab, string> = {
@@ -156,7 +175,6 @@ export function SettingsPage() {
           <SettingsOverviewTab
             slug={slug}
             name={companyMeta?.name ?? slug}
-            logoPath={companyMeta?.logoPath}
             status={status}
             companyStatus={companyMeta?.status ?? 'active'}
             memberCount={memberCount}
@@ -164,6 +182,7 @@ export function SettingsPage() {
             onJump={setTabAndHash}
             onArchive={archive}
             onReactivate={reactivate}
+            onDelete={deleteCompany}
           />
         ) : null}
         {tab === 'connections' ? (

@@ -206,6 +206,27 @@ export async function businessRoutes(app: FastifyInstance) {
     return { ok: true }
   })
 
+  /** Permanent delete — owner must send confirmSlug matching the company slug. */
+  app.delete('/api/b/:slug', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug } = req.params as { slug: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m) return reply.code(404).send({ error: 'not_found' })
+    requireRole(m, ['owner'])
+    const body = (req.body ?? {}) as { confirmSlug?: string }
+    if (!body.confirmSlug || body.confirmSlug !== slug) {
+      return reply.code(400).send({ error: 'confirm_slug_mismatch' })
+    }
+    await writeAudit({
+      businessId: m.businessId,
+      actorUserId: user.id,
+      action: 'business.deleted',
+      resourceRef: slug,
+      meta: { slug },
+    })
+    await db.delete(businesses).where(eq(businesses.id, m.businessId))
+    return { ok: true }
+  })
 
   app.post('/api/b/:slug/transfer-owner', async (req, reply) => {
     const user = await requireUser(req)

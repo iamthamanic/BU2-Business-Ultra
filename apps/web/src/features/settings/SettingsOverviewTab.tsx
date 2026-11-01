@@ -1,8 +1,8 @@
 /**
- * SettingsOverviewTab — connection summary cards + archive / danger zone.
+ * SettingsOverviewTab — connection summary cards + archive / delete danger zone.
  * Location: apps/web/src/features/settings/SettingsOverviewTab.tsx
  */
-import { CompanySwitcher } from '../../components/CompanySwitcher'
+import { useState } from 'react'
 import { useI18n } from '../../lib/i18n'
 import type { SettingsStatus } from './SettingsHeader'
 import type { SettingsTab } from './settingsTabs'
@@ -10,7 +10,6 @@ import type { SettingsTab } from './settingsTabs'
 type Props = {
   slug: string
   name: string
-  logoPath?: string | null
   status: SettingsStatus | null
   companyStatus: string
   memberCount: number
@@ -18,12 +17,12 @@ type Props = {
   onJump: (tab: SettingsTab) => void
   onArchive: () => void
   onReactivate: () => void
+  onDelete: (confirmSlug: string) => void | Promise<void>
 }
 
 export function SettingsOverviewTab({
   slug,
   name,
-  logoPath,
   status,
   companyStatus,
   memberCount,
@@ -31,9 +30,24 @@ export function SettingsOverviewTab({
   onJump,
   onArchive,
   onReactivate,
+  onDelete,
 }: Props) {
   const { t } = useI18n()
   const archived = companyStatus === 'archived'
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [confirmSlug, setConfirmSlug] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const canDelete = confirmSlug.trim() === slug
+
+  async function confirmDelete() {
+    if (!canDelete || deleting) return
+    setDeleting(true)
+    try {
+      await onDelete(confirmSlug.trim())
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   return (
     <div className="stack">
@@ -80,22 +94,12 @@ export function SettingsOverviewTab({
         />
       </div>
 
-      <section className="panel stack">
-        <h3 className="co-card-title">{t('businesses')}</h3>
-        <CompanySwitcher
-          variant="panel"
-          activeSlug={slug}
-          activeName={name}
-          activeLogoPath={logoPath}
-        />
-      </section>
-
       <section className="panel stack co-danger-zone">
         <h3 className="co-card-title">{t('dangerZone')}</h3>
         <p className="muted" style={{ margin: 0 }}>
           {t('dangerZoneHint')}
         </p>
-        <div className="row">
+        <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
           {archived ? (
             <button className="btn" type="button" onClick={onReactivate}>
               {t('reactivate')}
@@ -105,7 +109,60 @@ export function SettingsOverviewTab({
               {t('archive')}
             </button>
           )}
+          <button
+            className="btn danger"
+            type="button"
+            onClick={() => {
+              setDeleteOpen((v) => !v)
+              setConfirmSlug('')
+            }}
+          >
+            {t('deleteCompany')}
+          </button>
         </div>
+
+        {deleteOpen ? (
+          <div className="stack co-delete-confirm">
+            <p className="co-delete-warn" role="alert">
+              {t('deleteCompanyWarn')}
+            </p>
+            <p className="muted" style={{ margin: 0 }}>
+              {t('deleteCompanyTypeSlug').replace('{slug}', slug).replace('{name}', name)}
+            </p>
+            <label className="stack" style={{ gap: 4 }}>
+              <span className="filter-lbl muted">{t('deleteCompanyConfirmLabel')}</span>
+              <input
+                className="input"
+                value={confirmSlug}
+                onChange={(e) => setConfirmSlug(e.target.value)}
+                placeholder={slug}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </label>
+            <div className="row" style={{ gap: 8 }}>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => {
+                  setDeleteOpen(false)
+                  setConfirmSlug('')
+                }}
+              >
+                {t('cancel')}
+              </button>
+              <button
+                type="button"
+                className="btn danger"
+                disabled={!canDelete || deleting}
+                onClick={() => void confirmDelete()}
+              >
+                {deleting ? t('deletingCompany') : t('deleteCompanyForever')}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         {msg ? <p className="muted">{msg}</p> : null}
       </section>
     </div>

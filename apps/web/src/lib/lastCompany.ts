@@ -17,6 +17,7 @@ export function readLastCompany(): string | null {
 export function writeLastCompany(slug: string) {
   try {
     if (slug) localStorage.setItem(KEY, slug)
+    else localStorage.removeItem(KEY)
   } catch {
     /* ignore quota / private mode */
   }

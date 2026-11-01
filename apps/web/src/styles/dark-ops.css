@@ -2333,6 +2333,23 @@ select {
   border-color: color-mix(in srgb, var(--bad) 35%, var(--border));
 }
 
+.co-delete-confirm {
+  margin-top: 4px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--bad) 40%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bad) 8%, var(--panel));
+  gap: 10px;
+}
+
+.co-delete-warn {
+  margin: 0;
+  color: #fca5a5;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
 .co-brand-chips {
   display: flex;
   flex-wrap: wrap;
