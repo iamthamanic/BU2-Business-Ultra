@@ -86,7 +86,7 @@ scripts/           backup/restore
 
 ## Recent changes
 
-- **2026-11-01** — Topbar company chip text-only (pill radius); company switcher moved to Settings → Companies
+- **2026-11-01** — Topbar chips sharper (`--radius-sm`); company switcher moved out of topbar into Settings → Companies
 - **2026-11-01** — Topbar logo only; "Business Ultra" wordmark in sidebar `sb-head` (hidden when slim/collapsed)
 - **2026-11-01** — BU logo moved to topbar left (links home); sidebar head keeps collapse toggle only
 - **2026-11-01** — UI label Companies (not Businesses); frontend routes aligned to legacy `/co/:slug/...` with `/b/...` redirects ([docs/ROUTING.md](./docs/ROUTING.md))

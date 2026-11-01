@@ -618,7 +618,7 @@ select {
   align-items: center;
   gap: 8px;
   height: 32px;
-  padding: 0 14px;
+  padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--panel2);
@@ -675,7 +675,7 @@ select {
   align-items: center;
   gap: 8px;
   height: 32px;
-  padding: 0 14px 0 6px;
+  padding: 0 12px 0 6px;
   max-width: min(300px, 52vw);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -788,7 +788,7 @@ select {
   max-width: 320px;
   padding: 6px;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius);
   background: var(--panel);
   box-shadow: 0 16px 40px #00000077;
   display: none;
@@ -807,7 +807,7 @@ select {
   width: 100%;
   padding: 9px 12px;
   border: none;
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text);
   font: inherit;
@@ -830,7 +830,7 @@ select {
   font-weight: 600;
   margin-top: 4px;
   border-top: 1px solid var(--border);
-  border-radius: 0 0 12px 12px;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
   padding-top: 12px;
   justify-content: center;
 }
@@ -853,7 +853,7 @@ select {
   min-width: 280px;
   padding: 14px;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius);
   background: var(--panel);
   box-shadow: 0 16px 40px #00000077;
   display: grid;
@@ -865,7 +865,9 @@ select {
   min-width: 0;
   width: 100%;
   box-shadow: none;
-  background: var(--panel2);
+  background: transparent;
+  border: none;
+  padding: 0;
 }
 
 .settings-companies {
@@ -878,7 +880,7 @@ select {
   align-items: center;
   gap: 12px;
   min-width: 0;
-  padding: 10px 14px;
+  padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--panel2);
@@ -910,7 +912,7 @@ select {
   max-width: none;
   width: 100%;
   box-shadow: none;
-  border-radius: 16px;
+  border-radius: var(--radius);
   background: var(--panel2);
 }
 
@@ -921,7 +923,7 @@ select {
 .hdr-company-panel input {
   background: var(--panel2);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   color: var(--text);
   padding: 9px 12px;
   font-size: 12px;
