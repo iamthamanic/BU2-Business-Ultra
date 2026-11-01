@@ -2776,6 +2776,13 @@ select {
   text-align: left;
 }
 
+.funnel-rank-cell {
+  width: 48px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--dim);
+}
+
 .funnel-thumb-cell {
   width: 56px;
 }

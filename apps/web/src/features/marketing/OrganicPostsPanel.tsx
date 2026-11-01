@@ -81,7 +81,7 @@ export function OrganicPostsPanel({
 
   const cols = useMemo(() => {
     const base: { key: string; label: string; tip?: MessageKey }[] = [
-      { key: 'thumb', label: '' },
+      { key: 'rank', label: t('colRank') },
       { key: 'date', label: t('colDate'), tip: 'tipColDate' },
       { key: 'type', label: t('colType'), tip: 'tipColType' },
       { key: 'bucket', label: t('colAge'), tip: 'tipColAge' },
@@ -146,7 +146,7 @@ export function OrganicPostsPanel({
   }, [filtered, sortKey, sortDir, showReach])
 
   function toggleSort(key: string) {
-    if (key === 'thumb') return
+    if (key === 'rank') return
     if (sortKey === key) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
       return
@@ -154,12 +154,6 @@ export function OrganicPostsPanel({
     setSortKey(key)
     setSortDir(key === 'date' || key === 'title' || key === 'type' || key === 'bucket' ? 'asc' : 'desc')
   }
-
-  const top5 = useMemo(() => {
-    return [...filtered]
-      .sort((a, b) => (b.engagement ?? -1) - (a.engagement ?? -1) || b.views - a.views)
-      .slice(0, 5)
-  }, [filtered])
 
   const kpis = useMemo(() => {
     const views = filtered.reduce((s, p) => s + (p.views || 0), 0)
@@ -174,72 +168,6 @@ export function OrganicPostsPanel({
 
   return (
     <div className="stack organic-posts-panel">
-      <details className="panel funnel-top5">
-        <summary className="funnel-top5-summary">
-          <FunnelTip tip={t('tipTop5')}>{t('top5Title')}</FunnelTip>
-        </summary>
-        <div className="funnel-table-wrap">
-          <table className="table funnel-grid-table funnel-top5-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>
-                  <FunnelTip tip={t('tipColDate')}>{t('colDate')}</FunnelTip>
-                </th>
-                <th>
-                  <FunnelTip tip={t('tipColType')}>{t('colType')}</FunnelTip>
-                </th>
-                <th>
-                  <FunnelTip tip={t('tipColPost')}>{t('colPost')}</FunnelTip>
-                </th>
-                <th>
-                  <FunnelTip tip={t('tipColViews')}>{t('colViews')}</FunnelTip>
-                </th>
-                {showReach ? (
-                  <th>
-                    <FunnelTip tip={t('tipColReach')}>{t('colReach')}</FunnelTip>
-                  </th>
-                ) : null}
-                <th>
-                  <FunnelTip tip={t('tipColLikes')}>{t('colLikes')}</FunnelTip>
-                </th>
-                <th>
-                  <FunnelTip tip={t('tipColShares')}>{t('colShares')}</FunnelTip>
-                </th>
-                <th>
-                  <FunnelTip tip={t('tipColEr')}>{t('colEr')}</FunnelTip>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {top5.length === 0 ? (
-                <tr>
-                  <td colSpan={showReach ? 9 : 8} className="funnel-table-empty muted">
-                    {emptyHint}
-                  </td>
-                </tr>
-              ) : (
-                top5.map((p, i) => (
-                  <tr key={p.id}>
-                    <td className="num">{i + 1}</td>
-                    <td className="num">{fmtDate(p.date)}</td>
-                    <td>
-                      <span className="badge">{p.type}</span>
-                    </td>
-                    <td>{p.title || '—'}</td>
-                    <td className="num">{fmtN(p.views)}</td>
-                    {showReach ? <td className="num">{p.reach != null ? fmtN(p.reach) : '—'}</td> : null}
-                    <td className="num">{fmtN(p.likes)}</td>
-                    <td className="num">{fmtN(p.shares)}</td>
-                    <td className="num">{p.engagement != null ? `${p.engagement}%` : '—'}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </details>
-
       <div className="funnel-filters-bar">
         <div className="funnel-filter-row" role="toolbar" aria-label={t('timeWindow')}>
           <span className="filter-lbl muted">
@@ -339,7 +267,7 @@ export function OrganicPostsPanel({
           <thead>
             <tr>
               {cols.map((c) => {
-                const sortable = c.key !== 'thumb'
+                const sortable = c.key !== 'rank'
                 const active = sortKey === c.key
                 return (
                   <th
@@ -360,7 +288,9 @@ export function OrganicPostsPanel({
                           {active ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}
                         </span>
                       </button>
-                    ) : null}
+                    ) : (
+                      c.label
+                    )}
                     {c.tip ? (
                       <FunnelTip tip={t(c.tip)} iconOnly>
                         {c.label}
@@ -379,15 +309,9 @@ export function OrganicPostsPanel({
                 </td>
               </tr>
             ) : (
-              sorted.map((p) => (
+              sorted.map((p, i) => (
                 <tr key={p.id}>
-                  <td className="funnel-thumb-cell">
-                    {p.image ? (
-                      <a href={p.url || '#'} target="_blank" rel="noopener noreferrer">
-                        <img className="funnel-thumb" src={p.image} alt="" loading="lazy" />
-                      </a>
-                    ) : null}
-                  </td>
+                  <td className="num funnel-rank-cell">{i + 1}</td>
                   <td className="num">{fmtDate(p.date)}</td>
                   <td>
                     <span className="badge">{p.type}</span>
