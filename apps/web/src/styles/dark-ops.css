@@ -321,17 +321,28 @@ select {
   padding: 9px 0;
 }
 
+/* Slim: toggle above company mark (stacked) */
 .sidebar.slim .sb-head {
-  justify-content: center;
+  flex-direction: column;
+  justify-content: flex-start;
   align-items: center;
   flex-wrap: nowrap;
-  gap: 6px;
+  gap: 8px;
+  min-height: 0;
 }
 
 .sidebar.slim .sb-toggle {
   margin-left: 0;
+  order: -1;
   position: relative;
   z-index: 1;
+}
+
+.sidebar.slim .sb-company {
+  flex: 0 0 auto;
+  width: auto;
+  display: flex;
+  justify-content: center;
 }
 
 .sb-head {
@@ -1757,8 +1768,31 @@ select {
   }
 
   .sidebar.slim .sb-head {
+    flex-direction: row;
     justify-content: space-between;
     align-items: center;
+  }
+
+  .sidebar.slim .sb-toggle {
+    order: 0;
+  }
+
+  .sidebar.slim .sb-company .hdr-chip-kicker,
+  .sidebar.slim .sb-company .hdr-chip-value,
+  .sidebar.slim .sb-company .hdr-company-chevron {
+    display: initial;
+  }
+
+  .sidebar.slim .sb-company .hdr-company-btn {
+    width: 100%;
+    height: 34px;
+    padding: 0 8px 0 4px;
+    justify-content: flex-start;
+  }
+
+  .sidebar.slim .sb-company {
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
   .sidebar .sb-toggle {
