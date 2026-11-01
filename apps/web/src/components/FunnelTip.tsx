@@ -78,7 +78,7 @@ export function FunnelTip({ tip, children, iconOnly = false, className = '' }: P
       >
         {iconOnly ? null : <span className="funnel-tip-label">{children}</span>}
         <span className="funnel-tip-ic" aria-hidden>
-          <Info size={iconOnly ? 13 : 12} weight="regular" />
+          <Info size={iconOnly ? 14 : 13} weight="fill" />
         </span>
         {iconOnly ? <span className="sr-only">{children}</span> : null}
       </span>

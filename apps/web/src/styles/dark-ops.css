@@ -2376,7 +2376,7 @@ select {
 .chip,
 .funnel-tip-bubble,
 .funnel-thumb {
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
 }
 
 .funnel-connect-hint {
@@ -2455,14 +2455,23 @@ select {
 
 .funnel-tip-ic {
   display: inline-flex;
-  color: var(--dim);
-  opacity: 0.7;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: #9aa8b8;
   flex-shrink: 0;
+  line-height: 0;
 }
 
 .funnel-tip:hover .funnel-tip-ic,
 .funnel-tip:focus-visible .funnel-tip-ic {
-  opacity: 1;
+  color: #c0cad6;
+}
+
+.filter-lbl .funnel-tip-ic {
+  width: 13px;
+  height: 13px;
 }
 
 .funnel-tip--icon {
