@@ -214,12 +214,16 @@ const de = {
   logoSaved: 'Logo gespeichert',
   logoRemoved: 'Logo entfernt',
   removeLogoConfirm: 'Logo entfernen?',
-  connectBannerKey: 'Funnel noch nicht verbunden — Metricool API-Key fehlt.',
-  connectBannerBrand: 'Keine Metricool-Brand verknüpft — Ansicht leer.',
-  connectBannerStub: 'Connector folgt — Tabs und Tabelle sind vorbereitet.',
-  connectBannerBrevo: 'Email-Funnel noch nicht verbunden — Brevo API-Key fehlt.',
-  connectBannerAds: 'Paid-Funnel noch nicht verbunden — {provider}-Key fehlt.',
-  connectBannerCta: 'hier verbinden',
+  connectBannerKey:
+    'Funnel noch nicht verbunden. Bitte verbinden, um Informationen zu Content zu erhalten.',
+  connectBannerBrand:
+    'Funnel noch nicht verbunden. Bitte verbinden, um Informationen zu Content zu erhalten.',
+  connectBannerStub: 'Connector folgt. Tabs und Tabelle sind vorbereitet.',
+  connectBannerBrevo:
+    'Funnel noch nicht verbunden. Bitte verbinden, um Informationen zu Content zu erhalten.',
+  connectBannerAds:
+    'Funnel noch nicht verbunden. Bitte verbinden, um Informationen zu Content zu erhalten.',
+  connectBannerCta: 'Verbinden',
   postsEmptyNeedBrand: 'Keine Beiträge — Metricool-Brand unter Einstellungen verknüpfen.',
   postsEmptyWindow: 'Keine Beiträge in diesem Zeitraum.',
   campaignsEmptyNeedKey: 'Keine Kampagnen — Integration unter Einstellungen verbinden.',
@@ -494,12 +498,16 @@ const en: { [K in keyof typeof de]: string } = {
   logoSaved: 'Logo saved',
   logoRemoved: 'Logo removed',
   removeLogoConfirm: 'Remove logo?',
-  connectBannerKey: 'Funnel not connected yet — Metricool API key missing.',
-  connectBannerBrand: 'No Metricool brand linked — view is empty.',
-  connectBannerStub: 'Connector coming soon — tabs and table are ready.',
-  connectBannerBrevo: 'Email funnel not connected — Brevo API key missing.',
-  connectBannerAds: 'Paid funnel not connected — {provider} key missing.',
-  connectBannerCta: 'connect here',
+  connectBannerKey:
+    'Funnel not connected yet. Please connect to see content information.',
+  connectBannerBrand:
+    'Funnel not connected yet. Please connect to see content information.',
+  connectBannerStub: 'Connector coming soon. Tabs and table are ready.',
+  connectBannerBrevo:
+    'Funnel not connected yet. Please connect to see content information.',
+  connectBannerAds:
+    'Funnel not connected yet. Please connect to see content information.',
+  connectBannerCta: 'Connect',
   postsEmptyNeedBrand: 'No posts — link a Metricool brand under Settings.',
   postsEmptyWindow: 'No posts in this time window.',
   campaignsEmptyNeedKey: 'No campaigns — connect the integration under Settings.',

@@ -133,7 +133,7 @@ export function AdsPage() {
         <FunnelConnectHint
           need={stub ? 'stub' : 'key'}
           settingsHref={settingsHref}
-          message={stub ? t('adsStubBody') : t('connectBannerAds').replace('{provider}', title)}
+          message={stub ? t('adsStubBody') : t('connectBannerAds')}
         />
       ) : null}
 

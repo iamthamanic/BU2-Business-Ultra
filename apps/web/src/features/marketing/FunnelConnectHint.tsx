@@ -1,8 +1,9 @@
 /**
- * FunnelConnectHint — soft Legacy-style dashed banner above funnel tables.
- * Never replaces the main surface; links to Settings → Verbindungen.
+ * FunnelConnectHint — soft warning banner above funnel tables.
+ * Never replaces the main surface; CTA opens Settings → Verbindungen.
  * Location: apps/web/src/features/marketing/FunnelConnectHint.tsx
  */
+import { WarningCircle } from '@phosphor-icons/react'
 import { Link } from 'react-router-dom'
 import { useI18n } from '../../lib/i18n'
 
@@ -27,9 +28,12 @@ export function FunnelConnectHint({ need, settingsHref, message }: Props) {
 
   return (
     <div className="funnel-connect-hint" role="status">
+      <span className="funnel-connect-hint-ic" aria-hidden>
+        <WarningCircle size={18} weight="fill" />
+      </span>
       <span className="funnel-connect-hint-text">{text}</span>
       {need !== 'stub' ? (
-        <Link className="funnel-connect-hint-link" to={settingsHref}>
+        <Link className="btn funnel-connect-hint-btn" to={settingsHref}>
           {t('connectBannerCta')}
         </Link>
       ) : null}
