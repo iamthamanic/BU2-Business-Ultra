@@ -1,7 +1,7 @@
 /**
  * BusinessShell — `/co/:slug` layout with department sidebar IA.
- * Flat Marketing · Product (hosts Katalog + CostMyBusiness) · Customer · Tools (Sortanize, CheckMap).
- * Settings in footer; company switcher in topbar. Nav filtered by membership.tabs.
+ * Flat Marketing · Product · Customer · Projects · Tools (Sortanize, CheckMap).
+ * Settings in footer; company switcher in sidebar. Nav filtered by membership.tabs.
  * API calls remain `/api/b/:slug`. Location: apps/web/src/components/BusinessShell.tsx
  */
 import { useEffect, useMemo, useState } from 'react'
@@ -13,6 +13,7 @@ import {
   Megaphone,
   Cube,
   UsersThree,
+  Folders,
 } from '@phosphor-icons/react'
 import { canSeeNavTab } from '@bu2/shared'
 import { api } from '../lib/api'
@@ -100,6 +101,15 @@ export function BusinessShell({
         label: t('customer'),
         icon: UsersThree,
         dataIc: 'customer',
+      })
+    }
+    if (canSeeNavTab(tabs, 'projects')) {
+      items.push({
+        key: 'projects',
+        to: routes.projects,
+        label: t('projects'),
+        icon: Folders,
+        dataIc: 'projects',
       })
     }
     return items

@@ -721,6 +721,9 @@ select {
 .sb-item[data-ic='customer'] {
   --sb-ic: #2dd4bf;
 }
+.sb-item[data-ic='projects'] {
+  --sb-ic: #a78bfa;
+}
 .sb-item[data-ic='instagram'] {
   --sb-ic: #e4405f;
 }

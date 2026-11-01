@@ -18,6 +18,7 @@ import { BusinessShell } from '../components/BusinessShell'
 import { CatalogPage } from '../features/catalog/CatalogPage'
 import { ProductShell } from '../features/product/ProductShell'
 import { CustomerPage } from '../features/customer/CustomerPage'
+import { ProjectsPage } from '../features/projects/ProjectsPage'
 import { MarketingShell } from '../features/marketing/MarketingShell'
 import { MarketingPage } from '../features/marketing/MarketingPage'
 import { AdsPage } from '../features/ads/AdsPage'
@@ -121,6 +122,7 @@ export function App() {
           <Route path="cmb" element={<CoRedirect to="product/costmybusiness" />} />
         </Route>
         <Route path="customer" element={<CustomerPage />} />
+        <Route path="projects" element={<ProjectsPage />} />
 
         <Route path="marketing" element={<MarketingShell />}>
           <Route
