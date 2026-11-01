@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS users (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   email varchar(320) NOT NULL UNIQUE,
   display_name varchar(160),
+  password_hash text,
   is_superadmin boolean NOT NULL DEFAULT false,
   is_breakglass_operator boolean NOT NULL DEFAULT false,
   locale varchar(8) NOT NULL DEFAULT 'de',

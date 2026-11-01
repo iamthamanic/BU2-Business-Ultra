@@ -10,6 +10,8 @@ const EnvSchema = z.object({
   SECRETS_MASTER_KEY: z.string().min(16),
   SESSION_SECRET: z.string().min(16),
   BOOTSTRAP_OWNER_EMAIL: z.string().email().default('raccoova@gmail.com'),
+  /** Local/dev bootstrap password only — never use the default in production */
+  BOOTSTRAP_OWNER_PASSWORD: z.string().min(8).default('change-me-local'),
   BREVO_SENDER_EMAIL: z.string().email().default('social@halteverbot123.de'),
   BREVO_SENDER_NAME: z.string().default('Business Ultra'),
   BREVO_API_KEY: z.string().optional().default(''),

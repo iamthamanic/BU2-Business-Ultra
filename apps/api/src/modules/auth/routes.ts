@@ -1,9 +1,20 @@
+/**
+ * Auth routes: password login, magic-link/OTP, session, password change.
+ * Location: apps/api/src/modules/auth/routes.ts
+ */
 import type { FastifyInstance } from 'fastify'
 import { eq } from 'drizzle-orm'
-import { MagicLinkRequestSchema, MagicLinkVerifySchema, OtpVerifySchema } from '@bu2/shared'
+import {
+  ChangePasswordSchema,
+  MagicLinkRequestSchema,
+  MagicLinkVerifySchema,
+  OtpVerifySchema,
+  PasswordLoginSchema,
+} from '@bu2/shared'
 import { db } from '../../db/client.js'
 import { authChallenges, sessions, users } from '../../db/schema.js'
 import { hashToken, randomOtp, randomToken } from '../../lib/crypto.js'
+import { hashPassword, verifyPassword } from '../../lib/password.js'
 import { sendMagicLinkEmail } from '../../lib/brevo.js'
 import { loadEnv } from '../../lib/env.js'
 import { writeAudit } from '../../lib/audit.js'
@@ -18,10 +29,12 @@ async function ensureUser(email: string) {
   // Invite-only: only bootstrap owner may auto-create on first login before any invite
   const env = loadEnv()
   if (normalized === env.BOOTSTRAP_OWNER_EMAIL.toLowerCase()) {
+    const passwordHash = await hashPassword(env.BOOTSTRAP_OWNER_PASSWORD)
     const [created] = await db
       .insert(users)
       .values({
         email: normalized,
+        passwordHash,
         isSuperadmin: true,
         isBreakglassOperator: true,
         displayName: 'Bootstrap Owner',
@@ -58,6 +71,50 @@ async function createSession(userId: string, reply: { setCookie: (name: string, 
 }
 
 export async function authRoutes(app: FastifyInstance) {
+  /** Primary: email + password → session cookie */
+  app.post('/api/auth/login', async (req, reply) => {
+    const body = PasswordLoginSchema.parse(req.body)
+    const email = body.email.toLowerCase()
+    const rows = await db.select().from(users).where(eq(users.email, email)).limit(1)
+    const user = rows[0]
+    // Uniform error — avoid email enumeration
+    if (!user?.passwordHash) {
+      return reply.code(401).send({ error: 'invalid_credentials' })
+    }
+    const ok = await verifyPassword(body.password, user.passwordHash)
+    if (!ok) {
+      return reply.code(401).send({ error: 'invalid_credentials' })
+    }
+    await createSession(user.id, reply)
+    await writeAudit({ actorUserId: user.id, action: 'auth.login', meta: { method: 'password' } })
+    return { ok: true, user: { id: user.id, email: user.email } }
+  })
+
+  /** Set or change password for the logged-in user */
+  app.post('/api/auth/password', async (req, reply) => {
+    const actor = await requireUser(req).catch(() => null)
+    if (!actor) return reply.code(401).send({ error: 'unauthorized' })
+    const body = ChangePasswordSchema.parse(req.body)
+    const rows = await db.select().from(users).where(eq(users.id, actor.id)).limit(1)
+    const user = rows[0]
+    if (!user) return reply.code(401).send({ error: 'unauthorized' })
+
+    if (user.passwordHash) {
+      if (!body.currentPassword) {
+        return reply.code(400).send({ error: 'current_password_required' })
+      }
+      const match = await verifyPassword(body.currentPassword, user.passwordHash)
+      if (!match) {
+        return reply.code(401).send({ error: 'invalid_credentials' })
+      }
+    }
+
+    const passwordHash = await hashPassword(body.newPassword)
+    await db.update(users).set({ passwordHash }).where(eq(users.id, user.id))
+    await writeAudit({ actorUserId: user.id, action: 'auth.password_changed', meta: {} })
+    return { ok: true }
+  })
+
   app.post('/api/auth/magic-link', async (req, reply) => {
     const body = MagicLinkRequestSchema.parse(req.body)
     const email = body.email.toLowerCase()

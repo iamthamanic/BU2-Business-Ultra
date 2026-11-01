@@ -14,6 +14,8 @@ export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
   email: varchar('email', { length: 320 }).notNull().unique(),
   displayName: varchar('display_name', { length: 160 }),
+  /** bcrypt hash; null until password is set (OTP/magic-link-only users) */
+  passwordHash: text('password_hash'),
   isSuperadmin: boolean('is_superadmin').notNull().default(false),
   isBreakglassOperator: boolean('is_breakglass_operator').notNull().default(false),
   locale: varchar('locale', { length: 8 }).notNull().default('de'),

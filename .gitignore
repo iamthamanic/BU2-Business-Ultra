@@ -22,6 +22,7 @@ postgres-data/
 backups/
 *.sql
 !apps/api/src/db/bootstrap.sql
+!apps/api/drizzle/*.sql
 *.pem
 *.key
 secrets/

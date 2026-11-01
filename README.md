@@ -27,10 +27,22 @@ pnpm dev
 
 ### First login
 
-1. Open `/login` as `raccoova@gmail.com`
-2. Without `BREVO_API_KEY`, magic link + OTP print to API console
-3. Create first business (empty start)
-4. Settings → paste provider keys (features stay gated until valid)
+Primary auth is **email + password**. Magic Link / OTP remains as a secondary/dev option on the login page.
+
+| Field | Local default (from `.env.example`) |
+|-------|-------------------------------------|
+| Email | `raccoova@gmail.com` (`BOOTSTRAP_OWNER_EMAIL`) |
+| Password | `change-me-local` (`BOOTSTRAP_OWNER_PASSWORD`) |
+
+1. `pnpm db:migrate && pnpm db:seed` (seeds/refreshes the bootstrap password hash)
+2. Open `/login` → email + password → **Anmelden**
+3. Optional: expand Magic Link / OTP; without `BREVO_API_KEY`, codes print to the API console
+4. Create first business (empty start)
+5. Settings → paste provider keys (features stay gated until valid)
+
+Change password while logged in: `POST /api/auth/password` with `{ "currentPassword": "…", "newPassword": "…" }`.
+
+**Never commit real secrets.** Override `BOOTSTRAP_OWNER_PASSWORD` in `.env` / deploy secrets for anything beyond local.
 
 Sender: `social@halteverbot123.de`.
 

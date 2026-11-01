@@ -301,6 +301,32 @@ select {
   padding: var(--sp-6);
 }
 
+.login-secondary {
+  border-top: 1px solid var(--border);
+  padding-top: var(--sp-3);
+  margin-top: var(--sp-2);
+}
+
+.login-secondary summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 13px;
+  user-select: none;
+}
+
+.login-secondary summary::-webkit-details-marker {
+  display: none;
+}
+
+.login-secondary summary::before {
+  content: '▸ ';
+  color: var(--dim);
+}
+
+.login-secondary[open] summary::before {
+  content: '▾ ';
+}
+
 .rail-toggle {
   display: none;
 }

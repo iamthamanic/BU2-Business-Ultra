@@ -48,6 +48,16 @@ export const OtpVerifySchema = z.object({
   code: z.string().length(6),
 })
 
+export const PasswordLoginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8).max(200),
+})
+
+export const ChangePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(200).optional(),
+  newPassword: z.string().min(8).max(200),
+})
+
 export const CatalogProductSchema = z.object({
   id: z.string().uuid().optional(),
   name: z.string().min(1).max(200),

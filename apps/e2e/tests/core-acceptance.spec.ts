@@ -9,14 +9,17 @@ const API = process.env.PUBLIC_API_URL ?? 'http://127.0.0.1:8742'
 
 async function loginAsBootstrap(request: APIRequestContext) {
   const email = process.env.BOOTSTRAP_OWNER_EMAIL ?? 'raccoova@gmail.com'
+  const password = process.env.BOOTSTRAP_OWNER_PASSWORD ?? 'change-me-local'
+  const login = await request.post(`${API}/api/auth/login`, {
+    data: { email, password },
+  })
+  if (login.ok()) return
+
+  // Fallback: magic-link + OTP (dev helper) if password not seeded yet
   const magic = await request.post(`${API}/api/auth/magic-link`, {
     data: { email },
   })
   expect(magic.ok()).toBeTruthy()
-  // Dev console OTP is not readable here — use verify via challenge table workaround:
-  // For CI we seed a known flow: request magic link then hit DB… Instead use cookie from OTP
-  // extracted by a test-only endpoint is avoided. We re-request and scrape API logs is flaky.
-  // Practical approach: call verify-otp after reading last challenge via internal test helper.
   const otpRes = await request.post(`${API}/api/auth/dev/last-otp`, {
     data: { email },
   })
@@ -28,7 +31,7 @@ async function loginAsBootstrap(request: APIRequestContext) {
     expect(verify.ok()).toBeTruthy()
     return
   }
-  test.skip(true, 'dev OTP helper unavailable — start API with NODE_ENV=development')
+  test.skip(true, 'password login failed and OTP helper unavailable')
 }
 
 test.describe('core 23B @core23b', () => {
