@@ -1,0 +1,148 @@
+import type { FastifyInstance } from 'fastify'
+import { eq } from 'drizzle-orm'
+import { MagicLinkRequestSchema, MagicLinkVerifySchema, OtpVerifySchema } from '@bu2/shared'
+import { db } from '../../db/client.js'
+import { authChallenges, sessions, users } from '../../db/schema.js'
+import { hashToken, randomOtp, randomToken } from '../../lib/crypto.js'
+import { sendMagicLinkEmail } from '../../lib/brevo.js'
+import { loadEnv } from '../../lib/env.js'
+import { writeAudit } from '../../lib/audit.js'
+import { requireUser } from '../../plugins/auth.js'
+
+const SESSION_DAYS = 14
+
+async function ensureUser(email: string) {
+  const normalized = email.toLowerCase()
+  const existing = await db.select().from(users).where(eq(users.email, normalized)).limit(1)
+  if (existing[0]) return existing[0]
+  // Invite-only: only bootstrap owner may auto-create on first login before any invite
+  const env = loadEnv()
+  if (normalized === env.BOOTSTRAP_OWNER_EMAIL.toLowerCase()) {
+    const [created] = await db
+      .insert(users)
+      .values({
+        email: normalized,
+        isSuperadmin: true,
+        isBreakglassOperator: true,
+        displayName: 'Bootstrap Owner',
+      })
+      .returning()
+    await writeAudit({
+      actorUserId: created!.id,
+      action: 'bootstrap.owner_created',
+      meta: { email: normalized },
+    })
+    return created!
+  }
+  const err = new Error('Invite required') as Error & { statusCode: number }
+  err.statusCode = 403
+  throw err
+}
+
+async function createSession(userId: string, reply: { setCookie: (name: string, value: string, opts: Record<string, unknown>) => void }) {
+  const token = randomToken(32)
+  const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000)
+  await db.insert(sessions).values({
+    userId,
+    tokenHash: hashToken(token),
+    expiresAt,
+  })
+  await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, userId))
+  reply.setCookie('bu2_session', token, {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: loadEnv().NODE_ENV === 'production',
+    maxAge: SESSION_DAYS * 24 * 60 * 60,
+  })
+}
+
+export async function authRoutes(app: FastifyInstance) {
+  app.post('/api/auth/magic-link', async (req, reply) => {
+    const body = MagicLinkRequestSchema.parse(req.body)
+    const email = body.email.toLowerCase()
+    // Existence check without enumeration: always 200
+    try {
+      await ensureUser(email)
+    } catch (e) {
+      const err = e as Error & { statusCode?: number }
+      if (err.statusCode === 403) {
+        return reply.code(200).send({ ok: true, mode: 'queued' })
+      }
+      throw e
+    }
+    const token = randomToken(24)
+    const otp = randomOtp()
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000)
+    await db.insert(authChallenges).values({
+      email,
+      tokenHash: hashToken(token),
+      otpHash: hashToken(otp),
+      expiresAt,
+    })
+    const env = loadEnv()
+    const magicUrl = `${env.PUBLIC_WEB_URL}/login/verify?token=${encodeURIComponent(token)}`
+    const sent = await sendMagicLinkEmail({ to: email, magicUrl, otp })
+    await writeAudit({ action: 'auth.magic_link_requested', meta: { email, mode: sent.mode } })
+    return { ok: true, mode: sent.mode }
+  })
+
+  app.post('/api/auth/verify', async (req, reply) => {
+    const body = MagicLinkVerifySchema.parse(req.body)
+    const rows = await db
+      .select()
+      .from(authChallenges)
+      .where(eq(authChallenges.tokenHash, hashToken(body.token)))
+      .limit(1)
+    const challenge = rows[0]
+    if (!challenge || challenge.consumedAt || challenge.expiresAt.getTime() < Date.now()) {
+      return reply.code(400).send({ error: 'invalid_or_expired' })
+    }
+    await db
+      .update(authChallenges)
+      .set({ consumedAt: new Date() })
+      .where(eq(authChallenges.id, challenge.id))
+    const user = await ensureUser(challenge.email)
+    await createSession(user.id, reply)
+    await writeAudit({ actorUserId: user.id, action: 'auth.login', meta: { method: 'magic_link' } })
+    return { ok: true, user: { id: user.id, email: user.email } }
+  })
+
+  app.post('/api/auth/verify-otp', async (req, reply) => {
+    const body = OtpVerifySchema.parse(req.body)
+    const email = body.email.toLowerCase()
+    const rows = await db.select().from(authChallenges).where(eq(authChallenges.email, email))
+    const challenge = rows
+      .filter((c) => !c.consumedAt && c.expiresAt.getTime() >= Date.now())
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0]
+    if (!challenge?.otpHash || challenge.otpHash !== hashToken(body.code)) {
+      return reply.code(400).send({ error: 'invalid_or_expired' })
+    }
+    await db
+      .update(authChallenges)
+      .set({ consumedAt: new Date() })
+      .where(eq(authChallenges.id, challenge.id))
+    const user = await ensureUser(email)
+    await createSession(user.id, reply)
+    await writeAudit({ actorUserId: user.id, action: 'auth.login', meta: { method: 'otp' } })
+    return { ok: true, user: { id: user.id, email: user.email } }
+  })
+
+  app.post('/api/auth/logout', async (req, reply) => {
+    const token = req.cookies.bu2_session
+    if (token) {
+      await db
+        .update(sessions)
+        .set({ revokedAt: new Date() })
+        .where(eq(sessions.tokenHash, hashToken(token)))
+    }
+    reply.clearCookie('bu2_session', { path: '/' })
+    return { ok: true }
+  })
+
+  app.get('/api/auth/me', async (req, reply) => {
+    const user = await requireUser(req).catch(() => null)
+    if (!user) return reply.code(401).send({ error: 'unauthorized' })
+    return { user }
+  })
+}

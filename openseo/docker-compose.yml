@@ -1,0 +1,14 @@
+# Optional OpenSEO standalone — pin by digest before production use.
+# Replace REPLACE_WITH_VERIFIED_DIGEST after pulling/inspecting upstream.
+services:
+  openseo:
+    image: ghcr.io/every-app/open-seo-standalone@sha256:REPLACE_WITH_VERIFIED_DIGEST
+    # Fallback tag for local exploration only (NOT for prod):
+    # image: ghcr.io/every-app/open-seo-standalone:latest
+    ports:
+      - "8750:3000"
+    environment:
+      AUTH_MODE: password
+      # BU SSO bridge is a fork concern — see SSO_CONTRACT.md
+    profiles:
+      - openseo

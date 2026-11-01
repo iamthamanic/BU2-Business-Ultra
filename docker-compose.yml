@@ -1,0 +1,64 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bu2}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bu2_local_dev_change_me}
+      POSTGRES_DB: ${POSTGRES_DB:-bu2}
+    ports:
+      - "5432:5432"
+    volumes:
+      - bu2_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bu2} -d ${POSTGRES_DB:-bu2}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bu2}:${POSTGRES_PASSWORD:-bu2_local_dev_change_me}@postgres:5432/${POSTGRES_DB:-bu2}
+      API_PORT: "8742"
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-http://127.0.0.1:8742}
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://127.0.0.1:8741}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://127.0.0.1:8741}
+      SORTANIZE_URL: http://sortanize:8760
+      UPLOADS_DIR: /data/uploads
+    ports:
+      - "8742:8742"
+    volumes:
+      - bu2_uploads:/data/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      sortanize:
+        condition: service_started
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_URL: ${PUBLIC_API_URL:-http://127.0.0.1:8742}
+    ports:
+      - "8741:80"
+    depends_on:
+      - api
+
+  sortanize:
+    build:
+      context: ./services/sortanize
+    ports:
+      - "8760:8760"
+    volumes:
+      - bu2_sortanize_tmp:/tmp/sortanize
+
+volumes:
+  bu2_pgdata:
+  bu2_uploads:
+  bu2_sortanize_tmp:

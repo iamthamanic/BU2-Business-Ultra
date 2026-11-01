@@ -1,0 +1,24 @@
+{
+  "name": "business-ultra-2",
+  "private": true,
+  "version": "2.0.0",
+  "description": "Business Ultra 2 — greenfield modular monolith (Vite React + Fastify + Drizzle + Postgres)",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter @bu2/api --filter @bu2/web dev",
+    "dev:api": "pnpm --filter @bu2/api dev",
+    "dev:web": "pnpm --filter @bu2/web dev",
+    "build": "pnpm -r --filter @bu2/shared --filter @bu2/finance-calc --filter @bu2/api --filter @bu2/web build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "db:generate": "pnpm --filter @bu2/api db:generate",
+    "db:migrate": "pnpm --filter @bu2/api db:migrate",
+    "db:seed": "pnpm --filter @bu2/api db:seed",
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down"
+  }
+}

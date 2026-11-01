@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bu2
+          POSTGRES_PASSWORD: bu2_ci
+          POSTGRES_DB: bu2
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bu2 -d bu2"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://bu2:bu2_ci@localhost:5432/bu2
+      SECRETS_MASTER_KEY: ci-secrets-master-key-32bytes-min!!
+      SESSION_SECRET: ci-session-secret-32bytes-minimum!
+      BOOTSTRAP_OWNER_EMAIL: raccoova@gmail.com
+      BREVO_SENDER_EMAIL: social@halteverbot123.de
+      PUBLIC_WEB_URL: http://127.0.0.1:8741
+      PUBLIC_API_URL: http://127.0.0.1:8742
+      CORS_ORIGIN: http://127.0.0.1:8741
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install
+      - run: pnpm --filter @bu2/shared build
+      - run: pnpm --filter @bu2/finance-calc build
+      - run: pnpm --filter @bu2/finance-calc test
+      - run: pnpm --filter @bu2/api db:migrate
+      - run: pnpm --filter @bu2/api db:seed
+      - run: pnpm typecheck
+      - run: pnpm --filter @bu2/web build
