@@ -1,13 +1,14 @@
 /**
- * OrganicProductionPanel — Produktion tab: calendar shell + draft compose (Metricool-style hub).
- * Shares Analyse filter chrome (Zeitraum / Brand / Post-Art). Full planner UX lands iteratively.
+ * OrganicProductionPanel — Produktion tab: calendar driven by Zeitraum filter.
+ * Shows every month spanned by the selected range; days in-range are highlighted.
  * Location: apps/web/src/features/marketing/OrganicProductionPanel.tsx
  */
 import { useMemo, useState } from 'react'
-import { CaretLeft, CaretRight, Plus, SquaresFour, Storefront } from '@phosphor-icons/react'
+import { Plus, SquaresFour, Storefront } from '@phosphor-icons/react'
 import { FunnelDateRangePicker } from '../../components/FunnelDateRangePicker'
 import { FunnelTip } from '../../components/FunnelTip'
 import { useI18n } from '../../lib/i18n'
+import { formatIsoDate } from '../../lib/funnelExport'
 import {
   defaultDateRange,
   ORGANIC_PRESETS,
@@ -34,6 +35,15 @@ type Props = {
   onRetry: (id: string) => void | Promise<void>
 }
 
+type CalCell = {
+  day: number | null
+  iso: string | null
+  inRange: boolean
+  isToday: boolean
+}
+
+const MAX_MONTHS = 12
+
 function startOfMonth(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), 1)
 }
@@ -44,6 +54,52 @@ function daysInMonth(d: Date) {
 
 function weekdayMon0(d: Date) {
   return (d.getDay() + 6) % 7
+}
+
+function parseIsoDay(iso: string | undefined): Date | null {
+  if (!iso || iso.length < 10 || iso === 'all') return null
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number)
+  if (!y || !m || !d) return null
+  return new Date(y, m - 1, d)
+}
+
+function monthsBetween(from: Date, to: Date): Date[] {
+  const start = startOfMonth(from <= to ? from : to)
+  const end = startOfMonth(from <= to ? to : from)
+  const out: Date[] = []
+  let cur = new Date(start)
+  while (cur.getTime() <= end.getTime() && out.length < MAX_MONTHS) {
+    out.push(new Date(cur))
+    cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1)
+  }
+  return out
+}
+
+function buildMonthCells(
+  month: Date,
+  rangeFrom: string,
+  rangeTo: string,
+  todayIso: string,
+): CalCell[] {
+  const total = daysInMonth(month)
+  const pad = weekdayMon0(month)
+  const out: CalCell[] = []
+  for (let i = 0; i < pad; i++) {
+    out.push({ day: null, iso: null, inRange: false, isToday: false })
+  }
+  for (let d = 1; d <= total; d++) {
+    const iso = formatIsoDate(new Date(month.getFullYear(), month.getMonth(), d))
+    out.push({
+      day: d,
+      iso,
+      inRange: iso >= rangeFrom && iso <= rangeTo,
+      isToday: iso === todayIso,
+    })
+  }
+  while (out.length % 7 !== 0) {
+    out.push({ day: null, iso: null, inRange: false, isToday: false })
+  }
+  return out
 }
 
 export function OrganicProductionPanel({
@@ -60,7 +116,6 @@ export function OrganicProductionPanel({
   const [range, setRange] = useState<DateRangeValue>(() => defaultDateRange(initialWindow))
   const [brand, setBrand] = useState('__all__')
   const [postType, setPostType] = useState('__all__')
-  const [cursor, setCursor] = useState(() => startOfMonth(new Date()))
   const [title, setTitle] = useState('')
   const [text, setText] = useState('')
   const [composerOpen, setComposerOpen] = useState(false)
@@ -79,38 +134,77 @@ export function OrganicProductionPanel({
     }
   }
 
-  const monthLabel = useMemo(() => {
-    try {
-      return new Intl.DateTimeFormat(locale === 'en' ? 'en-US' : 'de-DE', {
-        month: 'long',
-        year: 'numeric',
-      }).format(cursor)
-    } catch {
-      return `${cursor.getMonth() + 1}/${cursor.getFullYear()}`
-    }
-  }, [cursor, locale])
+  const todayIso = formatIsoDate(new Date())
 
-  const cells = useMemo(() => {
-    const total = daysInMonth(cursor)
-    const pad = weekdayMon0(cursor)
-    const today = new Date()
-    const out: { day: number | null; isToday: boolean }[] = []
-    for (let i = 0; i < pad; i++) out.push({ day: null, isToday: false })
-    for (let d = 1; d <= total; d++) {
-      const isToday =
-        today.getFullYear() === cursor.getFullYear() &&
-        today.getMonth() === cursor.getMonth() &&
-        today.getDate() === d
-      out.push({ day: d, isToday })
+  const boundRange = useMemo(() => {
+    let from = parseIsoDay(range.from)
+    let to = parseIsoDay(range.to)
+    if (!from || !to) {
+      const postDates = posts
+        .map((p) => p.date?.slice(0, 10))
+        .filter((d): d is string => Boolean(d && d.length >= 10))
+        .sort()
+      if (postDates.length) {
+        from = parseIsoDay(postDates[0]!)
+        to = parseIsoDay(postDates[postDates.length - 1]!)
+      } else {
+        const now = new Date()
+        from = startOfMonth(now)
+        to = now
+      }
     }
-    while (out.length % 7 !== 0) out.push({ day: null, isToday: false })
-    return out
-  }, [cursor])
+    if (!from || !to) {
+      const now = new Date()
+      return { from: formatIsoDate(now), to: formatIsoDate(now), fromDate: now, toDate: now }
+    }
+    if (from.getTime() > to.getTime()) {
+      const tmp = from
+      from = to
+      to = tmp
+    }
+    return {
+      from: formatIsoDate(from),
+      to: formatIsoDate(to),
+      fromDate: from,
+      toDate: to,
+    }
+  }, [range.from, range.to, posts])
+
+  const monthBlocks = useMemo(() => {
+    const months = monthsBetween(boundRange.fromDate, boundRange.toDate)
+    const loc = locale === 'en' ? 'en-US' : 'de-DE'
+    return months.map((month) => {
+      let label: string
+      try {
+        label = new Intl.DateTimeFormat(loc, { month: 'long', year: 'numeric' }).format(month)
+      } catch {
+        label = `${month.getMonth() + 1}/${month.getFullYear()}`
+      }
+      return {
+        key: `${month.getFullYear()}-${month.getMonth()}`,
+        label,
+        cells: buildMonthCells(month, boundRange.from, boundRange.to, todayIso),
+      }
+    })
+  }, [boundRange, locale, todayIso])
 
   const weekdays =
     locale === 'en'
       ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
       : ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+
+  const monthSpanCount = useMemo(() => {
+    let n = 0
+    let cur = startOfMonth(boundRange.fromDate)
+    const end = startOfMonth(boundRange.toDate)
+    while (cur.getTime() <= end.getTime()) {
+      n++
+      cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1)
+      if (n > MAX_MONTHS + 1) break
+    }
+    return n
+  }, [boundRange.fromDate, boundRange.toDate])
+  const truncated = monthSpanCount > MAX_MONTHS
 
   async function saveDraft() {
     await onCreateDraft(title, text)
@@ -169,35 +263,10 @@ export function OrganicProductionPanel({
             </button>
           ))}
         </div>
-      </div>
 
-      <div className="prod-toolbar">
-        <div className="prod-month-nav">
-          <button
-            type="button"
-            className="btn icon-btn"
-            aria-label={t('prodPrevMonth')}
-            onClick={() =>
-              setCursor((c) => new Date(c.getFullYear(), c.getMonth() - 1, 1))
-            }
-          >
-            <CaretLeft size={16} weight="bold" />
-          </button>
-          <h2 className="prod-month-label">{monthLabel}</h2>
-          <button
-            type="button"
-            className="btn icon-btn"
-            aria-label={t('prodNextMonth')}
-            onClick={() =>
-              setCursor((c) => new Date(c.getFullYear(), c.getMonth() + 1, 1))
-            }
-          >
-            <CaretRight size={16} weight="bold" />
-          </button>
-        </div>
         <button
           type="button"
-          className="btn primary"
+          className="btn primary prod-create-in-bar"
           onClick={() => setComposerOpen(true)}
         >
           <Plus size={16} weight="bold" aria-hidden />
@@ -207,30 +276,47 @@ export function OrganicProductionPanel({
 
       <p className="muted prod-lede">{t('prodLede')}</p>
 
-      <div className="prod-calendar panel" role="grid" aria-label={t('prodCalendar')}>
-        <div className="prod-cal-head" role="row">
-          {weekdays.map((w) => (
-            <div key={w} className="prod-cal-dow muted" role="columnheader">
-              {w}
+      {truncated ? (
+        <p className="muted prod-range-cap">{t('prodMonthsCap')}</p>
+      ) : null}
+
+      <div className="prod-calendars" aria-label={t('prodCalendar')}>
+        {monthBlocks.map((block) => (
+          <div key={block.key} className="prod-calendar panel">
+            <h3 className="prod-month-heading">{block.label}</h3>
+            <div className="prod-cal-head" role="row">
+              {weekdays.map((w) => (
+                <div key={w} className="prod-cal-dow muted" role="columnheader">
+                  {w}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <div className="prod-cal-body">
-          {cells.map((cell, i) => (
-            <button
-              key={i}
-              type="button"
-              role="gridcell"
-              className={`prod-cal-cell${cell.day == null ? ' is-empty' : ''}${cell.isToday ? ' is-today' : ''}`}
-              disabled={cell.day == null}
-              onClick={() => {
-                if (cell.day != null) setComposerOpen(true)
-              }}
-            >
-              {cell.day != null ? <span className="prod-cal-day">{cell.day}</span> : null}
-            </button>
-          ))}
-        </div>
+            <div className="prod-cal-body" role="grid">
+              {block.cells.map((cell, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  role="gridcell"
+                  className={[
+                    'prod-cal-cell',
+                    cell.day == null ? 'is-empty' : '',
+                    cell.inRange ? 'is-in-range' : 'is-out-range',
+                    cell.isToday ? 'is-today' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  disabled={cell.day == null || !cell.inRange}
+                  aria-disabled={cell.day == null || !cell.inRange}
+                  onClick={() => {
+                    if (cell.inRange) setComposerOpen(true)
+                  }}
+                >
+                  {cell.day != null ? <span className="prod-cal-day">{cell.day}</span> : null}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
 
       {composerOpen ? (
