@@ -8,6 +8,7 @@ import { useLocation, useParams } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { companyRoutes } from '../../lib/companyPaths'
 import { useI18n } from '../../lib/i18n'
+import { CustomFunnelToolbar } from './CustomFunnelToolbar'
 import { FunnelConnectHint } from './FunnelConnectHint'
 import { OrganicPostsPanel, type OrganicPost } from './OrganicPostsPanel'
 
@@ -175,8 +176,14 @@ export function MarketingPage() {
     return (
       <div className="stack funnel-page">
         <FunnelConnectHint need="stub" settingsHref={settingsHref} message={t('offlineStubBody')} />
-        <div className="panel">
-          <table className="table">
+        <CustomFunnelToolbar
+          channel={ch}
+          win={win}
+          onWindowChange={setWin}
+          rows={[]}
+        />
+        <div className="panel funnel-table-wrap">
+          <table className="table funnel-grid-table">
             <thead>
               <tr>
                 <th>{t('colDate')}</th>
@@ -205,6 +212,18 @@ export function MarketingPage() {
           <FunnelConnectHint need="key" settingsHref={settingsHref} message={t('connectBannerBrevo')} />
         ) : null}
 
+        <CustomFunnelToolbar
+          channel={ch}
+          win={win}
+          onWindowChange={setWin}
+          rows={campaigns.map((c) => ({
+            id: String(c.id),
+            name: String(c.name ?? '—'),
+            status: c.status != null ? String(c.status) : '—',
+            type: 'email',
+          }))}
+        />
+
         <div className="panel stack">
           <input
             className="input"
@@ -225,11 +244,11 @@ export function MarketingPage() {
           </button>
         </div>
 
-        <div className="panel">
+        <div className="panel funnel-table-wrap">
           <h3 className="section-title" style={{ marginTop: 0 }}>
             Brevo
           </h3>
-          <table className="table">
+          <table className="table funnel-grid-table">
             <thead>
               <tr>
                 <th>{t('name')}</th>

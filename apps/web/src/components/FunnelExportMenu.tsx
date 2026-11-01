@@ -76,7 +76,7 @@ export function FunnelExportMenu({ getPayload, className = '' }: Props) {
   return (
     <div
       ref={rootRef}
-      className={`funnel-filter-row funnel-export-box ${className}`.trim()}
+      className={`funnel-export-box ${className}`.trim()}
     >
       <button
         type="button"

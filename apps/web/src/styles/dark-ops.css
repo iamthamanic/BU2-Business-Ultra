@@ -2371,7 +2371,7 @@ select {
 
 .funnel-page .panel,
 .funnel-connect-hint,
-.funnel-filter-row,
+.funnel-filters-bar,
 .funnel-kpi,
 .chip,
 .funnel-tip-bubble,
@@ -2423,15 +2423,20 @@ select {
 .funnel-filters-bar {
   display: flex;
   flex-wrap: wrap;
-  align-items: stretch;
-  gap: 10px;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  background: var(--panel2);
 }
 
 .funnel-export-box {
   position: relative;
   margin-left: auto;
-  padding: 4px 6px;
-  align-self: stretch;
+  padding: 0;
+  align-self: center;
+  border: 0;
+  background: transparent;
 }
 
 .funnel-export-btn {
@@ -2524,6 +2529,9 @@ select {
 
 .funnel-filters-bar .funnel-filter-row {
   flex: 0 1 auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .funnel-filter-row {
@@ -2531,9 +2539,6 @@ select {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  background: var(--panel2);
 }
 
 .funnel-tip {
