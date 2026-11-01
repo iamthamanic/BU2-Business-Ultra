@@ -301,12 +301,13 @@ select {
   padding: var(--sp-6);
 }
 
-/* Segmented login mode: Zugangsdaten | Magic Link */
+/* Segmented login mode: Zugangsdaten | Magic Link (~26–28px tall) */
 .login-mode-toggle {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2px;
-  padding: 2px;
+  gap: 1px;
+  padding: 1px;
+  margin-top: var(--sp-3);
   background: var(--panel2);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -317,13 +318,13 @@ select {
   border: none;
   background: transparent;
   color: var(--dim);
-  padding: 5px 8px;
+  padding: 5px 6px;
   border-radius: calc(var(--radius) - 1px);
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.02em;
-  line-height: 1.25;
+  line-height: 1.2;
 }
 
 .login-mode-toggle button:hover {
