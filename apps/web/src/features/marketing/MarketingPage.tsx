@@ -338,8 +338,11 @@ export function MarketingPage() {
         />
       ) : (
         <OrganicProductionPanel
+          posts={organic?.posts ?? []}
           drafts={drafts}
           contentReady={contentReady}
+          initialWindow={win}
+          onWindowChange={(w) => setWin(w)}
           onCreateDraft={createDraft}
           onSchedule={schedule}
           onRetry={retry}

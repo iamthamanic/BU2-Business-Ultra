@@ -1,11 +1,19 @@
 /**
  * OrganicProductionPanel — Produktion tab: calendar shell + draft compose (Metricool-style hub).
- * Full planner UX lands iteratively; this ships the IA + calendar skeleton.
+ * Shares Analyse filter chrome (Zeitraum / Brand / Post-Art). Full planner UX lands iteratively.
  * Location: apps/web/src/features/marketing/OrganicProductionPanel.tsx
  */
 import { useMemo, useState } from 'react'
-import { CaretLeft, CaretRight, Plus } from '@phosphor-icons/react'
+import { CaretLeft, CaretRight, Plus, SquaresFour, Storefront } from '@phosphor-icons/react'
+import { FunnelDateRangePicker } from '../../components/FunnelDateRangePicker'
+import { FunnelTip } from '../../components/FunnelTip'
 import { useI18n } from '../../lib/i18n'
+import {
+  defaultDateRange,
+  ORGANIC_PRESETS,
+  type DateRangeValue,
+} from '../../lib/dateRange'
+import type { OrganicPost } from './OrganicPostsPanel'
 
 type DraftRow = {
   id: string
@@ -13,9 +21,14 @@ type DraftRow = {
   remoteStatus?: unknown
 }
 
+type WindowKey = '24h' | '7d' | '30d' | 'all'
+
 type Props = {
+  posts?: OrganicPost[]
   drafts: DraftRow[]
   contentReady: boolean
+  initialWindow?: WindowKey
+  onWindowChange?: (w: WindowKey) => void
   onCreateDraft: (title: string, text: string) => void | Promise<void>
   onSchedule: (id: string) => void | Promise<void>
   onRetry: (id: string) => void | Promise<void>
@@ -34,17 +47,37 @@ function weekdayMon0(d: Date) {
 }
 
 export function OrganicProductionPanel({
+  posts = [],
   drafts,
   contentReady,
+  initialWindow = '30d',
+  onWindowChange,
   onCreateDraft,
   onSchedule,
   onRetry,
 }: Props) {
   const { t, locale } = useI18n()
+  const [range, setRange] = useState<DateRangeValue>(() => defaultDateRange(initialWindow))
+  const [brand, setBrand] = useState('__all__')
+  const [postType, setPostType] = useState('__all__')
   const [cursor, setCursor] = useState(() => startOfMonth(new Date()))
   const [title, setTitle] = useState('')
   const [text, setText] = useState('')
   const [composerOpen, setComposerOpen] = useState(false)
+
+  const types = useMemo(() => {
+    const set = new Set(posts.map((p) => p.type).filter(Boolean))
+    return Array.from(set).sort()
+  }, [posts])
+
+  function onRangeChange(next: DateRangeValue) {
+    setRange(next)
+    if (next.preset === '24h' || next.preset === '7d' || next.preset === '30d' || next.preset === 'all') {
+      onWindowChange?.(next.preset)
+    } else {
+      onWindowChange?.('all')
+    }
+  }
 
   const monthLabel = useMemo(() => {
     try {
@@ -88,6 +121,56 @@ export function OrganicProductionPanel({
 
   return (
     <div className="stack organic-production-panel">
+      <div className="funnel-filters-bar">
+        <FunnelDateRangePicker
+          value={range}
+          onChange={onRangeChange}
+          presets={ORGANIC_PRESETS}
+          dates={posts.map((p) => p.date)}
+        />
+
+        <div className="funnel-filter-row" role="toolbar" aria-label={t('filterBrand')}>
+          <span className="filter-lbl muted">
+            <Storefront className="filter-lbl-ic" size={14} weight="duotone" aria-hidden />
+            <FunnelTip tip={t('tipBrand')}>{t('filterBrand')}</FunnelTip>
+          </span>
+          <button
+            type="button"
+            className={`chip ${brand === '__all__' ? 'active' : ''}`}
+            onClick={() => setBrand('__all__')}
+          >
+            {t('filterAll')}
+            <span className="n">{posts.length}</span>
+          </button>
+        </div>
+
+        <div className="funnel-filter-row" role="toolbar" aria-label={t('filterPostType')}>
+          <span className="filter-lbl muted">
+            <SquaresFour className="filter-lbl-ic" size={14} weight="duotone" aria-hidden />
+            <FunnelTip tip={t('tipPostType')}>{t('filterPostType')}</FunnelTip>
+          </span>
+          <button
+            type="button"
+            className={`chip ${postType === '__all__' ? 'active' : ''}`}
+            onClick={() => setPostType('__all__')}
+          >
+            {t('filterAll')}
+            <span className="n">{posts.length}</span>
+          </button>
+          {types.map((ty) => (
+            <button
+              key={ty}
+              type="button"
+              className={`chip ${postType === ty ? 'active' : ''}`}
+              onClick={() => setPostType(ty)}
+            >
+              {ty}
+              <span className="n">{posts.filter((p) => p.type === ty).length}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="prod-toolbar">
         <div className="prod-month-nav">
           <button
