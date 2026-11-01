@@ -2090,6 +2090,12 @@ select {
 .mkt-tab[data-ic='geo'] {
   --mkt-ic: #22d3ee;
 }
+.mkt-tab[data-ic='catalog'] {
+  --mkt-ic: #f59e0b;
+}
+.mkt-tab[data-ic='cmb'] {
+  --mkt-ic: var(--warn);
+}
 
 .mkt-tab:hover .mkt-tab-ic {
   opacity: 0.85;

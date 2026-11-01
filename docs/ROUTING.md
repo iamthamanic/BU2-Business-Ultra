@@ -17,9 +17,9 @@ Admin stays **global** (no company prefix): `/admin`. Auth: `/login`, `/login/ve
 | Department | Nav items |
 |---|---|
 | **Marketing** | Hub · Organic (channels) · Paid (channels) · Custom (channels) · Persona Journey · SEO · GEO |
-| **Product** | Katalog (default Product surface) |
+| **Product** | Katalog (default) · CostMyBusiness |
 | **Customer** | _(stub)_ |
-| **Tools** | CostMyBusiness · Sortanize · CheckMap |
+| **Tools** | Sortanize · CheckMap |
 | Footer | Einstellungen · language · logout |
 | Topbar | Company switcher (unchanged) |
 
@@ -37,7 +37,7 @@ SEO/GEO stay under Marketing in the sidebar; URLs remain `/tools/seo` and `/tool
 | Organic marketing | `/co/:slug/marketing/funnel/organic/:channel` | same | Channels: instagram, facebook, tiktok, linkedin, youtube |
 | Paid ads | `/co/:slug/marketing/funnel/paid/:channel` | same | Channels: google, meta, tiktok, chatgpt |
 | Custom funnel | `/co/:slug/marketing/funnel/custom/:channel` | same | email, offline |
-| CostMyBusiness | `/co/:slug/tools/cmb` | same | Tools dept |
+| CostMyBusiness | `/co/:slug/product/costmybusiness` | same | Under Product; `/tools/cmb` + `/cmb` redirect here |
 | Sortanize | `/co/:slug/tools/sortanize` | same | Tools dept |
 | CheckMap | `/co/:slug/tools/checkmap` (+ `/m/:mapId`) | same | Tools dept |
 | Personas / journey | `/co/:slug/tools/persona-journey` | same | Marketing dept (nav); alias `/tools/personas` |
@@ -57,8 +57,8 @@ SEO/GEO stay under Marketing in the sidebar; URLs remain `/tools/seo` and `/tool
 ## Intentional deviations
 
 1. **API** still `/api/b/:slug` — do not rename without a versioned migration.
-2. **Katalog** lives under **Product** (`/product/katalog`); **Settings** remains footer. Old `/catalog` bookmarks redirect.
-3. **Product** sidebar highlights for all `/product/*` routes (including Katalog).
+2. **Katalog** and **CostMyBusiness** live under **Product** (`/product/katalog`, `/product/costmybusiness`); **Settings** remains footer. Old `/catalog` and `/tools/cmb` bookmarks redirect.
+3. **Product** sidebar highlights for all `/product/*` routes (Katalog + CostMyBusiness).
 4. **GEO** shares OpenSEO module UI with a distinct nav entry and surface hint.
 5. Channel segment is in the URL for shareability; module UIs may not yet filter by channel.
 6. No separate **Website** sidebar department — SEO/GEO live under Marketing.

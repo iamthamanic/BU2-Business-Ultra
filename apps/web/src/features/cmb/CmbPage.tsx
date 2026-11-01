@@ -1,3 +1,8 @@
+/**
+ * CmbPage — CostMyBusiness models / snapshots UI nested under Product.
+ * Route: `/co/:slug/product/costmybusiness`. API remains `/api/b/:slug/cmb`.
+ * Location: apps/web/src/features/cmb/CmbPage.tsx
+ */
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { api } from '../../lib/api'

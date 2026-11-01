@@ -1,13 +1,12 @@
 /**
  * BusinessShell — `/co/:slug` layout with department sidebar IA.
- * Flat Marketing · Product (hosts Katalog) · Customer · Tools (CMB, Sortanize, CheckMap).
+ * Flat Marketing · Product (hosts Katalog + CostMyBusiness) · Customer · Tools (Sortanize, CheckMap).
  * Settings in footer; company switcher in topbar. Nav filtered by membership.tabs.
  * API calls remain `/api/b/:slug`. Location: apps/web/src/components/BusinessShell.tsx
  */
 import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useParams } from 'react-router-dom'
 import {
-  Calculator,
   MapTrifold,
   ArrowsDownUp,
   GearSix,
@@ -84,8 +83,8 @@ export function BusinessShell({
         dataIc: 'marketing',
       })
     }
-    // Product rail highlights for /product/* including Katalog; catalog entitlement still unlocks Product
-    if (canSeeNavTab(tabs, 'product') || canSeeNavTab(tabs, 'catalog')) {
+    // Product rail highlights for /product/* (Katalog + CMB); catalog/cmb entitlement still unlocks Product
+    if (canSeeNavTab(tabs, 'product') || canSeeNavTab(tabs, 'catalog') || canSeeNavTab(tabs, 'cmb')) {
       items.push({
         key: 'product',
         to: routes.product,
@@ -111,9 +110,6 @@ export function BusinessShell({
     const out: RailGroup[] = []
 
     const toolItems: RailItem[] = []
-    if (canSeeNavTab(tabs, 'cmb')) {
-      toolItems.push({ key: 'cmb', to: routes.cmb, label: t('cmb'), icon: Calculator, dataIc: 'cmb' })
-    }
     if (canSeeNavTab(tabs, 'sortanize')) {
       toolItems.push({
         key: 'sortanize',

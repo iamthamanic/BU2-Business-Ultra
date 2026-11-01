@@ -66,7 +66,8 @@ export function companyRoutes(slug: string) {
     paid: (ch: string) => `${base}/marketing/funnel/paid/${ch}`,
     custom: `${base}/marketing/funnel/custom/${DEFAULT_CUSTOM_CHANNEL}`,
     customCh: (ch: string) => `${base}/marketing/funnel/custom/${ch}`,
-    cmb: `${base}/tools/cmb`,
+    /** CostMyBusiness nested under Product (canonical) */
+    cmb: `${base}/product/costmybusiness`,
     sortanize: `${base}/tools/sortanize`,
     checkmap: `${base}/tools/checkmap`,
     /** Persona Journey lives under Marketing tabs */
@@ -143,6 +144,10 @@ export function mapOldBu2FrontendPath(slug: string, rest: string): string {
     customer: routes.customer,
     ads: routes.ads,
     cmb: routes.cmb,
+    costmybusiness: routes.cmb,
+    'product/costmybusiness': routes.cmb,
+    'product/cmb': routes.cmb,
+    'tools/cmb': routes.cmb,
     checkmap: routes.checkmap,
     personas: routes.personas,
     sortanize: routes.sortanize,

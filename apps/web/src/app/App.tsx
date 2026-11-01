@@ -116,6 +116,9 @@ export function App() {
           <Route index element={<Navigate to="katalog" replace />} />
           <Route path="katalog" element={<CatalogPage />} />
           <Route path="catalog" element={<CoRedirect to="product/katalog" />} />
+          <Route path="costmybusiness/*" element={<CmbPage />} />
+          <Route path="costmybusiness" element={<CmbPage />} />
+          <Route path="cmb" element={<CoRedirect to="product/costmybusiness" />} />
         </Route>
         <Route path="customer" element={<CustomerPage />} />
 
@@ -137,8 +140,8 @@ export function App() {
           <Route path="funnel/paid" element={<Navigate to={DEFAULT_PAID_CHANNEL} replace />} />
         </Route>
 
-        <Route path="tools/cmb/*" element={<CmbPage />} />
-        <Route path="tools/cmb" element={<CmbPage />} />
+        <Route path="tools/cmb/*" element={<CoRedirect to="product/costmybusiness" />} />
+        <Route path="tools/cmb" element={<CoRedirect to="product/costmybusiness" />} />
         <Route path="tools/sortanize/*" element={<SortanizePage />} />
         <Route path="tools/sortanize" element={<SortanizePage />} />
         <Route path="tools/checkmap/m/:mapId" element={<CheckMapPage />} />
@@ -165,7 +168,8 @@ export function App() {
         <Route path="comments" element={<CoRedirect to="marketing" />} />
         <Route path="ads" element={<CoRedirect to={`marketing/funnel/paid/${DEFAULT_PAID_CHANNEL}`} />} />
         <Route path="c/:channel" element={<CoRedirectOrganic />} />
-        <Route path="cmb" element={<CoRedirect to="tools/cmb" />} />
+        <Route path="cmb" element={<CoRedirect to="product/costmybusiness" />} />
+        <Route path="costmybusiness" element={<CoRedirect to="product/costmybusiness" />} />
         <Route path="checkmap" element={<CoRedirect to="tools/checkmap" />} />
         <Route path="personas" element={<CoRedirect to="marketing/personas" />} />
         <Route path="sortanize" element={<CoRedirect to="tools/sortanize" />} />
