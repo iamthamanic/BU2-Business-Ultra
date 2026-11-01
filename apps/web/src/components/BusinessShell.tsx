@@ -1,6 +1,6 @@
 /**
  * BusinessShell — `/co/:slug` layout with collapsible module sidebar (legacy URL + IA parity).
- * Grouped Organic / Paid / Custom / Tools / Website nav; settings in footer; company switcher in header.
+ * Grouped Organic / Paid / Custom / Tools / Website nav; settings in footer; company name in topbar (switcher on Settings).
  * Nav filtered by membership.tabs (legacy ME.tabs); owner/admin see all (tabs null).
  * API calls remain `/api/b/:slug`. Location: apps/web/src/components/BusinessShell.tsx
  */

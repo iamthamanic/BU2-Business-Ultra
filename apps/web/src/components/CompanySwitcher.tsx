@@ -1,5 +1,6 @@
 /**
- * CompanySwitcher — header chip dropdown to switch companies (legacy hdr-company parity).
+ * CompanySwitcher — switch / create / list companies.
+ * Dropdown mode kept for reuse; Settings embeds `variant="panel"`.
  * Location: apps/web/src/components/CompanySwitcher.tsx
  */
 import { useEffect, useRef, useState } from 'react'
@@ -23,6 +24,8 @@ type Props = {
   activeName?: string
   activeLogoPath?: string | null
   canCreate?: boolean
+  /** `dropdown` = topbar chip; `panel` = Settings Companies section */
+  variant?: 'dropdown' | 'panel'
 }
 
 function initials(name: string) {
@@ -56,6 +59,7 @@ export function CompanySwitcher({
   activeName,
   activeLogoPath,
   canCreate = true,
+  variant = 'dropdown',
 }: Props) {
   const { t } = useI18n()
   const navigate = useNavigate()
@@ -83,6 +87,7 @@ export function CompanySwitcher({
   }, [])
 
   useEffect(() => {
+    if (variant === 'panel') return
     if (!open && !creating) return
     function onDoc(ev: MouseEvent) {
       if (!hostRef.current?.contains(ev.target as Node)) {
@@ -102,7 +107,7 @@ export function CompanySwitcher({
       document.removeEventListener('mousedown', onDoc)
       document.removeEventListener('keydown', onKey)
     }
-  }, [open, creating])
+  }, [open, creating, variant])
 
   const label = activeName || activeSlug || t('noCompany')
 
@@ -143,6 +148,111 @@ export function CompanySwitcher({
     }
   }
 
+  function goCompany(nextSlug: string) {
+    setOpen(false)
+    navigate(companyBase(nextSlug))
+  }
+
+  const companyList = (
+    <>
+      {!list.length ? (
+        <div className="hdr-company-empty">{err || t('noCompany')}</div>
+      ) : (
+        list.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            role="option"
+            aria-selected={c.slug === activeSlug}
+            className={`hdr-company-item${c.slug === activeSlug ? ' active' : ''}`}
+            onClick={() => goCompany(c.slug)}
+          >
+            <LogoMark name={c.name} logoPath={c.logoPath} className="hdr-company-item-logo" />
+            <span className="hdr-company-item-name">{c.name}</span>
+          </button>
+        ))
+      )}
+      {canCreate && (
+        <button
+          type="button"
+          className="hdr-company-item create"
+          onClick={() => {
+            setOpen(false)
+            setCreating(true)
+            setMsg('')
+          }}
+        >
+          {t('createCompanyPlus')}
+        </button>
+      )}
+      <button
+        type="button"
+        className="hdr-company-item"
+        onClick={() => {
+          setOpen(false)
+          setCreating(false)
+          navigate('/')
+        }}
+      >
+        {t('allCompanies')}
+      </button>
+    </>
+  )
+
+  const createForm = creating ? (
+    <div className={variant === 'panel' ? 'hdr-company-panel inline' : 'hdr-company-panel'}>
+      <div className="hdr-chip-kicker">{t('newCompany')}</div>
+      <input
+        type="text"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder={t('companyNamePh')}
+        autoComplete="organization"
+        autoFocus
+      />
+      <input
+        type="text"
+        value={slug}
+        onChange={(e) => setSlug(e.target.value)}
+        placeholder={t('companySlugPh')}
+        autoComplete="off"
+      />
+      <div className="hdr-actions">
+        <button type="button" onClick={() => setCreating(false)}>
+          {t('cancel')}
+        </button>
+        <button type="button" data-save onClick={() => void createCompany()}>
+          {t('create')}
+        </button>
+      </div>
+      {msg ? <div data-msg>{msg}</div> : null}
+    </div>
+  ) : null
+
+  if (variant === 'panel') {
+    return (
+      <div className="settings-companies" data-bu-company-switcher="1">
+        <div className="settings-companies-current">
+          <LogoMark
+            name={label}
+            logoPath={activeLogoPath}
+            className="hdr-company-logo"
+          />
+          <div className="settings-companies-current-text">
+            <span className="hdr-chip-kicker">{t('company')}</span>
+            <strong>{label}</strong>
+          </div>
+        </div>
+        {!creating ? (
+          <div className="hdr-company-menu open settings-companies-list" role="listbox">
+            {companyList}
+          </div>
+        ) : null}
+        {createForm}
+      </div>
+    )
+  }
+
   return (
     <div className="hdr-company" ref={hostRef} data-bu-company-switcher="1">
       <button
@@ -166,83 +276,13 @@ export function CompanySwitcher({
         <CaretDown className="hdr-company-chevron" size={14} weight="bold" aria-hidden />
       </button>
 
-      {open && !creating && (
+      {open && !creating ? (
         <div className="hdr-company-menu open" role="listbox">
-          {!list.length ? (
-            <div className="hdr-company-empty">{err || t('noCompany')}</div>
-          ) : (
-            list.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                role="option"
-                aria-selected={c.slug === activeSlug}
-                className={`hdr-company-item${c.slug === activeSlug ? ' active' : ''}`}
-                onClick={() => {
-                  setOpen(false)
-                  navigate(companyBase(c.slug))
-                }}
-              >
-                <LogoMark name={c.name} logoPath={c.logoPath} className="hdr-company-item-logo" />
-                <span className="hdr-company-item-name">{c.name}</span>
-              </button>
-            ))
-          )}
-          {canCreate && (
-            <button
-              type="button"
-              className="hdr-company-item create"
-              onClick={() => {
-                setOpen(false)
-                setCreating(true)
-                setMsg('')
-              }}
-            >
-              {t('createCompanyPlus')}
-            </button>
-          )}
-          <button
-            type="button"
-            className="hdr-company-item"
-            onClick={() => {
-              setOpen(false)
-              navigate('/')
-            }}
-          >
-            {t('allCompanies')}
-          </button>
+          {companyList}
         </div>
-      )}
+      ) : null}
 
-      {creating && (
-        <div className="hdr-company-panel">
-          <div className="hdr-chip-kicker">{t('newCompany')}</div>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={t('companyNamePh')}
-            autoComplete="organization"
-            autoFocus
-          />
-          <input
-            type="text"
-            value={slug}
-            onChange={(e) => setSlug(e.target.value)}
-            placeholder={t('companySlugPh')}
-            autoComplete="off"
-          />
-          <div className="hdr-actions">
-            <button type="button" onClick={() => setCreating(false)}>
-              {t('cancel')}
-            </button>
-            <button type="button" data-save onClick={() => void createCompany()}>
-              {t('create')}
-            </button>
-          </div>
-          {msg ? <div data-msg>{msg}</div> : null}
-        </div>
-      )}
+      {createForm}
     </div>
   )
 }

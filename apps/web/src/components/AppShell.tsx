@@ -1,13 +1,13 @@
 /**
  * AppShell — legacy-parity chrome: collapsible sidebar + header context chip bar.
- * Logo-only BrandMark left in the topbar; wordmark lives in sidebar sb-head; company switcher follows; account/logout/lang in sidebar footer.
+ * Logo-only BrandMark left in the topbar; wordmark lives in sidebar sb-head;
+ * company shown as context text (switcher lives in Settings); account chip right.
  * Location: apps/web/src/components/AppShell.tsx
  */
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { List, X } from '@phosphor-icons/react'
 import { BrandMark } from './BrandMark'
 import { IconRail, type RailGroup, type RailItem } from './IconRail'
-import { CompanySwitcher } from './CompanySwitcher'
 import { useI18n } from '../lib/i18n'
 import type { AuthUser } from '../app/App'
 
@@ -62,6 +62,14 @@ export function AppShell({
   const admin =
     showAdmin ?? (user.isSuperadmin || user.isBreakglassOperator)
 
+  const contextLabel = company?.name || company?.slug
+  const contextTitle =
+    company?.name && company?.slug
+      ? `${company.name} (${company.slug})`
+      : typeof subtitle === 'string'
+        ? subtitle
+        : undefined
+
   return (
     <div className="shell-root">
       <header className="topbar">
@@ -78,13 +86,11 @@ export function AppShell({
             {drawerOpen ? <X size={18} weight="regular" /> : <List size={18} weight="regular" />}
           </button>
           <BrandMark to="/" showName={false} size="sm" />
-          {company ? (
-            <CompanySwitcher
-              activeSlug={company.slug}
-              activeName={company.name}
-              activeLogoPath={company.logoPath}
-              canCreate
-            />
+          {contextLabel ? (
+            <div className="hdr-chip hdr-context" title={contextTitle}>
+              <span className="hdr-chip-kicker">{t('company')}</span>
+              <span className="hdr-chip-value">{contextLabel}</span>
+            </div>
           ) : subtitle ? (
             <div className="hdr-chip hdr-context" title={typeof subtitle === 'string' ? subtitle : undefined}>
               <span className="hdr-chip-kicker">{t('workspaceHome')}</span>

@@ -1,5 +1,10 @@
+/**
+ * SettingsPage — company secrets, invites, logo, and Companies switcher panel.
+ * Location: apps/web/src/features/settings/SettingsPage.tsx
+ */
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { CompanySwitcher } from '../../components/CompanySwitcher'
 import { api } from '../../lib/api'
 import { useI18n } from '../../lib/i18n'
 
@@ -15,6 +20,7 @@ export function SettingsPage() {
   const [inviteToken, setInviteToken] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<string | null>(null)
+  const [companyMeta, setCompanyMeta] = useState<{ name: string; logoPath?: string | null } | null>(null)
 
   async function refresh() {
     const r = await api<{ secrets: any[] }>(`/api/b/${slug}/settings/secrets`)
@@ -22,6 +28,19 @@ export function SettingsPage() {
   }
 
   useEffect(() => { refresh().catch(console.error) }, [slug])
+
+  useEffect(() => {
+    if (!slug) return
+    let cancelled = false
+    api<{ business: { name: string; logoPath?: string | null } }>(`/api/b/${slug}`)
+      .then((r) => {
+        if (!cancelled) setCompanyMeta({ name: r.business.name, logoPath: r.business.logoPath })
+      })
+      .catch((e) => console.error(e))
+    return () => {
+      cancelled = true
+    }
+  }, [slug])
 
   async function save(provider: string) {
     const apiKey = keys[provider]
@@ -76,6 +95,18 @@ export function SettingsPage() {
     <div className="stack">
       <h1 style={{ margin: 0 }}>{t('settings')}</h1>
       <p className="muted">{t('disabledUntilKey')}</p>
+
+      <div className="panel stack">
+        <h3 style={{ margin: 0 }}>{t('businesses')}</h3>
+        <CompanySwitcher
+          variant="panel"
+          activeSlug={slug}
+          activeName={companyMeta?.name ?? slug}
+          activeLogoPath={companyMeta?.logoPath}
+          canCreate
+        />
+      </div>
+
       <div className="panel stack">
         {PROVIDERS.map((p) => {
           const st = statuses.find((s) => s.provider === p)

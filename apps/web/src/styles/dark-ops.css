@@ -618,7 +618,7 @@ select {
   align-items: center;
   gap: 8px;
   height: 32px;
-  padding: 0 12px;
+  padding: 0 14px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--panel2);
@@ -675,7 +675,7 @@ select {
   align-items: center;
   gap: 8px;
   height: 32px;
-  padding: 0 12px 0 6px;
+  padding: 0 14px 0 6px;
   max-width: min(300px, 52vw);
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -717,7 +717,7 @@ select {
   flex-shrink: 0;
   width: 22px;
   height: 22px;
-  border-radius: 7px;
+  border-radius: 999px;
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
@@ -751,7 +751,7 @@ select {
 .hdr-company-item-logo {
   width: 26px;
   height: 26px;
-  border-radius: 8px;
+  border-radius: 999px;
   font-size: 10px;
   padding: 3px;
 }
@@ -788,7 +788,7 @@ select {
   max-width: 320px;
   padding: 6px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 16px;
   background: var(--panel);
   box-shadow: 0 16px 40px #00000077;
   display: none;
@@ -807,7 +807,7 @@ select {
   width: 100%;
   padding: 9px 12px;
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   background: transparent;
   color: var(--text);
   font: inherit;
@@ -830,7 +830,7 @@ select {
   font-weight: 600;
   margin-top: 4px;
   border-top: 1px solid var(--border);
-  border-radius: 0 0 10px 10px;
+  border-radius: 0 0 12px 12px;
   padding-top: 12px;
   justify-content: center;
 }
@@ -853,11 +853,65 @@ select {
   min-width: 280px;
   padding: 14px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 16px;
   background: var(--panel);
   box-shadow: 0 16px 40px #00000077;
   display: grid;
   gap: 8px;
+}
+
+.hdr-company-panel.inline {
+  position: static;
+  min-width: 0;
+  width: 100%;
+  box-shadow: none;
+  background: var(--panel2);
+}
+
+.settings-companies {
+  display: grid;
+  gap: 12px;
+}
+
+.settings-companies-current {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel2);
+}
+
+.settings-companies-current .hdr-company-logo {
+  width: 28px;
+  height: 28px;
+  font-size: 10px;
+}
+
+.settings-companies-current-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-companies-current-text strong {
+  color: var(--text);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-companies-list {
+  position: static;
+  min-width: 0;
+  max-width: none;
+  width: 100%;
+  box-shadow: none;
+  border-radius: 16px;
+  background: var(--panel2);
 }
 
 .hdr-company-panel .hdr-chip-kicker {
@@ -867,7 +921,7 @@ select {
 .hdr-company-panel input {
   background: var(--panel2);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   color: var(--text);
   padding: 9px 12px;
   font-size: 12px;
@@ -884,7 +938,7 @@ select {
 .hdr-company-panel .hdr-actions button {
   height: 30px;
   padding: 0 12px;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   cursor: pointer;
   border: 1px solid var(--border);
