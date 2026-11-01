@@ -301,30 +301,38 @@ select {
   padding: var(--sp-6);
 }
 
-.login-secondary {
-  border-top: 1px solid var(--border);
-  padding-top: var(--sp-3);
-  margin-top: var(--sp-2);
+/* Segmented login mode: Zugangsdaten | Magic Link */
+.login-mode-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 3px;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
 
-.login-secondary summary {
-  cursor: pointer;
-  list-style: none;
-  font-size: 13px;
-  user-select: none;
-}
-
-.login-secondary summary::-webkit-details-marker {
-  display: none;
-}
-
-.login-secondary summary::before {
-  content: '▸ ';
+.login-mode-toggle button {
+  appearance: none;
+  border: none;
+  background: transparent;
   color: var(--dim);
+  padding: 8px 10px;
+  border-radius: calc(var(--radius) - 1px);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
 }
 
-.login-secondary[open] summary::before {
-  content: '▾ ';
+.login-mode-toggle button:hover {
+  color: var(--text);
+}
+
+.login-mode-toggle button.active {
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--border);
 }
 
 .rail-toggle {

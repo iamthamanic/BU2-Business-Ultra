@@ -1,5 +1,5 @@
 /**
- * Login page: primary email+password; secondary Magic Link / OTP (collapsed).
+ * Login page: segmented Zugangsdaten (email+password) vs Magic Link / OTP.
  * Location: apps/web/src/features/auth/LoginPage.tsx
  */
 import { useState, type FormEvent } from 'react'
@@ -7,13 +7,21 @@ import { api } from '../../lib/api'
 import { useI18n } from '../../lib/i18n'
 import type { AuthUser } from '../../app/App'
 
+type LoginMode = 'credentials' | 'magic'
+
 export function LoginPage({ onAuthed }: { onAuthed: (u: AuthUser) => void }) {
   const { t } = useI18n()
+  const [mode, setMode] = useState<LoginMode>('credentials')
   const [email, setEmail] = useState('raccoova@gmail.com')
   const [password, setPassword] = useState('')
   const [otp, setOtp] = useState('')
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
+
+  function switchMode(next: LoginMode) {
+    setMode(next)
+    setMsg('')
+  }
 
   async function loginPassword(e?: FormEvent) {
     e?.preventDefault()
@@ -36,11 +44,11 @@ export function LoginPage({ onAuthed }: { onAuthed: (u: AuthUser) => void }) {
     setBusy(true)
     setMsg('')
     try {
-      const r = await api<{ mode: string }>('/api/auth/magic-link', {
+      await api<{ mode: string }>('/api/auth/magic-link', {
         method: 'POST',
         body: JSON.stringify({ email }),
       })
-      setMsg(r.mode === 'console' ? t('magicDevHint') : t('magicSent'))
+      setMsg(t('magicSent'))
     } catch (err) {
       setMsg(String(err))
     } finally {
@@ -77,38 +85,67 @@ export function LoginPage({ onAuthed }: { onAuthed: (u: AuthUser) => void }) {
           />
           <span className="brand-name">{t('brand')}</span>
         </div>
-        <p className="muted">Dark-Ops · {t('login')}</p>
 
-        <form className="stack" onSubmit={loginPassword}>
-          <label>
-            <span className="label">{t('email')}</span>
-            <input
-              className="input"
-              type="email"
-              autoComplete="username"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </label>
-          <label>
-            <span className="label">{t('password')}</span>
-            <input
-              className="input"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </label>
-          <button className="btn primary" type="submit" disabled={busy || password.length < 8}>
-            {t('login')}
+        <div className="login-mode-toggle" role="tablist" aria-label={t('login')}>
+          <button
+            type="button"
+            role="tab"
+            className={mode === 'credentials' ? 'active' : ''}
+            aria-selected={mode === 'credentials'}
+            onClick={() => switchMode('credentials')}
+          >
+            {t('loginModeCredentials')}
           </button>
-        </form>
+          <button
+            type="button"
+            role="tab"
+            className={mode === 'magic' ? 'active' : ''}
+            aria-selected={mode === 'magic'}
+            onClick={() => switchMode('magic')}
+          >
+            {t('loginModeMagic')}
+          </button>
+        </div>
 
-        <details className="login-secondary">
-          <summary className="muted">{t('magicOtpAlt')}</summary>
-          <div className="stack" style={{ marginTop: 12 }}>
-            <button className="btn" type="button" disabled={busy} onClick={sendMagic}>
+        {mode === 'credentials' ? (
+          <form className="stack" onSubmit={loginPassword}>
+            <label>
+              <span className="label">{t('email')}</span>
+              <input
+                className="input"
+                type="email"
+                autoComplete="username"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </label>
+            <label>
+              <span className="label">{t('password')}</span>
+              <input
+                className="input"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </label>
+            <button className="btn primary" type="submit" disabled={busy || password.length < 8}>
+              {t('login')}
+            </button>
+          </form>
+        ) : (
+          <div className="stack">
+            <label>
+              <span className="label">{t('email')}</span>
+              <input
+                className="input"
+                type="email"
+                autoComplete="username"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </label>
+            <button className="btn primary" type="button" disabled={busy} onClick={sendMagic}>
               {t('sendMagic')}
             </button>
             <label>
@@ -119,13 +156,14 @@ export function LoginPage({ onAuthed }: { onAuthed: (u: AuthUser) => void }) {
                 onChange={(e) => setOtp(e.target.value)}
                 maxLength={6}
                 inputMode="numeric"
+                autoComplete="one-time-code"
               />
             </label>
             <button className="btn" type="button" disabled={busy || otp.length !== 6} onClick={verifyOtp}>
               {t('verifyOtp')}
             </button>
           </div>
-        </details>
+        )}
 
         {msg && <p className="muted">{msg}</p>}
       </div>
