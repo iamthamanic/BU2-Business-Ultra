@@ -2427,6 +2427,68 @@ select {
   gap: 10px;
 }
 
+.funnel-export-box {
+  position: relative;
+  margin-left: auto;
+  padding: 4px 6px;
+  align-self: stretch;
+}
+
+.funnel-export-btn {
+  appearance: none;
+  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--dim);
+  cursor: pointer;
+}
+
+.funnel-export-btn:hover,
+.funnel-export-btn:focus-visible {
+  color: var(--text);
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
+}
+
+.funnel-export-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 40;
+  min-width: 200px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  box-shadow: 0 8px 24px #00000066;
+}
+
+.funnel-export-item {
+  appearance: none;
+  font: inherit;
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: calc(var(--radius-sm) - 1px);
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.funnel-export-item:hover,
+.funnel-export-item:focus-visible {
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel2));
+}
+
 .funnel-filters-bar .funnel-filter-row {
   flex: 0 1 auto;
 }
@@ -2707,7 +2769,8 @@ select {
 
 .paid-search {
   margin-left: auto;
-  min-width: min(280px, 100%);
+  min-width: min(220px, 100%);
+  flex: 1 1 160px;
 }
 
 .paid-search-input {

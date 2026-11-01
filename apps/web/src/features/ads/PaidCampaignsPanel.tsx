@@ -18,9 +18,14 @@ import {
   TrendUp,
   Wallet,
 } from '@phosphor-icons/react'
+import { FunnelExportMenu } from '../../components/FunnelExportMenu'
 import { FunnelTip } from '../../components/FunnelTip'
 import { useI18n } from '../../lib/i18n'
 import type { MessageKey } from '../../i18n/messages'
+import {
+  windowToDateRange,
+  type FunnelExportPayload,
+} from '../../lib/funnelExport'
 
 export type PaidCampaignRow = {
   id: string
@@ -50,6 +55,7 @@ const WINDOWS: { key: WindowKey; labelKey: 'win7d' | 'win30d' | 'win90d' | 'winA
 ]
 
 type Props = {
+  channel: string
   campaigns: PaidCampaignRow[]
   emptyHint: string
   initialWindow?: WindowKey
@@ -57,6 +63,7 @@ type Props = {
 }
 
 export function PaidCampaignsPanel({
+  channel,
   campaigns,
   emptyHint,
   initialWindow = '30d',
@@ -94,33 +101,81 @@ export function PaidCampaignsPanel({
     { key: 'revenue', label: t('colRevenue'), tip: 'tipRevenue' },
   ]
 
+  function getExportPayload(): FunnelExportPayload {
+    const range = windowToDateRange(win)
+    const winLabel = WINDOWS.find((w) => w.key === win)
+    return {
+      kind: 'Paid',
+      channel,
+      from: range.from,
+      to: range.to,
+      filters: [
+        { label: t('timeWindow'), value: winLabel ? t(winLabel.labelKey) : win },
+        ...(q.trim() ? [{ label: t('exportSearch'), value: q.trim() }] : []),
+      ],
+      kpis: [
+        { label: t('colSpend'), value: fmtEur(agg.spendCents) },
+        { label: t('colImpr'), value: fmtN(agg.impressions) },
+        { label: t('colClicks'), value: fmtN(agg.clicks) },
+        { label: t('colCtr'), value: fmtPct(agg.ctr) },
+        { label: t('colCpc'), value: fmtEur(agg.cpcCents) },
+        { label: t('colConv'), value: fmtN(agg.conv) },
+        { label: t('colCvr'), value: fmtPct(agg.cvr) },
+        { label: t('colCpa'), value: fmtEur(agg.cpaCents) },
+        { label: t('colRoas'), value: fmtRoas(agg.roas) },
+        { label: t('colRevenue'), value: fmtEur(agg.revenueCents) },
+      ],
+      columns: cols.map((c) => ({ key: c.key, label: c.label })),
+      rows: filtered.map((c) => ({
+        notes: t('notesBadge').replace('{n}', String(c.notesCount ?? 0)),
+        manual:
+          c.adsConv != null
+            ? `${t('adsConvShort')}: ${fmtN(c.adsConv)}`
+            : `${t('adsConvShort')}: —`,
+        name: c.status ? `${c.name} (${c.status})` : c.name,
+        spend: fmtEur(c.spendCents ?? 0),
+        impr: fmtN(c.impressions ?? 0),
+        clicks: fmtN(c.clicks ?? 0),
+        ctr: fmtPct(c.ctr),
+        cpc: fmtEur(c.cpcCents),
+        cvr: fmtPct(c.cvr),
+        cpa: fmtEur(c.cpaCents),
+        roas: fmtRoas(c.roas),
+        revenue: fmtEur(c.revenueCents ?? 0),
+      })),
+    }
+  }
+
   return (
     <div className="stack paid-campaigns-panel">
-      <div className="funnel-filter-row paid-filter-row" role="toolbar" aria-label={t('timeWindow')}>
-        <span className="filter-lbl muted">
-          <Clock className="filter-lbl-ic" size={14} weight="duotone" aria-hidden />
-          <FunnelTip tip={t('tipWin')}>{t('timeWindow')}</FunnelTip>
-        </span>
-        {WINDOWS.map((w) => (
-          <button
-            key={w.key}
-            type="button"
-            className={`chip ${win === w.key ? 'active' : ''}`}
-            onClick={() => pickWindow(w.key)}
-          >
-            {t(w.labelKey)}
-            <span className="n">{w.key === win ? filtered.length : '·'}</span>
-          </button>
-        ))}
-        <label className="paid-search">
-          <span className="sr-only">{t('adsSearchPh')}</span>
-          <input
-            className="input paid-search-input"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder={t('adsSearchPh')}
-          />
-        </label>
+      <div className="funnel-filters-bar">
+        <div className="funnel-filter-row paid-filter-row" role="toolbar" aria-label={t('timeWindow')}>
+          <span className="filter-lbl muted">
+            <Clock className="filter-lbl-ic" size={14} weight="duotone" aria-hidden />
+            <FunnelTip tip={t('tipWin')}>{t('timeWindow')}</FunnelTip>
+          </span>
+          {WINDOWS.map((w) => (
+            <button
+              key={w.key}
+              type="button"
+              className={`chip ${win === w.key ? 'active' : ''}`}
+              onClick={() => pickWindow(w.key)}
+            >
+              {t(w.labelKey)}
+              <span className="n">{w.key === win ? filtered.length : '·'}</span>
+            </button>
+          ))}
+          <label className="paid-search">
+            <span className="sr-only">{t('adsSearchPh')}</span>
+            <input
+              className="input paid-search-input"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={t('adsSearchPh')}
+            />
+          </label>
+        </div>
+        <FunnelExportMenu getPayload={getExportPayload} />
       </div>
 
       <div className="funnel-kpi-strip paid-kpi-strip" aria-label="KPIs">

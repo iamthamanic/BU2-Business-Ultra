@@ -138,6 +138,7 @@ export function AdsPage() {
       ) : null}
 
       <PaidCampaignsPanel
+        channel={channel || provider}
         campaigns={loading ? [] : rows}
         emptyHint={emptyRow}
         initialWindow={win}

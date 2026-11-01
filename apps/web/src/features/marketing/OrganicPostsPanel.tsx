@@ -17,9 +17,14 @@ import {
   Storefront,
   UsersThree,
 } from '@phosphor-icons/react'
+import { FunnelExportMenu } from '../../components/FunnelExportMenu'
 import { FunnelTip } from '../../components/FunnelTip'
 import { useI18n } from '../../lib/i18n'
 import type { MessageKey } from '../../i18n/messages'
+import {
+  windowToDateRange,
+  type FunnelExportPayload,
+} from '../../lib/funnelExport'
 
 export type OrganicPost = {
   id: string
@@ -166,6 +171,37 @@ export function OrganicPostsPanel({
     return { posts: filtered.length, views, reach, inter, likes, comments, shares, saves }
   }, [filtered])
 
+  function getExportPayload(): FunnelExportPayload {
+    const range = windowToDateRange(win, { dates: sorted.map((p) => p.date) })
+    const winLabel = WINDOWS.find((w) => w.key === win)
+    const kpiList = [
+      { label: t('kpiPosts'), value: fmtN(kpis.posts) },
+      { label: t('colViews'), value: fmtN(kpis.views) },
+    ]
+    if (showReach) kpiList.push({ label: t('colReach'), value: fmtN(kpis.reach) })
+    kpiList.push(
+      { label: t('kpiInteractions'), value: fmtN(kpis.inter) },
+      { label: t('colLikes'), value: fmtN(kpis.likes) },
+      { label: t('colComments'), value: fmtN(kpis.comments) },
+      { label: t('colShares'), value: fmtN(kpis.shares) },
+      { label: t('colSaves'), value: fmtN(kpis.saves) },
+    )
+    return {
+      kind: 'Organic',
+      channel,
+      from: range.from,
+      to: range.to,
+      filters: [
+        { label: t('timeWindow'), value: winLabel ? t(winLabel.labelKey) : win },
+        { label: t('filterBrand'), value: brand === '__all__' ? t('filterAll') : brand },
+        { label: t('filterPostType'), value: postType === '__all__' ? t('filterAll') : postType },
+      ],
+      kpis: kpiList,
+      columns: cols.map((c) => ({ key: c.key, label: c.label })),
+      rows: sorted.map((p, i) => exportOrganicRow(p, i + 1, showReach)),
+    }
+  }
+
   return (
     <div className="stack organic-posts-panel">
       <div className="funnel-filters-bar">
@@ -227,6 +263,8 @@ export function OrganicPostsPanel({
             </button>
           ))}
         </div>
+
+        <FunnelExportMenu getPayload={getExportPayload} />
       </div>
 
       <div className="funnel-kpi-strip" aria-label="KPIs">
@@ -414,6 +452,40 @@ function bucketLabel(b: string) {
   if (b === '7d') return '≤7d'
   if (b === '30d') return '≤30d'
   return b || 'alt'
+}
+
+function exportOrganicRow(
+  p: OrganicPost,
+  rank: number,
+  showReach: boolean,
+): Record<string, string | number | null> {
+  const row: Record<string, string | number | null> = {
+    rank,
+    date: fmtDate(p.date),
+    type: p.type || '—',
+    bucket: bucketLabel(p.bucket),
+    title: p.title || '—',
+    views: p.views,
+    shareRate: p.sharesPer1000 != null ? String(p.sharesPer1000) : '—',
+    saveRate: showReach
+      ? p.savesPer1000 != null
+        ? String(p.savesPer1000)
+        : '—'
+      : p.savesPer100 != null
+        ? String(p.savesPer100)
+        : '—',
+    watch: p.watchPct != null ? `${p.watchPct}%` : '—',
+    duration: fmtDuration(p.durationSec),
+    paid: p.paidShare != null ? `${Math.round(p.paidShare * 100)}%` : '—',
+    likes: p.likes,
+    comments: p.comments,
+    shares: p.shares,
+    saves: p.saves,
+    er: p.engagement != null ? `${p.engagement}%` : '—',
+    kpi: p.kpiHit === true ? '✓' : p.kpiHit === false ? '✗' : '—',
+  }
+  if (showReach) row.reach = p.reach != null ? p.reach : '—'
+  return row
 }
 
 function sortValue(
