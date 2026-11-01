@@ -780,6 +780,7 @@ select {
 }
 
 .topbar {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -789,7 +790,8 @@ select {
   background: linear-gradient(180deg, #0d131b 0%, var(--bg) 100%);
   flex-shrink: 0;
   min-height: 52px;
-  z-index: 10;
+  /* Above .sidebar (20): company menu hangs into the shell column */
+  z-index: 40;
 }
 
 .topbar-start {
@@ -982,7 +984,7 @@ select {
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
-  z-index: 50;
+  z-index: 60;
   min-width: 240px;
   max-width: 320px;
   padding: 6px;
