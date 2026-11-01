@@ -19,7 +19,7 @@ export function OverviewPage() {
   }, [slug])
 
   async function archive() {
-    if (!confirm('Archive business?')) return
+    if (!confirm(t('archiveConfirm'))) return
     try {
       await api(`/api/b/${slug}/archive`, { method: 'POST', body: '{}' })
       setMsg('archived')
@@ -38,7 +38,7 @@ export function OverviewPage() {
       <h1 style={{ margin: 0 }}>{t('overview')}</h1>
       <div className="grid-2">
         <div className="panel stack">
-          <div className="muted">Business</div>
+          <div className="muted">{t('company')}</div>
           <strong>{biz?.name}</strong>
           <span className="kpi">{biz?.slug}</span>
           <span className={`badge ${biz?.status === 'active' ? 'ok' : 'warn'}`}>{biz?.status}</span>

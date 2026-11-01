@@ -84,7 +84,9 @@ export function AdminPage({ user, onLogout }: { user: AuthUser; onLogout: () => 
               </table>
             </div>
             <div className="panel">
-              <h3 className="section-title">Businesses ({data.counts.businesses})</h3>
+              <h3 className="section-title">
+                {t('businesses')} ({data.counts.businesses})
+              </h3>
               <table className="table">
                 <thead>
                   <tr>

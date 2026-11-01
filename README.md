@@ -1,8 +1,8 @@
 # Business Ultra 2 (BU2)
 
-Greenfield modular monolith — **Vite + React + TypeScript** frontend, **Fastify + Drizzle + Postgres 16** API, Dark-Ops UI, invite-only tenancy at `/b/:slug/...`.
+Greenfield modular monolith — **Vite + React + TypeScript** frontend, **Fastify + Drizzle + Postgres 16** API, Dark-Ops UI, invite-only tenancy at `/co/:slug/...` (API: `/api/b/:slug/...`).
 
-Locked decisions: [`DECISIONS.md`](./DECISIONS.md). OpenSEO fork apply notes: [`openseo/FORK_PATCH.md`](./openseo/FORK_PATCH.md). Backups: [`docs/BACKUP_RUNBOOK.md`](./docs/BACKUP_RUNBOOK.md).
+Locked decisions: [`DECISIONS.md`](./DECISIONS.md). Routing map: [`docs/ROUTING.md`](./docs/ROUTING.md). OpenSEO fork apply notes: [`openseo/FORK_PATCH.md`](./openseo/FORK_PATCH.md). Backups: [`docs/BACKUP_RUNBOOK.md`](./docs/BACKUP_RUNBOOK.md).
 
 ## Quick start
 
@@ -37,7 +37,7 @@ Primary auth is **email + password**. Magic Link / OTP remains as a secondary/de
 1. `pnpm db:migrate && pnpm db:seed` (seeds/refreshes the bootstrap password hash)
 2. Open `/login` → email + password → **Anmelden**
 3. Optional: expand Magic Link / OTP; without `BREVO_API_KEY`, codes print to the API console
-4. Create first business (empty start)
+4. Create first company (empty start) → opens under `/co/:slug/`
 5. Settings → paste provider keys (features stay gated until valid)
 
 Change password while logged in: `POST /api/auth/password` with `{ "currentPassword": "…", "newPassword": "…" }`.
@@ -83,3 +83,7 @@ services/sortanize Legacy-parity FastAPI + lead_matching
 openseo/           Digest pin + SSO contract + fork patch
 scripts/           backup/restore
 ```
+
+## Recent changes
+
+- **2026-11-01** — UI label Companies (not Businesses); frontend routes aligned to legacy `/co/:slug/...` with `/b/...` redirects ([docs/ROUTING.md](./docs/ROUTING.md))

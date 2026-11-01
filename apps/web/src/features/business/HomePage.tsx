@@ -1,9 +1,10 @@
 /**
- * HomePage — logged-in businesses console with collapsible sidebar shell.
+ * HomePage — logged-in companies console with collapsible sidebar shell.
  * Location: apps/web/src/features/business/HomePage.tsx
  */
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { companyBase } from '../../lib/companyPaths'
 import {
   Buildings,
   ArrowRight,
@@ -143,7 +144,7 @@ export function HomePage({ user, onLogout }: { user: AuthUser; onLogout: () => v
                   <div className="biz-row-meta">
                     <span className={`badge ${b.status === 'active' ? 'ok' : 'warn'}`}>{b.status}</span>
                     <span className="badge">{b.role}</span>
-                    <Link className="btn primary biz-open" to={`/b/${b.slug}`}>
+                    <Link className="btn primary biz-open" to={companyBase(b.slug)}>
                       {t('open')}
                       <ArrowRight size={14} weight="bold" aria-hidden />
                     </Link>

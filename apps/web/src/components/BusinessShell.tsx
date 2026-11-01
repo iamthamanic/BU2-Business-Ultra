@@ -1,6 +1,6 @@
 /**
- * BusinessShell — /b/:slug layout with collapsible module sidebar (legacy parity).
- * Location: apps/web/src/components/BusinessShell.tsx
+ * BusinessShell — `/co/:slug` layout with collapsible module sidebar (legacy URL parity).
+ * API calls remain `/api/b/:slug`. Location: apps/web/src/components/BusinessShell.tsx
  */
 import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useParams } from 'react-router-dom'
@@ -18,6 +18,7 @@ import {
   Buildings,
 } from '@phosphor-icons/react'
 import { api } from '../lib/api'
+import { companyRoutes } from '../lib/companyPaths'
 import { useI18n } from '../lib/i18n'
 import type { AuthUser } from '../app/App'
 import { AppShell } from './AppShell'
@@ -41,23 +42,24 @@ export function BusinessShell({
       .catch(() => setBiz(null))
   }, [slug])
 
-  const base = `/b/${slug}`
-  const railItems: RailItem[] = useMemo(
-    () => [
+  const routes = useMemo(() => (slug ? companyRoutes(slug) : null), [slug])
+
+  const railItems: RailItem[] = useMemo(() => {
+    if (!routes) return []
+    return [
       { key: 'home', to: '/', end: true, label: t('businesses'), icon: Buildings },
-      { key: 'overview', to: base, end: true, label: t('overview'), icon: SquaresFour },
-      { key: 'catalog', to: `${base}/catalog`, label: t('catalog'), icon: Package },
-      { key: 'marketing', to: `${base}/marketing`, label: t('marketing'), icon: Megaphone },
-      { key: 'ads', to: `${base}/ads`, label: t('ads'), icon: Target },
-      { key: 'cmb', to: `${base}/cmb`, label: t('cmb'), icon: Calculator },
-      { key: 'checkmap', to: `${base}/checkmap`, label: t('checkmap'), icon: MapTrifold },
-      { key: 'personas', to: `${base}/personas`, label: t('personas'), icon: UsersThree },
-      { key: 'sortanize', to: `${base}/sortanize`, label: t('sortanize'), icon: ArrowsDownUp },
-      { key: 'openseo', to: `${base}/openseo`, label: t('openseo'), icon: MagnifyingGlass },
-      { key: 'settings', to: `${base}/settings`, label: t('settings'), icon: GearSix },
-    ],
-    [base, t],
-  )
+      { key: 'overview', to: routes.overview, end: true, label: t('overview'), icon: SquaresFour },
+      { key: 'catalog', to: routes.catalog, label: t('catalog'), icon: Package },
+      { key: 'marketing', to: routes.marketing, label: t('marketing'), icon: Megaphone },
+      { key: 'ads', to: routes.ads, label: t('ads'), icon: Target },
+      { key: 'cmb', to: routes.cmb, label: t('cmb'), icon: Calculator },
+      { key: 'checkmap', to: routes.checkmap, label: t('checkmap'), icon: MapTrifold },
+      { key: 'personas', to: routes.personas, label: t('personas'), icon: UsersThree },
+      { key: 'sortanize', to: routes.sortanize, label: t('sortanize'), icon: ArrowsDownUp },
+      { key: 'openseo', to: routes.openseo, label: t('openseo'), icon: MagnifyingGlass },
+      { key: 'settings', to: routes.settings, label: t('settings'), icon: GearSix },
+    ]
+  }, [routes, t])
 
   const subtitle = (
     <>

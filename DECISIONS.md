@@ -29,7 +29,7 @@ Source of truth for implementation. Overrides conflicting Cursor user-rules (no 
 | 24B | DE+EN i18n |
 | 27A | No hard deadline |
 | 30 | Secrets via GitHub Secrets; commit `.env.example` names only |
-| Tenancy | Business auth root; Owner/Admin/Editor/Viewer; invite-only; URLs `/b/:slug/...` |
+| Tenancy | Business auth root; Owner/Admin/Editor/Viewer; invite-only; frontend URLs `/co/:slug/...` (legacy parity); API `/api/b/:slug/...` |
 | Mobile | Icon-rail overlay, NO bottom nav |
 | Marketing | Metricool-first scheduler SoR; master draft + target variants |
 | Catalog | Catalog SoR; CMB internal simulation |
