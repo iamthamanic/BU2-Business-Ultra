@@ -2594,6 +2594,7 @@ select {
   padding: 8px 10px;
   border: 1px solid var(--border);
   background: var(--panel);
+  overflow: hidden;
 }
 
 .funnel-kpi--accent {
@@ -2604,8 +2605,10 @@ select {
 .funnel-kpi-head {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   margin-bottom: 4px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .funnel-kpi-ic {
@@ -2616,15 +2619,27 @@ select {
 }
 
 .funnel-kpi-v {
-  font-size: 18px;
+  font-size: clamp(13px, 1.5vw, 18px);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .funnel-kpi-l {
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: 11px;
   line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.funnel-kpi-head .funnel-tip {
+  flex-shrink: 0;
 }
 
 .funnel-posts-table,
