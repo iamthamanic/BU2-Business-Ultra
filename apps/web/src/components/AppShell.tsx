@@ -1,13 +1,12 @@
 /**
- * AppShell — legacy-parity chrome: collapsible sidebar + header company switcher.
- * Logo-only BrandMark left in the topbar; wordmark lives in sidebar sb-head;
- * company switcher in topbar (Settings keeps panel); account chip right.
+ * AppShell — legacy-parity chrome: collapsible sidebar + header.
+ * Logo-only BrandMark in topbar; company switcher replaces wordmark in sidebar sb-head
+ * (Settings keeps panel); account chip right.
  * Location: apps/web/src/components/AppShell.tsx
  */
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { List, X } from '@phosphor-icons/react'
 import { BrandMark } from './BrandMark'
-import { CompanySwitcher } from './CompanySwitcher'
 import { IconRail, type RailGroup, type RailItem } from './IconRail'
 import { useI18n } from '../lib/i18n'
 import type { AuthUser } from '../app/App'
@@ -85,18 +84,8 @@ export function AppShell({
             {drawerOpen ? <X size={18} weight="regular" /> : <List size={18} weight="regular" />}
           </button>
           <BrandMark to="/" showName={false} size="sm" />
-          {company?.slug ? (
-            <>
-              <CompanySwitcher
-                variant="dropdown"
-                activeSlug={company.slug}
-                activeName={company.name || company.slug}
-                activeLogoPath={company.logoPath}
-                canCreate={allowCreate}
-              />
-              {company.status === 'archived' ? <span className="badge warn">archived</span> : null}
-            </>
-          ) : subtitle ? (
+          {company?.status === 'archived' ? <span className="badge warn">archived</span> : null}
+          {!company?.slug && subtitle ? (
             <div className="hdr-chip hdr-context" title={typeof subtitle === 'string' ? subtitle : undefined}>
               <span className="hdr-chip-kicker">{t('workspaceHome')}</span>
               <span className="hdr-chip-value">{subtitle}</span>
@@ -131,6 +120,16 @@ export function AppShell({
           label={t('navMain')}
           showAdmin={admin}
           onLogout={onLogout}
+          company={
+            company?.slug
+              ? {
+                  slug: company.slug,
+                  name: company.name || company.slug,
+                  logoPath: company.logoPath,
+                }
+              : null
+          }
+          canCreateCompany={allowCreate}
         />
         <div className="main">
           <div className="content enter-fade" id={contentId}>

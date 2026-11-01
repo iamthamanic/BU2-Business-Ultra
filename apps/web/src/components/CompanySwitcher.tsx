@@ -1,8 +1,9 @@
 /**
- * CompanySwitcher — switch / create companies (topbar dropdown + Settings panel).
+ * CompanySwitcher — switch / create companies (sidebar dropdown + Settings panel).
  * Location: apps/web/src/components/CompanySwitcher.tsx
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { CaretDown } from '@phosphor-icons/react'
 import { api } from '../lib/api'
@@ -24,8 +25,10 @@ type Props = {
   activeName?: string
   activeLogoPath?: string | null
   canCreate?: boolean
-  /** `dropdown` = topbar chip; `panel` = Settings Companies section */
+  /** `dropdown` = sidebar chip; `panel` = Settings Companies section */
   variant?: 'dropdown' | 'panel'
+  /** Extra class on host (e.g. sidebar layout). */
+  className?: string
 }
 
 function initials(name: string) {
@@ -60,10 +63,12 @@ export function CompanySwitcher({
   activeLogoPath,
   canCreate = true,
   variant = 'dropdown',
+  className,
 }: Props) {
   const { t } = useI18n()
   const navigate = useNavigate()
   const hostRef = useRef<HTMLDivElement>(null)
+  const popRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
   const [creating, setCreating] = useState(false)
   const [list, setList] = useState<Biz[]>([])
@@ -71,6 +76,11 @@ export function CompanySwitcher({
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
   const [msg, setMsg] = useState('')
+  const [popPos, setPopPos] = useState<{ top: number; left: number; width: number }>({
+    top: 0,
+    left: 0,
+    width: 240,
+  })
 
   useEffect(() => {
     let cancelled = false
@@ -86,14 +96,37 @@ export function CompanySwitcher({
     }
   }, [])
 
+  const popVisible = variant === 'dropdown' && (open || creating)
+
+  useLayoutEffect(() => {
+    if (!popVisible || !hostRef.current) return
+    function place() {
+      const r = hostRef.current!.getBoundingClientRect()
+      const width = Math.max(240, Math.min(320, Math.max(r.width, 240)))
+      let left = r.left
+      if (left + width > window.innerWidth - 8) {
+        left = Math.max(8, window.innerWidth - width - 8)
+      }
+      setPopPos({ top: r.bottom + 8, left, width })
+    }
+    place()
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, true)
+    return () => {
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, true)
+    }
+  }, [popVisible])
+
   useEffect(() => {
     if (variant === 'panel') return
     if (!open && !creating) return
     function onDoc(ev: MouseEvent) {
-      if (!hostRef.current?.contains(ev.target as Node)) {
-        setOpen(false)
-        setCreating(false)
-      }
+      const tnode = ev.target as Node
+      if (hostRef.current?.contains(tnode)) return
+      if (popRef.current?.contains(tnode)) return
+      setOpen(false)
+      setCreating(false)
     }
     function onKey(ev: KeyboardEvent) {
       if (ev.key === 'Escape') {
@@ -190,8 +223,8 @@ export function CompanySwitcher({
     </>
   )
 
-  const createForm = creating ? (
-    <div className={variant === 'panel' ? 'hdr-company-panel inline' : 'hdr-company-panel'}>
+  const createFormInner = (
+    <>
       <div className="hdr-chip-kicker">{t('newCompany')}</div>
       <input
         type="text"
@@ -217,8 +250,8 @@ export function CompanySwitcher({
         </button>
       </div>
       {msg ? <div data-msg>{msg}</div> : null}
-    </div>
-  ) : null
+    </>
+  )
 
   if (variant === 'panel') {
     return (
@@ -239,13 +272,37 @@ export function CompanySwitcher({
             {companyList}
           </div>
         ) : null}
-        {createForm}
+        {creating ? <div className="hdr-company-panel inline">{createFormInner}</div> : null}
       </div>
     )
   }
 
+  const hostClass = ['hdr-company', className].filter(Boolean).join(' ')
+
+  const portal =
+    typeof document !== 'undefined' && popVisible
+      ? createPortal(
+          <div
+            ref={popRef}
+            className={creating ? 'hdr-company-panel hdr-company-pop' : 'hdr-company-menu open hdr-company-pop'}
+            role={creating ? undefined : 'listbox'}
+            style={{
+              position: 'fixed',
+              top: popPos.top,
+              left: popPos.left,
+              width: creating ? Math.max(popPos.width, 280) : popPos.width,
+              minWidth: creating ? 280 : undefined,
+              zIndex: 80,
+            }}
+          >
+            {creating ? createFormInner : companyList}
+          </div>,
+          document.body,
+        )
+      : null
+
   return (
-    <div className="hdr-company" ref={hostRef} data-bu-company-switcher="1">
+    <div className={hostClass} ref={hostRef} data-bu-company-switcher="1">
       <button
         type="button"
         className="hdr-company-btn"
@@ -266,14 +323,7 @@ export function CompanySwitcher({
         <span className="hdr-chip-value">{label}</span>
         <CaretDown className="hdr-company-chevron" size={14} weight="bold" aria-hidden />
       </button>
-
-      {open && !creating ? (
-        <div className="hdr-company-menu open" role="listbox">
-          {companyList}
-        </div>
-      ) : null}
-
-      {createForm}
+      {portal}
     </div>
   )
 }

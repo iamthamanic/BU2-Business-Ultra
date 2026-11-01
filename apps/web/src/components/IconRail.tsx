@@ -1,13 +1,14 @@
 /**
  * IconRail / Sidebar — legacy-parity collapsible left nav (slim icons ↔ expanded labels).
  * Supports department groups (e.g. Tools) with session persistence; Marketing is a flat rail item.
- * Collapse toggle + wordmark in sb-head; settings/admin/lang/logout in footer. Logo stays in topbar.
+ * Collapse toggle + company switcher (or brand wordmark) in sb-head; settings/admin/lang/logout in footer.
  * Location: apps/web/src/components/IconRail.tsx
  */
 import { useEffect, useState } from 'react'
 import type { Icon } from '@phosphor-icons/react'
 import { CaretDown, SignOut, ShieldCheck } from '@phosphor-icons/react'
 import { NavLink, useLocation } from 'react-router-dom'
+import { CompanySwitcher } from './CompanySwitcher'
 import { useI18n } from '../lib/i18n'
 
 export type RailItem = {
@@ -76,6 +77,12 @@ function groupHasActive(group: RailGroup, pathname: string): boolean {
   return group.groups?.some((g) => groupHasActive(g, pathname)) ?? false
 }
 
+type CompanyHead = {
+  slug: string
+  name: string
+  logoPath?: string | null
+}
+
 type Props = {
   items?: RailItem[]
   groups?: RailGroup[]
@@ -88,6 +95,9 @@ type Props = {
   label: string
   showAdmin?: boolean
   onLogout?: () => void
+  /** Active company — replaces brand wordmark in sb-head */
+  company?: CompanyHead | null
+  canCreateCompany?: boolean
 }
 
 const ICON_WEIGHT = 'regular' as const
@@ -180,6 +190,8 @@ export function IconRail({
   label,
   showAdmin,
   onLogout,
+  company,
+  canCreateCompany,
 }: Props) {
   const { t, locale, setLocale } = useI18n()
   const [slim, setSlim] = useState(readSlim)
@@ -205,9 +217,20 @@ export function IconRail({
       data-expanded={expanded ? 'true' : 'false'}
     >
       <div className="sb-head">
-        <span className="sb-brand-name brand-name" aria-hidden={slim || undefined}>
-          {t('brand')}
-        </span>
+        {company?.slug ? (
+          <CompanySwitcher
+            className="sb-company"
+            variant="dropdown"
+            activeSlug={company.slug}
+            activeName={company.name}
+            activeLogoPath={company.logoPath}
+            canCreate={canCreateCompany}
+          />
+        ) : (
+          <span className="sb-brand-name brand-name" aria-hidden={slim || undefined}>
+            {t('brand')}
+          </span>
+        )}
         <button
           type="button"
           className="sb-toggle"

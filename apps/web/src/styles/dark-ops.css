@@ -302,6 +302,20 @@ select {
   display: none;
 }
 
+.sidebar.slim .sb-company .hdr-chip-kicker,
+.sidebar.slim .sb-company .hdr-chip-value,
+.sidebar.slim .sb-company .hdr-company-chevron {
+  display: none;
+}
+
+.sidebar.slim .sb-company .hdr-company-btn {
+  max-width: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  justify-content: center;
+}
+
 .sidebar.slim .sb-item {
   justify-content: center;
   padding: 9px 0;
@@ -338,6 +352,23 @@ select {
   font-size: 0.88rem;
   letter-spacing: 0.04em;
   color: var(--text);
+}
+
+.sb-head .sb-company {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-left: 0;
+}
+
+.sb-head .sb-company .hdr-company-btn {
+  width: 100%;
+  max-width: none;
+  height: 34px;
+  padding: 0 8px 0 4px;
+}
+
+.sb-head .sb-company .hdr-chip-kicker {
+  display: none;
 }
 
 .sb-toggle {
