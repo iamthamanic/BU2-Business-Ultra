@@ -3,7 +3,7 @@
  * Location: apps/web/src/features/settings/settingsTabs.ts
  */
 
-export const SETTINGS_TABS = ['overview', 'connections', 'funnel', 'team', 'logo'] as const
+export const SETTINGS_TABS = ['overview', 'connections', 'funnel', 'team', 'labels', 'logo'] as const
 export type SettingsTab = (typeof SETTINGS_TABS)[number]
 
 const HASH_ALIASES: Record<string, SettingsTab> = {
@@ -15,6 +15,8 @@ const HASH_ALIASES: Record<string, SettingsTab> = {
   brevo: 'connections',
   funnel: 'funnel',
   team: 'team',
+  labels: 'labels',
+  tags: 'labels',
   logo: 'logo',
 }
 

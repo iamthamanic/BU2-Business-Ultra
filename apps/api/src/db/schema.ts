@@ -1,5 +1,6 @@
 import {
   boolean,
+  date,
   integer,
   jsonb,
   pgTable,
@@ -53,6 +54,7 @@ export const businesses = pgTable(
     slug: varchar('slug', { length: 64 }).notNull(),
     status: varchar('status', { length: 16 }).notNull().default('active'),
     logoPath: text('logo_path'),
+    styleguide: jsonb('styleguide').$type<Record<string, unknown>>().notNull().default({}),
     createdByUserId: uuid('created_by_user_id').references(() => users.id),
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -321,6 +323,263 @@ export const businessIntegrations = pgTable(
       t.externalId,
     ),
   ],
+)
+
+/** Company products (SoR for Product UI — description, calc, persona links). */
+export const products = pgTable('products', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  businessId: uuid('business_id')
+    .notNull()
+    .references(() => businesses.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 200 }).notNull(),
+  description: text('description').notNull().default(''),
+  market: varchar('market', { length: 8 }).notNull().default('b2b'),
+  coverPath: text('cover_path'),
+  currency: varchar('currency', { length: 3 }).notNull().default('EUR'),
+  sellingPriceCents: integer('selling_price_cents').notNull().default(0),
+  priceKind: varchar('price_kind', { length: 8 }).notNull().default('gross'),
+  taxRateBps: integer('tax_rate_bps').notNull().default(1900),
+  costPositions: jsonb('cost_positions').$type<unknown[]>().notNull().default([]),
+  personaIds: jsonb('persona_ids').$type<string[]>().notNull().default([]),
+  personaDraft: jsonb('persona_draft').$type<Record<string, unknown>>().notNull().default({}),
+  journeyCanvas: jsonb('journey_canvas')
+    .$type<{ nodes: unknown[]; edges: unknown[] }>()
+    .notNull()
+    .default({ nodes: [], edges: [] }),
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/** CRM customers (person/org) — soft-archive. */
+export const customers = pgTable('customers', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  businessId: uuid('business_id')
+    .notNull()
+    .references(() => businesses.id, { onDelete: 'cascade' }),
+  kind: varchar('kind', { length: 16 }).notNull().default('person'),
+  displayName: varchar('display_name', { length: 200 }).notNull(),
+  email: varchar('email', { length: 320 }),
+  phone: varchar('phone', { length: 64 }),
+  address: text('address'),
+  street: varchar('street', { length: 200 }),
+  postalCode: varchar('postal_code', { length: 32 }),
+  city: varchar('city', { length: 120 }),
+  country: varchar('country', { length: 120 }),
+  billingStreet: varchar('billing_street', { length: 200 }),
+  billingPostalCode: varchar('billing_postal_code', { length: 32 }),
+  billingCity: varchar('billing_city', { length: 120 }),
+  billingCountry: varchar('billing_country', { length: 120 }),
+  relationStatus: varchar('relation_status', { length: 24 }).notNull().default('lead'),
+  birthDate: date('birth_date'),
+  photoUrl: text('photo_url'),
+  buyerPersonaId: uuid('buyer_persona_id').references(() => personas.id, { onDelete: 'set null' }),
+  tags: jsonb('tags').$type<string[]>().notNull().default([]),
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/** Company label catalog by scope (customer/project/marketing/product). */
+export const businessTags = pgTable(
+  'business_tags',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    businessId: uuid('business_id')
+      .notNull()
+      .references(() => businesses.id, { onDelete: 'cascade' }),
+    /** customer | project | marketing | product */
+    scope: varchar('scope', { length: 24 }).notNull().default('customer'),
+    name: varchar('name', { length: 40 }).notNull(),
+    color: varchar('color', { length: 16 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('business_tags_biz_scope_name_uidx').on(t.businessId, t.scope, t.name)],
+)
+
+/** CRM purchase lines — SoR for customer LTV / product mix (no full order system yet). */
+export const customerPurchases = pgTable('customer_purchases', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  businessId: uuid('business_id')
+    .notNull()
+    .references(() => businesses.id, { onDelete: 'cascade' }),
+  customerId: uuid('customer_id')
+    .notNull()
+    .references(() => customers.id, { onDelete: 'cascade' }),
+  productId: uuid('product_id').references(() => products.id, { onDelete: 'set null' }),
+  label: varchar('label', { length: 200 }).notNull(),
+  amountCents: integer('amount_cents').notNull().default(0),
+  currency: varchar('currency', { length: 3 }).notNull().default('EUR'),
+  purchasedAt: timestamp('purchased_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const customerNotes = pgTable('customer_notes', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  customerId: uuid('customer_id')
+    .notNull()
+    .references(() => customers.id, { onDelete: 'cascade' }),
+  authorUserId: uuid('author_user_id').references(() => users.id, { onDelete: 'set null' }),
+  body: text('body').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const customerConsents = pgTable('customer_consents', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  customerId: uuid('customer_id')
+    .notNull()
+    .references(() => customers.id, { onDelete: 'cascade' }),
+  purpose: varchar('purpose', { length: 120 }).notNull(),
+  channel: varchar('channel', { length: 40 }).notNull().default('email'),
+  grantedAt: timestamp('granted_at', { withTimezone: true }),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  evidence: text('evidence'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const customerEvents = pgTable('customer_events', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  customerId: uuid('customer_id')
+    .notNull()
+    .references(() => customers.id, { onDelete: 'cascade' }),
+  type: varchar('type', { length: 64 }).notNull(),
+  summary: text('summary').notNull().default(''),
+  actorUserId: uuid('actor_user_id').references(() => users.id, { onDelete: 'set null' }),
+  meta: jsonb('meta').$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/** Projects: area (container) or custom (completable). */
+export const projects = pgTable('projects', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  businessId: uuid('business_id')
+    .notNull()
+    .references(() => businesses.id, { onDelete: 'cascade' }),
+  type: varchar('type', { length: 16 }).notNull().default('custom'),
+  name: varchar('name', { length: 200 }).notNull(),
+  description: text('description').notNull().default(''),
+  area: varchar('area', { length: 120 }),
+  ownerUserId: uuid('owner_user_id').references(() => users.id, { onDelete: 'set null' }),
+  memberUserIds: jsonb('member_user_ids').$type<string[]>().notNull().default([]),
+  status: varchar('status', { length: 24 }).notNull().default('planned'),
+  startAt: timestamp('start_at', { withTimezone: true }),
+  dueAt: timestamp('due_at', { withTimezone: true }),
+  parentAreaProjectId: uuid('parent_area_project_id'),
+  boardLaneOrder: jsonb('board_lane_order').$type<string[] | null>().default(null),
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/** Tasks — project_id null = inbox; optional customer link. */
+export const tasks = pgTable('tasks', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  businessId: uuid('business_id')
+    .notNull()
+    .references(() => businesses.id, { onDelete: 'cascade' }),
+  projectId: uuid('project_id').references(() => projects.id, { onDelete: 'set null' }),
+  customerId: uuid('customer_id').references(() => customers.id, { onDelete: 'set null' }),
+  title: varchar('title', { length: 300 }).notNull(),
+  description: text('description').notNull().default(''),
+  status: varchar('status', { length: 24 }).notNull().default('open'),
+  priority: varchar('priority', { length: 16 }).notNull().default('medium'),
+  assigneeUserId: uuid('assignee_user_id').references(() => users.id, { onDelete: 'set null' }),
+  dueAt: timestamp('due_at', { withTimezone: true }),
+  sortOrder: integer('sort_order').notNull().default(0),
+  version: integer('version').notNull().default(1),
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const taskComments = pgTable('task_comments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  taskId: uuid('task_id')
+    .notNull()
+    .references(() => tasks.id, { onDelete: 'cascade' }),
+  authorUserId: uuid('author_user_id').references(() => users.id, { onDelete: 'set null' }),
+  body: text('body').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const taskChecklistItems = pgTable('task_checklist_items', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  taskId: uuid('task_id')
+    .notNull()
+    .references(() => tasks.id, { onDelete: 'cascade' }),
+  title: varchar('title', { length: 300 }).notNull(),
+  done: boolean('done').notNull().default(false),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const projectEvents = pgTable('project_events', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  projectId: uuid('project_id')
+    .notNull()
+    .references(() => projects.id, { onDelete: 'cascade' }),
+  type: varchar('type', { length: 64 }).notNull(),
+  summary: text('summary').notNull().default(''),
+  actorUserId: uuid('actor_user_id').references(() => users.id, { onDelete: 'set null' }),
+  meta: jsonb('meta').$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const taskAttachments = pgTable('task_attachments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  businessId: uuid('business_id')
+    .notNull()
+    .references(() => businesses.id, { onDelete: 'cascade' }),
+  taskId: uuid('task_id')
+    .notNull()
+    .references(() => tasks.id, { onDelete: 'cascade' }),
+  filename: varchar('filename', { length: 255 }).notNull(),
+  mimeType: varchar('mime_type', { length: 120 }).notNull(),
+  sizeBytes: integer('size_bytes').notNull().default(0),
+  storagePath: text('storage_path').notNull(),
+  createdByUserId: uuid('created_by_user_id').references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const recurrenceRules = pgTable('recurrence_rules', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  businessId: uuid('business_id')
+    .notNull()
+    .references(() => businesses.id, { onDelete: 'cascade' }),
+  projectId: uuid('project_id').references(() => projects.id, { onDelete: 'set null' }),
+  customerId: uuid('customer_id').references(() => customers.id, { onDelete: 'set null' }),
+  title: varchar('title', { length: 300 }).notNull(),
+  description: text('description').notNull().default(''),
+  priority: varchar('priority', { length: 16 }).notNull().default('medium'),
+  assigneeUserId: uuid('assignee_user_id').references(() => users.id, { onDelete: 'set null' }),
+  freq: varchar('freq', { length: 16 }).notNull().default('weekly'),
+  weekday: integer('weekday'),
+  monthDay: integer('month_day'),
+  timezone: varchar('timezone', { length: 64 }).notNull().default('Europe/Berlin'),
+  startsAt: timestamp('starts_at', { withTimezone: true }).notNull().defaultNow(),
+  endsAt: timestamp('ends_at', { withTimezone: true }),
+  pausedAt: timestamp('paused_at', { withTimezone: true }),
+  nextAt: timestamp('next_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const taskOccurrences = pgTable(
+  'task_occurrences',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    ruleId: uuid('rule_id')
+      .notNull()
+      .references(() => recurrenceRules.id, { onDelete: 'cascade' }),
+    scheduledFor: timestamp('scheduled_for', { withTimezone: true }).notNull(),
+    taskId: uuid('task_id')
+      .notNull()
+      .references(() => tasks.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('task_occurrences_rule_scheduled_uidx').on(t.ruleId, t.scheduledFor)],
 )
 
 /** Per-surface data source (Metricool brand vs Direct API). */

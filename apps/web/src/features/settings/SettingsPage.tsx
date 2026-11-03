@@ -1,19 +1,41 @@
 /**
- * SettingsPage — company settings with tabs: Übersicht | Verbindungen | Funnel | Team | Logo.
- * Hash deep-links (#connections etc.) from Marketing Hub. Location: apps/web/src/features/settings/SettingsPage.tsx
+ * SettingsPage — company settings with MktTabs surface strip:
+ * Übersicht | Verbindungen | Funnel | Team | Labels | Logo.
+ * Hash deep-links (#connections etc.) from Marketing Hub.
+ * Location: apps/web/src/features/settings/SettingsPage.tsx
  */
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import {
+  Funnel,
+  Image,
+  LinkSimple,
+  SquaresFour,
+  Tag,
+  UsersThree,
+} from '@phosphor-icons/react'
+import type { Icon } from '@phosphor-icons/react'
+import { MktTab, MktTabs } from '../../components/MktTabs'
 import { api } from '../../lib/api'
 import { writeLastCompany } from '../../lib/lastCompany'
 import { useI18n } from '../../lib/i18n'
 import { SettingsConnectionsTab } from './SettingsConnectionsTab'
 import { SettingsFunnelTab } from './SettingsFunnelTab'
 import { SettingsHeader, type SettingsStatus } from './SettingsHeader'
+import { SettingsLabelsTab } from './SettingsLabelsTab'
 import { SettingsLogoTab } from './SettingsLogoTab'
 import { SettingsOverviewTab } from './SettingsOverviewTab'
 import { SettingsTeamTab } from './SettingsTeamTab'
 import { SETTINGS_TABS, hashForTab, tabFromHash, type SettingsTab } from './settingsTabs'
+
+const TAB_ICONS: Record<SettingsTab, Icon> = {
+  overview: SquaresFour,
+  connections: LinkSimple,
+  funnel: Funnel,
+  team: UsersThree,
+  labels: Tag,
+  logo: Image,
+}
 
 type SecretRow = { provider: string; valid: boolean; keyHint?: string | null }
 
@@ -141,6 +163,7 @@ export function SettingsPage() {
     connections: t('connections'),
     funnel: t('funnelAssignment'),
     team: t('team'),
+    labels: t('settingsLabels'),
     logo: t('companyLogo'),
   }
 
@@ -155,20 +178,17 @@ export function SettingsPage() {
         onJump={setTabAndHash}
       />
 
-      <div className="co-settings-subnav" role="tablist" aria-label={t('settings')}>
+      <MktTabs level="surface" label={t('settings')} className="co-settings-tabs">
         {SETTINGS_TABS.map((id) => (
-          <button
+          <MktTab
             key={id}
-            type="button"
-            role="tab"
-            className={`co-settings-subtab ${tab === id ? 'active' : ''}`}
-            aria-selected={tab === id}
+            active={tab === id}
+            label={tabLabels[id]}
+            icon={TAB_ICONS[id]}
             onClick={() => setTabAndHash(id)}
-          >
-            {tabLabels[id]}
-          </button>
+          />
         ))}
-      </div>
+      </MktTabs>
 
       <div className="co-settings-pane" role="tabpanel">
         {tab === 'overview' ? (
@@ -205,6 +225,7 @@ export function SettingsPage() {
         {tab === 'team' ? (
           <SettingsTeamTab slug={slug} onMembersChanged={setMemberCount} />
         ) : null}
+        {tab === 'labels' ? <SettingsLabelsTab slug={slug} /> : null}
         {tab === 'logo' ? (
           <SettingsLogoTab
             slug={slug}

@@ -1,14 +1,12 @@
 /**
  * MarketingPage — organic + custom funnel channel depth (Legacy IA).
- * Organic: Analyse (KPIs/table) · Produktion (calendar + drafts). Soft connect banner when needed.
+ * Organic Analyse: KPIs/table · Organic Planung: calendar (URL …/planung). Soft connect banner when needed.
  * Location: apps/web/src/features/marketing/MarketingPage.tsx
  */
-import { useEffect, useState } from 'react'
-import { ChartBar, CalendarBlank } from '@phosphor-icons/react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useParams } from 'react-router-dom'
-import { MktTab, MktTabs } from '../../components/MktTabs'
 import { api } from '../../lib/api'
-import { companyRoutes } from '../../lib/companyPaths'
+import { companyRoutes, parseMarketingLocation } from '../../lib/companyPaths'
 import { useI18n } from '../../lib/i18n'
 import { CustomFunnelToolbar } from './CustomFunnelToolbar'
 import { FunnelConnectHint } from './FunnelConnectHint'
@@ -44,10 +42,12 @@ export function MarketingPage() {
   const { slug, channel } = useParams()
   const { pathname } = useLocation()
   const { t } = useI18n()
+  const parsed = useMemo(() => parseMarketingLocation(pathname), [pathname])
   const ch = (channel || 'instagram').toLowerCase()
   const isCustom = pathname.includes('/funnel/custom/')
   const isEmail = isCustom && ch === 'email'
   const isOffline = isCustom && ch === 'offline'
+  const isPlanung = !isCustom && parsed.surface === 'planung'
 
   const [organic, setOrganic] = useState<OrganicPayload | null>(null)
   const [drafts, setDrafts] = useState<any[]>([])
@@ -59,12 +59,11 @@ export function MarketingPage() {
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(true)
   const [win, setWin] = useState<'24h' | '7d' | '30d' | 'all'>('30d')
-  const [organicMode, setOrganicMode] = useState<'analyse' | 'produktion'>('analyse')
 
   const settingsHref = slug ? companyRoutes(slug).settingsConnections : '#'
 
   async function refreshOrganic(windowKey = win) {
-    if (!slug || isCustom) return
+    if (!slug || isCustom || isPlanung) return
     const r = await api<OrganicPayload>(
       `/api/b/${slug}/marketing/funnel/organic/${ch}?window=${windowKey}`,
     )
@@ -74,6 +73,10 @@ export function MarketingPage() {
   async function refresh() {
     setLoading(true)
     try {
+      if (isPlanung) {
+        setOrganic(null)
+        return
+      }
       if (isOffline) {
         setOrganic(null)
         return
@@ -102,7 +105,7 @@ export function MarketingPage() {
   useEffect(() => {
     refresh().catch(console.error)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh on route/window
-  }, [slug, ch, isCustom, isEmail, isOffline, win])
+  }, [slug, ch, isCustom, isEmail, isOffline, isPlanung, win])
 
   async function createDraft(nextTitle: string, nextText: string) {
     await api(`/api/b/${slug}/marketing/drafts`, {
@@ -174,10 +177,17 @@ export function MarketingPage() {
     }
   }
 
+  if (isPlanung) {
+    return (
+      <div className="stack funnel-page">
+        <OrganicProductionPanel initialWindow={win} onWindowChange={(w) => setWin(w)} />
+      </div>
+    )
+  }
+
   if (isOffline) {
     return (
       <div className="stack funnel-page">
-        <FunnelConnectHint need="stub" settingsHref={settingsHref} message={t('offlineStubBody')} />
         <CustomFunnelToolbar
           channel={ch}
           win={win}
@@ -197,7 +207,11 @@ export function MarketingPage() {
             <tbody>
               <tr>
                 <td colSpan={4} className="funnel-table-empty muted">
-                  {t('offlineEmptyRow')}
+                  <FunnelConnectHint
+                    need="stub"
+                    settingsHref={settingsHref}
+                    message={t('offlineStubBody')}
+                  />
                 </td>
               </tr>
             </tbody>
@@ -210,10 +224,6 @@ export function MarketingPage() {
   if (isEmail) {
     return (
       <div className="stack funnel-page">
-        {!brevoGate && !loading ? (
-          <FunnelConnectHint need="key" settingsHref={settingsHref} message={t('connectBannerBrevo')} />
-        ) : null}
-
         <CustomFunnelToolbar
           channel={ch}
           win={win}
@@ -268,7 +278,15 @@ export function MarketingPage() {
               ) : campaigns.length === 0 ? (
                 <tr>
                   <td colSpan={3} className="funnel-table-empty muted">
-                    {!brevoGate ? t('campaignsEmptyNeedKey') : t('noCampaigns')}
+                    {!brevoGate ? (
+                      <FunnelConnectHint
+                        need="key"
+                        settingsHref={settingsHref}
+                        message={t('connectBannerBrevo')}
+                      />
+                    ) : (
+                      t('noCampaigns')
+                    )}
                   </td>
                 </tr>
               ) : (
@@ -297,57 +315,26 @@ export function MarketingPage() {
     )
   }
 
-  // Organic — always show table chrome; soft banner when not connected
+  // Organic Analyse — connect hint lives in the empty table row
   const need = organic?.connector.needs
-  const contentReady = !!organic?.connector.contentReady
+  const needsConnect = need === 'key' || need === 'brand'
   const emptyHint =
-    need === 'key' || need === 'brand' || (organic?.connector.brandsLinked ?? 0) === 0
+    needsConnect || (organic?.connector.brandsLinked ?? 0) === 0
       ? t('postsEmptyNeedBrand')
       : t('postsEmptyWindow')
 
   return (
     <div className="stack funnel-page">
-      {need === 'key' || need === 'brand' ? (
-        <FunnelConnectHint need={need} settingsHref={settingsHref} />
-      ) : null}
-
-      <MktTabs level="surface" label={t('navOrganic')} className="funnel-mode-tabs">
-        <MktTab
-          active={organicMode === 'analyse'}
-          label={t('tabAnalyse')}
-          icon={ChartBar}
-          dataIc="analyse"
-          onClick={() => setOrganicMode('analyse')}
-        />
-        <MktTab
-          active={organicMode === 'produktion'}
-          label={t('tabProduktion')}
-          icon={CalendarBlank}
-          dataIc="produktion"
-          onClick={() => setOrganicMode('produktion')}
-        />
-      </MktTabs>
-
-      {organicMode === 'analyse' ? (
-        <OrganicPostsPanel
-          channel={ch}
-          posts={organic?.posts ?? []}
-          emptyHint={loading && !organic ? t('loading') : emptyHint}
-          initialWindow={win}
-          onWindowChange={(w) => setWin(w)}
-        />
-      ) : (
-        <OrganicProductionPanel
-          posts={organic?.posts ?? []}
-          drafts={drafts}
-          contentReady={contentReady}
-          initialWindow={win}
-          onWindowChange={(w) => setWin(w)}
-          onCreateDraft={createDraft}
-          onSchedule={schedule}
-          onRetry={retry}
-        />
-      )}
+      <OrganicPostsPanel
+        channel={ch}
+        posts={organic?.posts ?? []}
+        emptyHint={loading && !organic ? t('loading') : emptyHint}
+        emptyContent={
+          needsConnect ? <FunnelConnectHint need={need} settingsHref={settingsHref} /> : undefined
+        }
+        initialWindow={win}
+        onWindowChange={(w) => setWin(w)}
+      />
 
       {msg ? <pre className="panel muted">{msg}</pre> : null}
     </div>

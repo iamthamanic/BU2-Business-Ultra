@@ -4,7 +4,8 @@ Source of truth for implementation. Overrides conflicting Cursor user-rules (no 
 
 | ID | Decision |
 |---|---|
-| 1A | V1 Must only — no CRM/ERP/workflow/billing SaaS |
+| 1A | V1 Must originally excluded CRM/ERP/workflow/billing SaaS |
+| 1A-rev | **CRM (Kunden) + Projects/Tasks in scope** — ERP/billing SaaS still out; CheckMap stays separate SoR |
 | 2B-rev A | Vite + React + TypeScript frontend; Node LTS + TypeScript strict API (Fastify); Drizzle + Postgres 16; Docker volumes |
 | Dark-Ops | Legacy Dark-Ops visual baseline (`#0b0f14` canvas, icon rail) |
 | Ports | Web `http://127.0.0.1:8741`, API `:8742` |

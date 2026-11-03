@@ -2,7 +2,7 @@
  * OrganicPostsPanel — Legacy-parity posts table + window chips for organic funnel channels.
  * Columns mirror Legacy dashboard COLS (reach only for Meta). Location: apps/web/src/features/marketing/OrganicPostsPanel.tsx
  */
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import type { Icon } from '@phosphor-icons/react'
 import {
   Article,
@@ -62,6 +62,8 @@ type Props = {
   channel: string
   posts: OrganicPost[]
   emptyHint: string
+  /** Prefer over emptyHint when set (e.g. FunnelConnectHint in the empty row). */
+  emptyContent?: ReactNode
   initialWindow?: '24h' | '7d' | '30d' | 'all'
   onWindowChange?: (w: '24h' | '7d' | '30d' | 'all') => void
 }
@@ -70,6 +72,7 @@ export function OrganicPostsPanel({
   channel,
   posts,
   emptyHint,
+  emptyContent,
   initialWindow = '30d',
   onWindowChange,
 }: Props) {
@@ -372,7 +375,7 @@ export function OrganicPostsPanel({
             {sorted.length === 0 ? (
               <tr>
                 <td colSpan={cols.length} className="funnel-table-empty muted">
-                  {emptyHint}
+                  {emptyContent ?? emptyHint}
                 </td>
               </tr>
             ) : (

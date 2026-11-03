@@ -138,7 +138,7 @@ export function LoginPage({ onAuthed }: { onAuthed: (u: AuthUser) => void }) {
                 </button>
               </div>
             </label>
-            <button className="btn primary" type="submit" disabled={busy || password.length < 8}>
+            <button className="btn primary" type="submit" disabled={busy || password.length < 4}>
               {t('login')}
             </button>
           </form>

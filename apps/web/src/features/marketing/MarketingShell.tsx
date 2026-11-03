@@ -1,10 +1,12 @@
 /**
  * MarketingShell — tabbed Marketing IA under `/co/:slug/marketing`.
- * Top: Funnel | Persona Journey · Funnel: Organic | Paid | Custom · channel tertiary tabs.
+ * Top: Funnel | Persona Journey · Funnel: Organic | Paid | Custom ·
+ * Organic/Paid: Analyse | Planung · channels only under Analyse.
  * Deep links sync via nested routes (`Outlet`). Location: apps/web/src/features/marketing/MarketingShell.tsx
  */
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { Outlet, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom'
+import { CalendarBlank, ChartBar } from '@phosphor-icons/react'
 import { canOpenSeo, canSeeNavTab } from '@bu2/shared'
 import type { CompanyOutletContext } from '../../components/BusinessShell'
 import { MktTab, MktTabs } from '../../components/MktTabs'
@@ -22,6 +24,7 @@ import {
   marketingPath,
   parseMarketingLocation,
   type FunnelKind,
+  type FunnelSurface,
   type MarketingTopTab,
 } from '../../lib/companyPaths'
 import { useI18n } from '../../lib/i18n'
@@ -61,6 +64,18 @@ export function MarketingShell() {
 
   const parsed = useMemo(() => parseMarketingLocation(pathname), [pathname])
 
+  /** Remember last Analyse channel per funnel so Planung → Analyse restores it. */
+  const lastChannelRef = useRef<{ organic: string; paid: string }>({
+    organic: 'instagram',
+    paid: 'meta',
+  })
+  if (parsed.surface === 'analyse' && parsed.funnel === 'organic') {
+    lastChannelRef.current.organic = parsed.channel
+  }
+  if (parsed.surface === 'analyse' && parsed.funnel === 'paid') {
+    lastChannelRef.current.paid = parsed.channel
+  }
+
   const tabs = ctx?.membership ? ctx.membership.tabs : null
   const role = ctx?.membership?.role ?? (ctx?.user.isSuperadmin ? 'owner' : 'viewer')
   const grantSeo = ctx?.membership?.grantSeoOpen ?? false
@@ -78,12 +93,35 @@ export function MarketingShell() {
     canSeeNavTab(tabs, ch === 'email' ? 'email' : 'offline'),
   )
 
-  function go(sel: { top: MarketingTopTab; funnel?: FunnelKind; channel?: string }) {
+  function go(sel: {
+    top: MarketingTopTab
+    funnel?: FunnelKind
+    channel?: string
+    surface?: FunnelSurface
+  }) {
     if (!slug) return
     navigate(marketingPath(slug, sel))
   }
 
+  function analyseChannel(funnel: 'organic' | 'paid'): string {
+    if (funnel === 'paid') {
+      const pref = lastChannelRef.current.paid
+      return paidTabs.includes(pref as (typeof PAID_CHANNELS)[number])
+        ? pref
+        : (paidTabs[0] ?? 'meta')
+    }
+    const pref = lastChannelRef.current.organic
+    return organicTabs.includes(pref as (typeof ORGANIC_TABS)[number])
+      ? pref
+      : (organicTabs[0] ?? 'instagram')
+  }
+
   if (!slug) return null
+
+  const showSurfaceTabs = parsed.funnel === 'organic' || parsed.funnel === 'paid'
+  const showChannels =
+    parsed.funnel === 'custom' ||
+    (showSurfaceTabs && parsed.surface === 'analyse')
 
   return (
     <div className="stack mkt-shell">
@@ -96,6 +134,7 @@ export function MarketingShell() {
                 top: 'funnel',
                 funnel: parsed.funnel,
                 channel: defaultChannel(parsed.funnel, organicTabs, paidTabs, customTabs),
+                surface: 'analyse',
               })
             }
             label={t('navFunnel')}
@@ -111,6 +150,13 @@ export function MarketingShell() {
               dataIc="personas"
             />
           ) : null}
+          <MktTab
+            active={parsed.top === 'styleguide'}
+            onClick={() => go({ top: 'styleguide' })}
+            label={t('styleguide')}
+            icon={MKT_L1_ICONS.styleguide}
+            dataIc="styleguide"
+          />
         </MktTabs>
 
         {parsed.top === 'funnel' ? (
@@ -120,7 +166,12 @@ export function MarketingShell() {
                 <MktTab
                   active={parsed.funnel === 'organic'}
                   onClick={() =>
-                    go({ top: 'funnel', funnel: 'organic', channel: organicTabs[0] ?? 'instagram' })
+                    go({
+                      top: 'funnel',
+                      funnel: 'organic',
+                      channel: analyseChannel('organic'),
+                      surface: 'analyse',
+                    })
                   }
                   label={t('navOrganic')}
                   icon={MKT_L2_ICONS.organic}
@@ -130,7 +181,14 @@ export function MarketingShell() {
               {paidTabs.length ? (
                 <MktTab
                   active={parsed.funnel === 'paid'}
-                  onClick={() => go({ top: 'funnel', funnel: 'paid', channel: paidTabs[0] ?? 'meta' })}
+                  onClick={() =>
+                    go({
+                      top: 'funnel',
+                      funnel: 'paid',
+                      channel: analyseChannel('paid'),
+                      surface: 'analyse',
+                    })
+                  }
                   label={t('navPaid')}
                   icon={MKT_L2_ICONS.paid}
                   dataIc="paid"
@@ -140,7 +198,12 @@ export function MarketingShell() {
                 <MktTab
                   active={parsed.funnel === 'custom'}
                   onClick={() =>
-                    go({ top: 'funnel', funnel: 'custom', channel: customTabs[0] ?? 'email' })
+                    go({
+                      top: 'funnel',
+                      funnel: 'custom',
+                      channel: customTabs[0] ?? 'email',
+                      surface: 'analyse',
+                    })
                   }
                   label={t('navCustom')}
                   icon={MKT_L2_ICONS.custom}
@@ -149,44 +212,87 @@ export function MarketingShell() {
               ) : null}
             </MktTabs>
 
-            <MktTabs level="l3" label={t('hubColChannel')}>
-              {parsed.funnel === 'organic'
-                ? organicTabs.map((ch) => (
-                    <MktTab
-                      key={ch}
-                      active={parsed.channel === ch}
-                      onClick={() => go({ top: 'funnel', funnel: 'organic', channel: ch })}
-                      label={ch === 'website' ? t('navWebsite') : t(`ch_${ch}` as 'ch_instagram')}
-                      icon={MKT_ORGANIC_ICONS[ch]}
-                      dataIc={ch === 'website' ? 'website' : ch}
-                    />
-                  ))
-                : null}
-              {parsed.funnel === 'paid'
-                ? paidTabs.map((ch) => (
-                    <MktTab
-                      key={ch}
-                      active={parsed.channel === ch}
-                      onClick={() => go({ top: 'funnel', funnel: 'paid', channel: ch })}
-                      label={t(PAID_LABEL[ch])}
-                      icon={MKT_PAID_ICONS[ch]}
-                      dataIc={PAID_TAB_KEY[ch]}
-                    />
-                  ))
-                : null}
-              {parsed.funnel === 'custom'
-                ? customTabs.map((ch) => (
-                    <MktTab
-                      key={ch}
-                      active={parsed.channel === ch}
-                      onClick={() => go({ top: 'funnel', funnel: 'custom', channel: ch })}
-                      label={t(CUSTOM_LABEL[ch])}
-                      icon={MKT_CUSTOM_ICONS[ch]}
-                      dataIc={ch}
-                    />
-                  ))
-                : null}
-            </MktTabs>
+            {showSurfaceTabs ? (
+              <MktTabs level="l3" label={t('tabAnalyse')}>
+                <MktTab
+                  active={parsed.surface === 'analyse'}
+                  onClick={() =>
+                    go({
+                      top: 'funnel',
+                      funnel: parsed.funnel,
+                      channel: analyseChannel(parsed.funnel === 'paid' ? 'paid' : 'organic'),
+                      surface: 'analyse',
+                    })
+                  }
+                  label={t('tabAnalyse')}
+                  icon={ChartBar}
+                  dataIc="analyse"
+                />
+                <MktTab
+                  active={parsed.surface === 'planung'}
+                  onClick={() =>
+                    go({
+                      top: 'funnel',
+                      funnel: parsed.funnel,
+                      surface: 'planung',
+                    })
+                  }
+                  label={t('tabPlanung')}
+                  icon={CalendarBlank}
+                  dataIc="planung"
+                />
+              </MktTabs>
+            ) : null}
+
+            {showChannels ? (
+              <MktTabs
+                level={showSurfaceTabs ? 'surface' : 'l3'}
+                label={t('hubColChannel')}
+              >
+                {parsed.funnel === 'organic'
+                  ? organicTabs.map((ch) => (
+                      <MktTab
+                        key={ch}
+                        active={parsed.channel === ch}
+                        onClick={() =>
+                          go({ top: 'funnel', funnel: 'organic', channel: ch, surface: 'analyse' })
+                        }
+                        label={ch === 'website' ? t('navWebsite') : t(`ch_${ch}` as 'ch_instagram')}
+                        icon={MKT_ORGANIC_ICONS[ch]}
+                        dataIc={ch === 'website' ? 'website' : ch}
+                      />
+                    ))
+                  : null}
+                {parsed.funnel === 'paid'
+                  ? paidTabs.map((ch) => (
+                      <MktTab
+                        key={ch}
+                        active={parsed.channel === ch}
+                        onClick={() =>
+                          go({ top: 'funnel', funnel: 'paid', channel: ch, surface: 'analyse' })
+                        }
+                        label={t(PAID_LABEL[ch])}
+                        icon={MKT_PAID_ICONS[ch]}
+                        dataIc={PAID_TAB_KEY[ch]}
+                      />
+                    ))
+                  : null}
+                {parsed.funnel === 'custom'
+                  ? customTabs.map((ch) => (
+                      <MktTab
+                        key={ch}
+                        active={parsed.channel === ch}
+                        onClick={() =>
+                          go({ top: 'funnel', funnel: 'custom', channel: ch, surface: 'analyse' })
+                        }
+                        label={t(CUSTOM_LABEL[ch])}
+                        icon={MKT_CUSTOM_ICONS[ch]}
+                        dataIc={ch}
+                      />
+                    ))
+                  : null}
+              </MktTabs>
+            ) : null}
           </>
         ) : null}
       </div>

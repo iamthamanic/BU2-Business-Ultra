@@ -14,7 +14,8 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   // Fastify rejects empty bodies when Content-Type is application/json —
   // only set that header when a body is actually sent.
   const headers = new Headers(init?.headers)
-  if (init?.body != null && !headers.has('content-type')) {
+  const isForm = typeof FormData !== 'undefined' && init?.body instanceof FormData
+  if (init?.body != null && !isForm && !headers.has('content-type')) {
     headers.set('content-type', 'application/json')
   }
   const res = await fetch(`${API_BASE}${path}`, {

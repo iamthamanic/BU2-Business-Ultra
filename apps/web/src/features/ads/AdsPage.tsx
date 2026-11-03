@@ -1,14 +1,15 @@
 /**
  * AdsPage — paid funnel campaigns; provider synced from `/marketing/funnel/paid/:channel`.
- * Legacy chrome always visible (KPI strip + full table); soft connect banner when key missing.
+ * Analyse: KPI strip + table · Planung (`…/planung`): calendar reuse.
  * Location: apps/web/src/features/ads/AdsPage.tsx
  */
 import { useEffect, useMemo, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useLocation, useParams } from 'react-router-dom'
 import { api } from '../../lib/api'
-import { companyRoutes } from '../../lib/companyPaths'
+import { companyRoutes, parseMarketingLocation } from '../../lib/companyPaths'
 import { useI18n } from '../../lib/i18n'
 import { FunnelConnectHint } from '../marketing/FunnelConnectHint'
+import { OrganicProductionPanel } from '../marketing/OrganicProductionPanel'
 import { PaidCampaignsPanel, type PaidCampaignRow } from './PaidCampaignsPanel'
 
 const LIVE_PROVIDERS = ['google_ads', 'meta_ads', 'tiktok_ads', 'chatgpt_ads'] as const
@@ -37,7 +38,11 @@ function isStub(p: Provider): p is StubProvider {
 
 export function AdsPage() {
   const { slug, channel } = useParams()
+  const { pathname } = useLocation()
   const { t } = useI18n()
+  const parsed = useMemo(() => parseMarketingLocation(pathname), [pathname])
+  const isPlanung = parsed.surface === 'planung'
+
   const [campaigns, setCampaigns] = useState<any[]>([])
   const [provider, setProvider] = useState<Provider>(() => providerFromChannel(channel))
   const [name, setName] = useState('')
@@ -49,10 +54,14 @@ export function AdsPage() {
   const settingsHref = slug ? companyRoutes(slug).settingsConnections : '#'
 
   useEffect(() => {
-    setProvider(providerFromChannel(channel))
-  }, [channel])
+    if (!isPlanung) setProvider(providerFromChannel(channel))
+  }, [channel, isPlanung])
 
   async function refresh() {
+    if (isPlanung) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     try {
       if (isStub(provider)) {
@@ -73,7 +82,8 @@ export function AdsPage() {
 
   useEffect(() => {
     refresh().catch(console.error)
-  }, [slug, provider])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh on route/provider
+  }, [slug, provider, isPlanung])
 
   async function create() {
     if (isStub(provider) || !ready) return
@@ -127,20 +137,29 @@ export function AdsPage() {
     [campaigns],
   )
 
+  if (isPlanung) {
+    return (
+      <div className="stack funnel-page">
+        <OrganicProductionPanel />
+      </div>
+    )
+  }
+
   return (
     <div className="stack funnel-page">
-      {showConnect ? (
-        <FunnelConnectHint
-          need={stub ? 'stub' : 'key'}
-          settingsHref={settingsHref}
-          message={stub ? t('adsStubBody') : t('connectBannerAds')}
-        />
-      ) : null}
-
       <PaidCampaignsPanel
         channel={channel || provider}
         campaigns={loading ? [] : rows}
         emptyHint={emptyRow}
+        emptyContent={
+          showConnect ? (
+            <FunnelConnectHint
+              need={stub ? 'stub' : 'key'}
+              settingsHref={settingsHref}
+              message={stub ? t('adsStubBody') : t('connectBannerAds')}
+            />
+          ) : undefined
+        }
         initialWindow={win}
         onWindowChange={setWin}
       />

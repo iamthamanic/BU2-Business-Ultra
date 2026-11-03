@@ -46,6 +46,14 @@ Change password while logged in: `POST /api/auth/password` with `{ "currentPassw
 
 Sender: `social@halteverbot123.de`.
 
+## Checks
+
+```bash
+pnpm checks   # lint + typecheck + web build
+```
+
+UI tokens and component rules: [`docs/UI_STYLEGUIDE.md`](./docs/UI_STYLEGUIDE.md). Agent map: [`AGENTS.md`](./AGENTS.md).
+
 ## Tests
 
 ```bash
@@ -86,6 +94,7 @@ scripts/           backup/restore
 
 ## Recent changes
 
+- **2026-11-03** — CRM (Kunden), Produkte, Projekte/Tasks, Labels/Tags, Styleguide + Create-Post flow; migrations `0002`–`0010`; Dark-Ops CRM UI
 - **2026-11-01** — Shell IA: Marketing (Hub/Organic/Paid/Custom/Persona/SEO/GEO) + Tools; Marketing Hub default landing; no Website dept ([docs/ROUTING.md](./docs/ROUTING.md))
 - **2026-11-01** — Topbar company switcher restored (legacy-style dropdown); sidebar Companies nav removed; `/` + post-login land on `bu2_last_company`; create-first when empty
 - **2026-11-01** — Topbar chips sharper (`--radius-sm`)

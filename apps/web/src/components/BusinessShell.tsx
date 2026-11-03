@@ -74,7 +74,7 @@ export function BusinessShell({
   const topItems: RailItem[] = useMemo(() => {
     if (!routes) return []
     const items: RailItem[] = []
-    // Order: Marketing → Product → Customer (Katalog is nested under Product)
+    // Order: Marketing → Product → Customer
     if (canSeeNavTab(tabs, 'overview') || canSeeNavTab(tabs, 'home') || canSeeNavTab(tabs, 'instagram')) {
       items.push({
         key: 'marketing',
@@ -84,7 +84,6 @@ export function BusinessShell({
         dataIc: 'marketing',
       })
     }
-    // Product rail highlights for /product/* (Katalog + CMB); catalog/cmb entitlement still unlocks Product
     if (canSeeNavTab(tabs, 'product') || canSeeNavTab(tabs, 'catalog') || canSeeNavTab(tabs, 'cmb')) {
       items.push({
         key: 'product',

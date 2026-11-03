@@ -4,12 +4,13 @@ import {
   ConfirmMutationSchema,
   SocialMasterDraftSchema,
   SocialNetworkSchema,
+  StyleguidePutSchema,
   canMutateContent,
   canSendMail,
 } from '@bu2/shared'
 import { z } from 'zod'
 import { db } from '../../db/client.js'
-import { brevoCampaigns, socialDrafts } from '../../db/schema.js'
+import { brevoCampaigns, businesses, socialDrafts } from '../../db/schema.js'
 import { loadMembership, requireUser } from '../../plugins/auth.js'
 import { getBusinessSecret } from '../../lib/secrets.js'
 import { writeAudit } from '../../lib/audit.js'
@@ -332,5 +333,47 @@ export async function marketingRoutes(app: FastifyInstance) {
       meta: { createMode, sendMode: sent.mode, detail: sent.detail },
     })
     return { ok: sent.ok, mode: sent.mode, remoteId, status }
+  })
+
+  /** Brand styleguide document for Marketing → Styleguide. */
+  app.get('/api/b/:slug/styleguide', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug } = req.params as { slug: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m && !user.isSuperadmin) return reply.code(404).send({ error: 'not_found' })
+    const rows = await db.select().from(businesses).where(eq(businesses.slug, slug)).limit(1)
+    const biz = rows[0]
+    if (!biz) return reply.code(404).send({ error: 'not_found' })
+    return {
+      business: { name: biz.name, logoPath: biz.logoPath },
+      styleguide: (biz.styleguide || {}) as Record<string, unknown>,
+      canEdit: m ? canMutateContent(m.role) : Boolean(user.isSuperadmin),
+    }
+  })
+
+  app.put('/api/b/:slug/styleguide', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug } = req.params as { slug: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    const body = StyleguidePutSchema.parse(req.body)
+    const [row] = await db
+      .update(businesses)
+      .set({ styleguide: body, updatedAt: new Date() })
+      .where(eq(businesses.id, m.businessId))
+      .returning({
+        styleguide: businesses.styleguide,
+        name: businesses.name,
+        logoPath: businesses.logoPath,
+      })
+    await writeAudit({
+      businessId: m.businessId,
+      actorUserId: user.id,
+      action: 'styleguide.updated',
+    })
+    return {
+      business: { name: row!.name, logoPath: row!.logoPath },
+      styleguide: (row!.styleguide || {}) as Record<string, unknown>,
+    }
   })
 }

@@ -10,12 +10,16 @@ import { registerAuth } from './plugins/auth.js'
 import { authRoutes } from './modules/auth/routes.js'
 import { businessRoutes } from './modules/business/routes.js'
 import { catalogRoutes } from './modules/catalog/routes.js'
+import { productRoutes } from './modules/products/routes.js'
+import { customerRoutes } from './modules/customers/routes.js'
+import { projectRoutes } from './modules/projects/routes.js'
 import { settingsRoutes } from './modules/settings/routes.js'
 import { marketingRoutes } from './modules/marketing/routes.js'
 import { adsRoutes } from './modules/ads/routes.js'
 import { cmbRoutes } from './modules/cmb/routes.js'
 import { checkmapRoutes } from './modules/checkmap/routes.js'
 import { personasRoutes } from './modules/personas/routes.js'
+import { tagsRoutes } from './modules/tags/routes.js'
 import { sortanizeRoutes } from './modules/sortanize/routes.js'
 import { openseoRoutes } from './modules/openseo/routes.js'
 import { adminRoutes } from './modules/admin/routes.js'
@@ -53,12 +57,16 @@ async function main() {
   await authRoutes(app)
   await businessRoutes(app)
   await catalogRoutes(app)
+  await productRoutes(app)
+  await customerRoutes(app)
+  await projectRoutes(app)
   await settingsRoutes(app)
   await marketingRoutes(app)
   await adsRoutes(app)
   await cmbRoutes(app)
   await checkmapRoutes(app)
   await personasRoutes(app)
+  await tagsRoutes(app)
   await sortanizeRoutes(app)
   await openseoRoutes(app)
   await adminRoutes(app)

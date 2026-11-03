@@ -1,6 +1,6 @@
 /**
- * FunnelConnectHint — soft warning banner above funnel tables.
- * Never replaces the main surface; CTA opens Settings → Verbindungen.
+ * FunnelConnectHint — soft warning banner for funnel empty states.
+ * Renders inside the empty table row; CTA opens Settings → Verbindungen.
  * Location: apps/web/src/features/marketing/FunnelConnectHint.tsx
  */
 import { WarningCircle } from '@phosphor-icons/react'

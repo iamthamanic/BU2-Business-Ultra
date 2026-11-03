@@ -1,38 +1,29 @@
 /**
  * OrganicProductionPanel — Produktion tab: calendar driven by Zeitraum filter.
- * Shows every month spanned by the selected range; days in-range are highlighted.
+ * Shows every month spanned by the selected range side-by-side; days in-range are highlighted.
  * Location: apps/web/src/features/marketing/OrganicProductionPanel.tsx
  */
 import { useMemo, useState } from 'react'
 import { Plus, SquaresFour, Storefront } from '@phosphor-icons/react'
+import { CreatePostModal } from '../../components/CreatePostModal'
 import { FunnelDateRangePicker } from '../../components/FunnelDateRangePicker'
 import { FunnelTip } from '../../components/FunnelTip'
 import { useI18n } from '../../lib/i18n'
 import { formatIsoDate } from '../../lib/funnelExport'
 import {
   defaultDateRange,
+  formatDisplayRange,
   ORGANIC_PRESETS,
   type DateRangeValue,
 } from '../../lib/dateRange'
 import type { OrganicPost } from './OrganicPostsPanel'
 
-type DraftRow = {
-  id: string
-  title?: string | null
-  remoteStatus?: unknown
-}
-
 type WindowKey = '24h' | '7d' | '30d' | 'all'
 
 type Props = {
   posts?: OrganicPost[]
-  drafts: DraftRow[]
-  contentReady: boolean
   initialWindow?: WindowKey
   onWindowChange?: (w: WindowKey) => void
-  onCreateDraft: (title: string, text: string) => void | Promise<void>
-  onSchedule: (id: string) => void | Promise<void>
-  onRetry: (id: string) => void | Promise<void>
 }
 
 type CalCell = {
@@ -104,21 +95,17 @@ function buildMonthCells(
 
 export function OrganicProductionPanel({
   posts = [],
-  drafts,
-  contentReady,
   initialWindow = '30d',
   onWindowChange,
-  onCreateDraft,
-  onSchedule,
-  onRetry,
 }: Props) {
   const { t, locale } = useI18n()
   const [range, setRange] = useState<DateRangeValue>(() => defaultDateRange(initialWindow))
+  const [draftRange, setDraftRange] = useState<DateRangeValue | null>(null)
   const [brand, setBrand] = useState('__all__')
   const [postType, setPostType] = useState('__all__')
-  const [title, setTitle] = useState('')
-  const [text, setText] = useState('')
   const [composerOpen, setComposerOpen] = useState(false)
+
+  const activeRange = draftRange ?? range
 
   const types = useMemo(() => {
     const set = new Set(posts.map((p) => p.type).filter(Boolean))
@@ -127,6 +114,7 @@ export function OrganicProductionPanel({
 
   function onRangeChange(next: DateRangeValue) {
     setRange(next)
+    setDraftRange(null)
     if (next.preset === '24h' || next.preset === '7d' || next.preset === '30d' || next.preset === 'all') {
       onWindowChange?.(next.preset)
     } else {
@@ -137,8 +125,8 @@ export function OrganicProductionPanel({
   const todayIso = formatIsoDate(new Date())
 
   const boundRange = useMemo(() => {
-    let from = parseIsoDay(range.from)
-    let to = parseIsoDay(range.to)
+    let from = parseIsoDay(activeRange.from)
+    let to = parseIsoDay(activeRange.to)
     if (!from || !to) {
       const postDates = posts
         .map((p) => p.date?.slice(0, 10))
@@ -168,7 +156,7 @@ export function OrganicProductionPanel({
       fromDate: from,
       toDate: to,
     }
-  }, [range.from, range.to, posts])
+  }, [activeRange.from, activeRange.to, posts])
 
   const monthBlocks = useMemo(() => {
     const months = monthsBetween(boundRange.fromDate, boundRange.toDate)
@@ -193,25 +181,17 @@ export function OrganicProductionPanel({
       ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
       : ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 
-  const monthSpanCount = useMemo(() => {
-    let n = 0
-    let cur = startOfMonth(boundRange.fromDate)
-    const end = startOfMonth(boundRange.toDate)
-    while (cur.getTime() <= end.getTime()) {
-      n++
-      cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1)
-      if (n > MAX_MONTHS + 1) break
-    }
-    return n
-  }, [boundRange.fromDate, boundRange.toDate])
-  const truncated = monthSpanCount > MAX_MONTHS
-
-  async function saveDraft() {
-    await onCreateDraft(title, text)
-    setTitle('')
-    setText('')
-    setComposerOpen(false)
-  }
+  const monthSpanCount = monthBlocks.length
+  const truncated =
+    monthSpanCount >= MAX_MONTHS &&
+    (() => {
+      const end = startOfMonth(boundRange.toDate)
+      const last = monthBlocks[monthBlocks.length - 1]
+      if (!last) return false
+      const [y, m] = last.key.split('-').map(Number)
+      const lastMonth = new Date(y!, m!, 1)
+      return lastMonth.getTime() < end.getTime()
+    })()
 
   return (
     <div className="stack organic-production-panel">
@@ -219,6 +199,7 @@ export function OrganicProductionPanel({
         <FunnelDateRangePicker
           value={range}
           onChange={onRangeChange}
+          onDraftChange={setDraftRange}
           presets={ORGANIC_PRESETS}
           dates={posts.map((p) => p.date)}
         />
@@ -274,13 +255,26 @@ export function OrganicProductionPanel({
         </button>
       </div>
 
-      <p className="muted prod-lede">{t('prodLede')}</p>
+      <div className="prod-range-meta">
+        <strong className="prod-range-meta-count">
+          {monthSpanCount === 1
+            ? t('prodMonthsOne')
+            : t('prodMonthsMany').replace('{n}', String(monthSpanCount))}
+        </strong>
+        <span className="prod-range-meta-sep" aria-hidden>
+          ·
+        </span>
+        <span className="muted prod-range-meta-dates">
+          {formatDisplayRange(boundRange.from, boundRange.to)}
+        </span>
+        {truncated ? <span className="muted prod-range-cap">{t('prodMonthsCap')}</span> : null}
+      </div>
 
-      {truncated ? (
-        <p className="muted prod-range-cap">{t('prodMonthsCap')}</p>
-      ) : null}
-
-      <div className="prod-calendars" aria-label={t('prodCalendar')}>
+      <div
+        className="prod-calendars"
+        data-months={Math.min(monthSpanCount, 4)}
+        aria-label={t('prodCalendar')}
+      >
         {monthBlocks.map((block) => (
           <div key={block.key} className="prod-calendar panel">
             <h3 className="prod-month-heading">{block.label}</h3>
@@ -293,9 +287,8 @@ export function OrganicProductionPanel({
             </div>
             <div className="prod-cal-body" role="grid">
               {block.cells.map((cell, i) => (
-                <button
+                <div
                   key={i}
-                  type="button"
                   role="gridcell"
                   className={[
                     'prod-cal-cell',
@@ -305,96 +298,17 @@ export function OrganicProductionPanel({
                   ]
                     .filter(Boolean)
                     .join(' ')}
-                  disabled={cell.day == null || !cell.inRange}
                   aria-disabled={cell.day == null || !cell.inRange}
-                  onClick={() => {
-                    if (cell.inRange) setComposerOpen(true)
-                  }}
                 >
                   {cell.day != null ? <span className="prod-cal-day">{cell.day}</span> : null}
-                </button>
+                </div>
               ))}
             </div>
           </div>
         ))}
       </div>
 
-      {composerOpen ? (
-        <div className="panel prod-composer stack">
-          <div className="prod-composer-head">
-            <strong>{t('composeDrafts')}</strong>
-            <button type="button" className="btn ghost" onClick={() => setComposerOpen(false)}>
-              {t('dateRangeCancel')}
-            </button>
-          </div>
-          <input
-            className="input"
-            placeholder={t('draftTitlePh')}
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-          <textarea
-            className="textarea"
-            placeholder={t('draftTextPh')}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-          />
-          <div className="row" style={{ gap: 8 }}>
-            <button className="btn primary" type="button" onClick={() => void saveDraft()}>
-              {t('saveDraft')}
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="panel stack" style={{ gap: 12 }}>
-        <strong>{t('draftsList')}</strong>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>{t('name')}</th>
-              <th>Remote</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {drafts.length === 0 ? (
-              <tr>
-                <td colSpan={3} className="funnel-table-empty muted">
-                  {t('funnelEmpty')}
-                </td>
-              </tr>
-            ) : (
-              drafts.map((d) => (
-                <tr key={d.id}>
-                  <td>{d.title}</td>
-                  <td className="kpi" style={{ maxWidth: 280, overflow: 'hidden' }}>
-                    {JSON.stringify(d.remoteStatus ?? {})}
-                  </td>
-                  <td className="row">
-                    <button
-                      className="btn"
-                      type="button"
-                      disabled={!contentReady}
-                      onClick={() => void onSchedule(d.id)}
-                    >
-                      {t('schedule')}
-                    </button>
-                    <button
-                      className="btn"
-                      type="button"
-                      disabled={!contentReady}
-                      onClick={() => void onRetry(d.id)}
-                    >
-                      {t('retry')}
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <CreatePostModal open={composerOpen} onClose={() => setComposerOpen(false)} />
     </div>
   )
 }

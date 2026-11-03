@@ -80,8 +80,9 @@ export function resolveCompareRange(
 }
 
 export function isValidRange(from: string, to: string): boolean {
-  if (!from || !to || from.length < 10 || to.length < 10) return false
+  if (!from || !to) return false
   if (from === 'all' || to === 'all') return true
+  if (from.length < 10 || to.length < 10) return false
   return from <= to
 }
 

@@ -6,6 +6,7 @@
  */
 import type { Icon } from '@phosphor-icons/react'
 import {
+  BookOpen,
   Browser,
   CurrencyCircleDollar,
   EnvelopeSimple,
@@ -28,10 +29,11 @@ import {
   YoutubeLogo,
 } from '@phosphor-icons/react'
 
-/** L1: Funnel | Persona Journey */
+/** L1: Funnel | Persona Journey | Styleguide */
 export const MKT_L1_ICONS = {
   funnel: Funnel,
   personas: Path,
+  styleguide: BookOpen,
 } as const satisfies Record<string, Icon>
 
 /** L2: Organic | Paid | Custom */

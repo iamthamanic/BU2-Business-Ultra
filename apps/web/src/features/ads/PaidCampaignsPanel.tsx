@@ -3,7 +3,7 @@
  * Always renders full structure; empty body when no rows / not connected.
  * Location: apps/web/src/features/ads/PaidCampaignsPanel.tsx
  */
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import type { Icon } from '@phosphor-icons/react'
 import {
   ChartLineUp,
@@ -58,6 +58,8 @@ type Props = {
   channel: string
   campaigns: PaidCampaignRow[]
   emptyHint: string
+  /** Prefer over emptyHint when set (e.g. FunnelConnectHint in the empty row). */
+  emptyContent?: ReactNode
   initialWindow?: WindowKey
   onWindowChange?: (w: WindowKey) => void
 }
@@ -66,6 +68,7 @@ export function PaidCampaignsPanel({
   channel,
   campaigns,
   emptyHint,
+  emptyContent,
   initialWindow = '30d',
   onWindowChange,
 }: Props) {
@@ -323,7 +326,7 @@ export function PaidCampaignsPanel({
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={cols.length} className="funnel-table-empty muted">
-                  {emptyHint}
+                  {emptyContent ?? emptyHint}
                 </td>
               </tr>
             ) : (

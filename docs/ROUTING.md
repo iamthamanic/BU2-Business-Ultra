@@ -18,7 +18,8 @@ Admin stays **global** (no company prefix): `/admin`. Auth: `/login`, `/login/ve
 |---|---|
 | **Marketing** | Hub · Organic (channels) · Paid (channels) · Custom (channels) · Persona Journey · SEO · GEO |
 | **Product** | Katalog (default) · CostMyBusiness |
-| **Customer** | _(stub)_ |
+| **Customer** | Kunden list + detail tabs |
+| **Projects** | Overview · Mine · Recurring · Detail |
 | **Tools** | Sortanize · CheckMap |
 | Footer | Einstellungen · language · logout |
 | Topbar | Company switcher (unchanged) |
@@ -44,6 +45,8 @@ SEO/GEO stay under Marketing in the sidebar; URLs remain `/tools/seo` and `/tool
 | OpenSEO / SEO | `/co/:slug/tools/seo` | same | Marketing dept (nav) |
 | GEO | `/co/:slug/tools/geo` | same page family as SEO | Marketing dept; AI Visibility surface |
 | Catalog / Katalog | _(none)_ | `/co/:slug/product/katalog` | Under Product; `/catalog` + `/katalog` redirect here |
+| Kunden | — | `/co/:slug/customer`, `/co/:slug/customer/:id` | CRM list + 5 tabs |
+| Projekte | — | `/co/:slug/projects`, `/mine`, `/recurring`, `/:id` | Area/custom + tasks/board |
 | Settings / keys | _(in-admin / overlays)_ | `/co/:slug/settings` (+ `#connections`) | Footer |
 | Comments | `/comments` → overview | → marketing hub | |
 | Short `/ads` | → paid/google | redirect under `/co` | |

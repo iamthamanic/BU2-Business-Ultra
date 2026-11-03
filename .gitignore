@@ -10,6 +10,8 @@ build/
 !.env.example
 uploads/**
 !uploads/.gitkeep
+apps/api/uploads/
+apps/api/scripts/check-pass.ts
 .DS_Store
 coverage/
 *.tsbuildinfo

@@ -12,6 +12,7 @@ import { businesses, invites, memberships, socialDrafts, users } from '../../db/
 import { hashToken, randomToken } from '../../lib/crypto.js'
 import { writeAudit } from '../../lib/audit.js'
 import { loadMembership, requireRole, requireUser } from '../../plugins/auth.js'
+import { seedDefaultAreaProjects } from '../projects/defaultAreas.js'
 
 export async function businessRoutes(app: FastifyInstance) {
   app.get('/api/businesses', async (req, reply) => {
@@ -63,6 +64,7 @@ export async function businessRoutes(app: FastifyInstance) {
       userId: user.id,
       role: 'owner',
     })
+    await seedDefaultAreaProjects(biz!.id, user.id)
     await writeAudit({
       businessId: biz!.id,
       actorUserId: user.id,

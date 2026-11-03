@@ -15,15 +15,18 @@ import { LoginPage } from '../features/auth/LoginPage'
 import { VerifyPage } from '../features/auth/VerifyPage'
 import { HomePage } from '../features/business/HomePage'
 import { BusinessShell } from '../components/BusinessShell'
-import { CatalogPage } from '../features/catalog/CatalogPage'
 import { ProductShell } from '../features/product/ProductShell'
-import { CustomerPage } from '../features/customer/CustomerPage'
-import { ProjectsPage } from '../features/projects/ProjectsPage'
+import { CustomerShell } from '../features/customer/CustomerShell'
+import { CustomerDetail } from '../features/customer/CustomerDetail'
+import { ProjectsShell } from '../features/projects/ProjectsShell'
+import { ProjectDetail } from '../features/projects/ProjectDetail'
+import { MyTasksPage } from '../features/projects/MyTasksPage'
+import { RecurringRulesPage } from '../features/projects/RecurringRulesPage'
 import { MarketingShell } from '../features/marketing/MarketingShell'
 import { MarketingPage } from '../features/marketing/MarketingPage'
 import { AdsPage } from '../features/ads/AdsPage'
-import { CmbPage } from '../features/cmb/CmbPage'
 import { CheckMapPage } from '../features/checkmap/CheckMapPage'
+import { StyleguidePage } from '../features/marketing/StyleguidePage'
 import { PersonasPage } from '../features/personas/PersonasPage'
 import { SortanizePage } from '../features/sortanize/SortanizePage'
 import { OpenSeoPage } from '../features/openseo/OpenSeoPage'
@@ -110,19 +113,23 @@ export function App() {
       <Route path="/co/:slug" element={authedShell}>
         {/* Default company landing = Marketing */}
         <Route index element={<CoRedirect to="marketing" />} />
-        {/* Katalog lives under Product; keep old bookmarks alive */}
-        <Route path="catalog" element={<CoRedirect to="product/katalog" />} />
-        <Route path="katalog" element={<CoRedirect to="product/katalog" />} />
-        <Route path="product" element={<ProductShell />}>
-          <Route index element={<Navigate to="katalog" replace />} />
-          <Route path="katalog" element={<CatalogPage />} />
-          <Route path="catalog" element={<CoRedirect to="product/katalog" />} />
-          <Route path="costmybusiness/*" element={<CmbPage />} />
-          <Route path="costmybusiness" element={<CmbPage />} />
-          <Route path="cmb" element={<CoRedirect to="product/costmybusiness" />} />
+        {/* Product placeholder — Katalog/CMB chrome deferred; bookmarks land on Product */}
+        <Route path="catalog" element={<CoRedirect to="product" />} />
+        <Route path="katalog" element={<CoRedirect to="product" />} />
+        <Route path="product" element={<ProductShell />} />
+        <Route path="product/katalog" element={<CoRedirect to="product" />} />
+        <Route path="product/catalog" element={<CoRedirect to="product" />} />
+        <Route path="product/costmybusiness/*" element={<CoRedirect to="product" />} />
+        <Route path="product/costmybusiness" element={<CoRedirect to="product" />} />
+        <Route path="product/cmb" element={<CoRedirect to="product" />} />
+        <Route path="customer" element={<CustomerShell />}>
+          <Route path=":id" element={<CustomerDetail />} />
         </Route>
-        <Route path="customer" element={<CustomerPage />} />
-        <Route path="projects" element={<ProjectsPage />} />
+        <Route path="projects" element={<ProjectsShell />}>
+          <Route path="mine" element={<MyTasksPage />} />
+          <Route path="recurring" element={<RecurringRulesPage />} />
+          <Route path=":id" element={<ProjectDetail />} />
+        </Route>
 
         <Route path="marketing" element={<MarketingShell />}>
           <Route
@@ -130,7 +137,9 @@ export function App() {
             element={<Navigate to={`funnel/organic/${DEFAULT_ORGANIC_CHANNEL}`} replace />}
           />
           <Route path="personas" element={<PersonasPage />} />
+          <Route path="styleguide" element={<StyleguidePage />} />
           <Route path="funnel/organic/website" element={<OpenSeoPage />} />
+          <Route path="funnel/organic/planung" element={<MarketingPage />} />
           <Route path="funnel/organic/:channel" element={<MarketingPage />} />
           <Route
             path="funnel/organic"
@@ -138,12 +147,13 @@ export function App() {
           />
           <Route path="funnel/custom/:channel" element={<MarketingPage />} />
           <Route path="funnel/custom" element={<Navigate to="email" replace />} />
+          <Route path="funnel/paid/planung" element={<AdsPage />} />
           <Route path="funnel/paid/:channel" element={<AdsPage />} />
           <Route path="funnel/paid" element={<Navigate to={DEFAULT_PAID_CHANNEL} replace />} />
         </Route>
 
-        <Route path="tools/cmb/*" element={<CoRedirect to="product/costmybusiness" />} />
-        <Route path="tools/cmb" element={<CoRedirect to="product/costmybusiness" />} />
+        <Route path="tools/cmb/*" element={<CoRedirect to="product" />} />
+        <Route path="tools/cmb" element={<CoRedirect to="product" />} />
         <Route path="tools/sortanize/*" element={<SortanizePage />} />
         <Route path="tools/sortanize" element={<SortanizePage />} />
         <Route path="tools/checkmap/m/:mapId" element={<CheckMapPage />} />

@@ -14,6 +14,7 @@
     "build": "pnpm -r --filter @bu2/shared --filter @bu2/finance-calc --filter @bu2/api --filter @bu2/web build",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
+    "checks": "scripts/run-checks.sh",
     "test": "pnpm -r --filter @bu2/finance-calc --filter @bu2/shared --filter @bu2/api test",
     "test:e2e": "pnpm --filter @bu2/e2e test:core",
     "db:generate": "pnpm --filter @bu2/api db:generate",

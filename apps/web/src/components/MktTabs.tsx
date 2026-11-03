@@ -1,8 +1,8 @@
 /**
- * MktTabs — unified Marketing Dark-Ops tab chrome for all hierarchy levels.
- * One segmented metaphor; size/weight/spacing only. Optional Phosphor icons
- * (decorative, aria-hidden) beside text labels. Used by MarketingShell + OpenSeo.
- * Location: apps/web/src/components/MktTabs.tsx
+ * MktTabs — canonical Dark-Ops tab chrome for EVERY tab strip in the app
+ * (Marketing, Settings, CRM detail, scope pickers). One segmented metaphor;
+ * size/weight/spacing only via level. Optional Phosphor icons (decorative).
+ * See docs/UI_STYLEGUIDE.md § Tablists. Location: apps/web/src/components/MktTabs.tsx
  */
 import type { Icon } from '@phosphor-icons/react'
 import type { ReactNode } from 'react'

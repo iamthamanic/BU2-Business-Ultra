@@ -1,0 +1,70 @@
+# Project config for verify-ui and agent pipeline
+# Filled by /project-setup (audit)
+
+name: business-ultra
+
+appRoot: apps/web
+
+devCommand: pnpm dev
+devUrl: http://127.0.0.1:8741
+
+checksCommand: pnpm run checks
+e2eCommand: pnpm test:e2e
+
+styleguide: docs/UI_STYLEGUIDE.md
+designDir: .qa/design
+acceptanceDir: .qa/acceptance
+evidenceDir: .qa/evidence
+
+locale: de
+
+adaptiveUi:
+  contract: null
+  profile: workstation-first
+
+security:
+  checklist: secure-by-default
+  launchChecklist: recommended
+
+typedStrict:
+  languages:
+    - typescript
+    - python
+
+testGate:
+  profile: monorepo
+  depthDefault: standard
+  runner: scripts
+  always:
+    - typedStrict
+    - secureByDefault
+    - rgSecretsDiff
+  never:
+    - aiReview
+    - explanationCheck
+    - fallow
+    - updateReadme
+    - mutation
+
+issueContract:
+  template: global
+  labels: [P0, P1, P2, needs-design]
+  maxAcceptanceBullets: 5
+  runtimeAxes: []
+  securitySection: true
+  locale: de
+
+viewports:
+  - name: mobile
+    width: 390
+    height: 844
+  - name: desktop
+    width: 1280
+    height: 720
+
+navigation:
+  - Marketing
+  - Produkt
+  - Kunden
+  - Projekte
+  - Einstellungen

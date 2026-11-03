@@ -40,7 +40,11 @@ export type OrganicTab = (typeof ORGANIC_TABS)[number]
 export type PaidChannel = (typeof PAID_CHANNELS)[number]
 export type CustomChannel = (typeof CUSTOM_CHANNELS)[number]
 export type FunnelKind = 'organic' | 'paid' | 'custom'
-export type MarketingTopTab = 'funnel' | 'personas'
+export type MarketingTopTab = 'funnel' | 'personas' | 'styleguide'
+/** Organic/Paid surface under funnel — Analyse shows channels; Planung is calendar-only. */
+export type FunnelSurface = 'analyse' | 'planung'
+
+export const FUNNEL_PLANUNG_SEGMENT = 'planung'
 
 /** Build `/co/:slug` base (no trailing slash). */
 export function companyBase(slug: string) {
@@ -55,20 +59,27 @@ export function companyRoutes(slug: string) {
     hub: `${base}/marketing`,
     /** Alias kept for older call sites; same as hub */
     overview: `${base}/marketing`,
-    /** Katalog nested under Product (canonical) */
-    catalog: `${base}/product/katalog`,
+    /** Katalog bookmarks resolve to Product placeholder for now */
+    catalog: `${base}/product`,
     marketing: `${base}/marketing`,
     product: `${base}/product`,
     customer: `${base}/customer`,
+    customerDetail: (id: string) => `${base}/customer/${encodeURIComponent(id)}`,
     projects: `${base}/projects`,
+    projectsMine: `${base}/projects/mine`,
+    projectsRecurring: `${base}/projects/recurring`,
+    projectDetail: (id: string) => `${base}/projects/${encodeURIComponent(id)}`,
     marketingPersonas: `${base}/marketing/personas`,
+    marketingStyleguide: `${base}/marketing/styleguide`,
     organic: (ch: string) => `${base}/marketing/funnel/organic/${ch}`,
+    organicPlanung: `${base}/marketing/funnel/organic/${FUNNEL_PLANUNG_SEGMENT}`,
     ads: `${base}/marketing/funnel/paid/${DEFAULT_PAID_CHANNEL}`,
     paid: (ch: string) => `${base}/marketing/funnel/paid/${ch}`,
+    paidPlanung: `${base}/marketing/funnel/paid/${FUNNEL_PLANUNG_SEGMENT}`,
     custom: `${base}/marketing/funnel/custom/${DEFAULT_CUSTOM_CHANNEL}`,
     customCh: (ch: string) => `${base}/marketing/funnel/custom/${ch}`,
-    /** CostMyBusiness nested under Product (canonical) */
-    cmb: `${base}/product/costmybusiness`,
+    /** CMB bookmarks resolve to Product placeholder for now */
+    cmb: `${base}/product`,
     sortanize: `${base}/tools/sortanize`,
     checkmap: `${base}/tools/checkmap`,
     /** Persona Journey lives under Marketing tabs */
@@ -78,43 +89,89 @@ export function companyRoutes(slug: string) {
     geo: `${base}/marketing/funnel/organic/website?surface=geo`,
     settings: `${base}/settings`,
     settingsConnections: `${base}/settings#connections`,
+    settingsLabels: `${base}/settings#labels`,
+    /** @deprecated use settingsLabels */
+    settingsTags: `${base}/settings#labels`,
   } as const
 }
 
 /**
  * Parse `/co/:slug/marketing/...` into tab state for MarketingShell.
+ * Organic/Paid: `.../planung` → surface planung; otherwise analyse + channel.
  */
 export function parseMarketingLocation(pathname: string): {
   top: MarketingTopTab
   funnel: FunnelKind
   channel: string
+  surface: FunnelSurface
 } {
   const m = pathname.match(/\/co\/[^/]+\/marketing(?:\/(.*))?$/)
   const rest = (m?.[1] || '').replace(/\/+$/, '')
   if (!rest || rest === '') {
-    return { top: 'funnel', funnel: 'organic', channel: DEFAULT_ORGANIC_CHANNEL }
+    return {
+      top: 'funnel',
+      funnel: 'organic',
+      channel: DEFAULT_ORGANIC_CHANNEL,
+      surface: 'analyse',
+    }
   }
   if (rest === 'personas' || rest.startsWith('personas/')) {
-    return { top: 'personas', funnel: 'organic', channel: DEFAULT_ORGANIC_CHANNEL }
+    return {
+      top: 'personas',
+      funnel: 'organic',
+      channel: DEFAULT_ORGANIC_CHANNEL,
+      surface: 'analyse',
+    }
+  }
+  if (rest === 'styleguide' || rest.startsWith('styleguide/')) {
+    return {
+      top: 'styleguide',
+      funnel: 'organic',
+      channel: DEFAULT_ORGANIC_CHANNEL,
+      surface: 'analyse',
+    }
   }
   const parts = rest.split('/')
   if (parts[0] === 'funnel' && parts[1] && parts[2]) {
     const funnel = parts[1] as FunnelKind
     if (funnel === 'organic' || funnel === 'paid' || funnel === 'custom') {
-      return { top: 'funnel', funnel, channel: parts[2].toLowerCase() }
+      const seg = parts[2].toLowerCase()
+      if ((funnel === 'organic' || funnel === 'paid') && seg === FUNNEL_PLANUNG_SEGMENT) {
+        return {
+          top: 'funnel',
+          funnel,
+          channel: funnel === 'paid' ? DEFAULT_PAID_CHANNEL : DEFAULT_ORGANIC_CHANNEL,
+          surface: 'planung',
+        }
+      }
+      return { top: 'funnel', funnel, channel: seg, surface: 'analyse' }
     }
   }
-  return { top: 'funnel', funnel: 'organic', channel: DEFAULT_ORGANIC_CHANNEL }
+  return {
+    top: 'funnel',
+    funnel: 'organic',
+    channel: DEFAULT_ORGANIC_CHANNEL,
+    surface: 'analyse',
+  }
 }
 
 /** Build path for a Marketing tab selection. */
 export function marketingPath(
   slug: string,
-  sel: { top: MarketingTopTab; funnel?: FunnelKind; channel?: string },
+  sel: {
+    top: MarketingTopTab
+    funnel?: FunnelKind
+    channel?: string
+    surface?: FunnelSurface
+  },
 ): string {
   const routes = companyRoutes(slug)
   if (sel.top === 'personas') return routes.marketingPersonas
+  if (sel.top === 'styleguide') return routes.marketingStyleguide
   const funnel = sel.funnel ?? 'organic'
+  if (sel.surface === 'planung' && (funnel === 'organic' || funnel === 'paid')) {
+    return funnel === 'paid' ? routes.paidPlanung : routes.organicPlanung
+  }
   const channel =
     sel.channel ??
     (funnel === 'paid'
