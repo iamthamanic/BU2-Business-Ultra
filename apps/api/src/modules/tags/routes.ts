@@ -12,7 +12,7 @@ import {
   type BusinessLabelScope,
 } from '@bu2/shared'
 import { db } from '../../db/client.js'
-import { businessTags, customers } from '../../db/schema.js'
+import { businessTags, customers, users } from '../../db/schema.js'
 import { loadMembership, requireUser } from '../../plugins/auth.js'
 
 function normalizeName(name: string): string {
@@ -22,6 +22,23 @@ function normalizeName(name: string): string {
 function parseScope(raw: unknown): BusinessLabelScope {
   const parsed = BusinessLabelScopeSchema.safeParse(raw || 'customer')
   return parsed.success ? parsed.data : 'customer'
+}
+
+function toLabel(
+  row: typeof businessTags.$inferSelect,
+  createdByDisplayName: string | null = null,
+) {
+  return {
+    id: row.id,
+    businessId: row.businessId,
+    scope: row.scope,
+    name: row.name,
+    color: row.color,
+    description: row.description || '',
+    createdByUserId: row.createdByUserId,
+    createdByDisplayName: createdByDisplayName?.trim() || null,
+    createdAt: row.createdAt,
+  }
 }
 
 async function findByName(businessId: string, scope: BusinessLabelScope, name: string) {
@@ -68,15 +85,20 @@ export async function tagsRoutes(app: FastifyInstance) {
     const q = (req.query as { scope?: string }) || {}
     const scope = q.scope ? parseScope(q.scope) : null
     const rows = await db
-      .select()
+      .select({
+        label: businessTags,
+        createdByDisplayName: users.displayName,
+      })
       .from(businessTags)
+      .leftJoin(users, eq(users.id, businessTags.createdByUserId))
       .where(
         scope
           ? and(eq(businessTags.businessId, m.businessId), eq(businessTags.scope, scope))
           : eq(businessTags.businessId, m.businessId),
       )
       .orderBy(asc(businessTags.scope), asc(businessTags.name))
-    return { labels: rows, tags: rows }
+    const labels = rows.map((r) => toLabel(r.label, r.createdByDisplayName))
+    return { labels, tags: labels }
   }
 
   async function createLabel(req: FastifyRequest, reply: FastifyReply) {
@@ -88,8 +110,9 @@ export async function tagsRoutes(app: FastifyInstance) {
     const scope = body.scope
     const name = normalizeName(body.name)
     if (!name) return reply.code(400).send({ error: 'invalid_name' })
+    const description = (body.description || '').trim()
     const existing = await findByName(m.businessId, scope, name)
-    if (existing) return reply.code(409).send({ error: 'label_exists', label: existing })
+    if (existing) return reply.code(409).send({ error: 'label_exists', label: toLabel(existing) })
     const [row] = await db
       .insert(businessTags)
       .values({
@@ -97,9 +120,12 @@ export async function tagsRoutes(app: FastifyInstance) {
         scope,
         name,
         color: body.color ?? null,
+        description,
+        createdByUserId: user.id,
       })
       .returning()
-    return reply.code(201).send({ label: row, tag: row })
+    const label = toLabel(row!, user.displayName ?? null)
+    return reply.code(201).send({ label, tag: label })
   }
 
   async function patchLabel(req: FastifyRequest, reply: FastifyReply) {
@@ -122,7 +148,7 @@ export async function tagsRoutes(app: FastifyInstance) {
       if (!nextName) return reply.code(400).send({ error: 'invalid_name' })
       if (nextName.toLowerCase() !== existing.name.toLowerCase()) {
         const clash = await findByName(m.businessId, scope, nextName)
-        if (clash) return reply.code(409).send({ error: 'label_exists', label: clash })
+        if (clash) return reply.code(409).send({ error: 'label_exists', label: toLabel(clash) })
       }
     }
 
@@ -131,6 +157,7 @@ export async function tagsRoutes(app: FastifyInstance) {
       .set({
         ...(body.name !== undefined ? { name: nextName } : {}),
         ...(body.color !== undefined ? { color: body.color } : {}),
+        ...(body.description !== undefined ? { description: body.description.trim() } : {}),
       })
       .where(and(eq(businessTags.id, id), eq(businessTags.businessId, m.businessId)))
       .returning()
@@ -138,7 +165,21 @@ export async function tagsRoutes(app: FastifyInstance) {
     if (scope === 'customer' && nextName !== existing.name) {
       await rewriteCustomerLabels(m.businessId, existing.name, nextName)
     }
-    return { label: row, tag: row }
+
+    let createdByDisplayName: string | null = user.displayName ?? null
+    if (row!.createdByUserId && row!.createdByUserId !== user.id) {
+      const [author] = await db
+        .select({ displayName: users.displayName })
+        .from(users)
+        .where(eq(users.id, row!.createdByUserId))
+        .limit(1)
+      createdByDisplayName = author?.displayName ?? null
+    } else if (!row!.createdByUserId) {
+      createdByDisplayName = null
+    }
+
+    const label = toLabel(row!, createdByDisplayName)
+    return { label, tag: label }
   }
 
   async function deleteLabel(req: FastifyRequest, reply: FastifyReply) {

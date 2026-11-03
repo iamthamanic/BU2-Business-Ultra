@@ -3,6 +3,7 @@
  * Location: apps/web/src/features/customer/CustomerCreateModal.tsx
  */
 import { useState } from 'react'
+import { X } from '@phosphor-icons/react'
 import { useI18n } from '../../lib/i18n'
 
 type Props = {
@@ -10,7 +11,9 @@ type Props = {
   onClose: () => void
   onSave: (body: {
     kind: 'person' | 'org'
-    displayName: string
+    displayName?: string
+    firstName?: string | null
+    lastName?: string | null
     email?: string | null
     phone?: string | null
     relationStatus: 'lead' | 'customer'
@@ -21,6 +24,8 @@ export function CustomerCreateModal({ open, onClose, onSave }: Props) {
   const { t } = useI18n()
   const [kind, setKind] = useState<'person' | 'org'>('person')
   const [displayName, setDisplayName] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [relationStatus, setRelationStatus] = useState<'lead' | 'customer'>('lead')
@@ -31,7 +36,10 @@ export function CustomerCreateModal({ open, onClose, onSave }: Props) {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    if (!displayName.trim()) {
+    const orgName = displayName.trim()
+    const fn = firstName.trim()
+    const ln = lastName.trim()
+    if (kind === 'org' ? !orgName : !fn && !ln) {
       setErr(t('customerErrName'))
       return
     }
@@ -40,16 +48,20 @@ export function CustomerCreateModal({ open, onClose, onSave }: Props) {
     try {
       await onSave({
         kind,
-        displayName: displayName.trim(),
+        displayName: kind === 'org' ? orgName : undefined,
+        firstName: kind === 'person' ? fn || null : null,
+        lastName: kind === 'person' ? ln || null : null,
         email: email.trim() || null,
         phone: phone.trim() || null,
         relationStatus,
       })
       setDisplayName('')
+      setFirstName('')
+      setLastName('')
       setEmail('')
       setPhone('')
-      setKind('person')
       setRelationStatus('lead')
+      setKind('person')
       onClose()
     } catch (ex) {
       setErr((ex as Error).message || t('saveFailed'))
@@ -65,8 +77,15 @@ export function CustomerCreateModal({ open, onClose, onSave }: Props) {
           <h2 className="section-title" style={{ margin: 0, fontSize: '1.1rem' }}>
             {t('customerCreate')}
           </h2>
-          <button type="button" className="btn" onClick={onClose}>
-            {t('cancel')}
+          <button
+            type="button"
+            className="btn icon-btn"
+            onClick={onClose}
+            disabled={saving}
+            aria-label={t('cancel')}
+            title={t('cancel')}
+          >
+            <X size={16} weight="bold" aria-hidden />
           </button>
         </header>
         <div className="crm-modal-body stack">
@@ -81,15 +100,37 @@ export function CustomerCreateModal({ open, onClose, onSave }: Props) {
               <option value="org">{t('customerKindOrg')}</option>
             </select>
           </label>
-          <label className="field">
-            <span className="label">{t('name')}</span>
-            <input
-              className="input"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              autoFocus
-            />
-          </label>
+          {kind === 'person' ? (
+            <div className="bu-modal-row-2">
+              <label className="field">
+                <span className="label">{t('customerFirstName')}</span>
+                <input
+                  className="input"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  autoFocus
+                />
+              </label>
+              <label className="field">
+                <span className="label">{t('customerLastName')}</span>
+                <input
+                  className="input"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                />
+              </label>
+            </div>
+          ) : (
+            <label className="field">
+              <span className="label">{t('customerCompany')}</span>
+              <input
+                className="input"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                autoFocus
+              />
+            </label>
+          )}
           <label className="field">
             <span className="label">{t('email')}</span>
             <input
@@ -121,7 +162,7 @@ export function CustomerCreateModal({ open, onClose, onSave }: Props) {
           {err ? <p className="error">{err}</p> : null}
         </div>
         <footer className="bu-modal-actions">
-          <button type="button" className="btn" onClick={onClose}>
+          <button type="button" className="btn" onClick={onClose} disabled={saving}>
             {t('cancel')}
           </button>
           <button type="submit" className="btn primary" disabled={saving}>

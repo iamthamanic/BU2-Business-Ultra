@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import {
   CreateBusinessSchema,
   InviteSchema,
+  UpdateBusinessSchema,
   canManageMembers,
   resolveEntitledTabs,
   type Role,
@@ -90,6 +91,30 @@ export async function businessRoutes(app: FastifyInstance) {
         }
       : null
     return { business: biz, membership }
+  })
+
+  app.patch('/api/b/:slug', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug } = req.params as { slug: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m || !canManageMembers(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    const body = UpdateBusinessSchema.parse(req.body)
+    const name = body.name.trim().replace(/\s+/g, ' ')
+    if (!name) return reply.code(400).send({ error: 'invalid_name' })
+    const [biz] = await db
+      .update(businesses)
+      .set({ name, updatedAt: new Date() })
+      .where(eq(businesses.id, m.businessId))
+      .returning()
+    if (!biz) return reply.code(404).send({ error: 'not_found' })
+    await writeAudit({
+      businessId: m.businessId,
+      actorUserId: user.id,
+      action: 'business.updated',
+      resourceRef: slug,
+      meta: { name },
+    })
+    return { business: biz }
   })
 
   app.post('/api/b/:slug/invites', async (req, reply) => {

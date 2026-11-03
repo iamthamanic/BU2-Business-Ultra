@@ -12,11 +12,13 @@ import {
   useParams,
 } from 'react-router-dom'
 import {
+  ArrowsClockwise,
   CalendarBlank,
   CheckCircle,
   CirclesThree,
   DotsThree,
   FolderSimpleDashed,
+  ListChecks,
   MagnifyingGlass,
   PlayCircle,
   Plus,
@@ -321,13 +323,35 @@ export function ProjectsShell() {
         </div>
       </header>
 
-      <div className="crm-subnav" role="navigation" aria-label={t('projects')}>
-        <Link className="btn project-mine-cta" to={`${routes.projects}/mine`}>
-          {t('projectsMine')}
-        </Link>
-        <Link className="btn" to={`${routes.projects}/recurring`}>
-          {t('projectsRecurring')}
-        </Link>
+      <div className="crm-subnav project-index-toolbar" role="navigation" aria-label={t('projects')}>
+        <div className="project-index-nav">
+          <Link className="btn project-mine-cta" to={`${routes.projects}/mine`}>
+            <ListChecks size={14} weight="bold" aria-hidden />
+            {t('projectsMine')}
+          </Link>
+          <Link className="btn" to={`${routes.projects}/recurring`}>
+            <ArrowsClockwise size={14} weight="bold" aria-hidden />
+            {t('projectsRecurring')}
+          </Link>
+        </div>
+        {!emptyAll ? (
+          <div className="project-index-filters" role="search">
+            <CrmIconSelect
+              name="projectStatusFilter"
+              value={statusFilter}
+              options={statusFilterOptions}
+              onChange={setStatusFilter}
+              aria-label={t('projectStatus')}
+            />
+            <CrmIconSelect
+              name="projectAreaFilter"
+              value={areaFilter}
+              options={areaFilterOptions}
+              onChange={setAreaFilter}
+              aria-label={t('projectAreas')}
+            />
+          </div>
+        ) : null}
       </div>
 
       {!emptyAll ? (
@@ -351,25 +375,6 @@ export function ProjectsShell() {
             <span className="project-kpi-label">{t('projectsStatDone')}</span>
             <strong className="project-kpi-value">{doneTotal}</strong>
           </div>
-        </div>
-      ) : null}
-
-      {!emptyAll ? (
-        <div className="project-index-filters" role="search">
-          <CrmIconSelect
-            name="projectStatusFilter"
-            value={statusFilter}
-            options={statusFilterOptions}
-            onChange={setStatusFilter}
-            aria-label={t('projectStatus')}
-          />
-          <CrmIconSelect
-            name="projectAreaFilter"
-            value={areaFilter}
-            options={areaFilterOptions}
-            onChange={setAreaFilter}
-            aria-label={t('projectAreas')}
-          />
         </div>
       ) : null}
 

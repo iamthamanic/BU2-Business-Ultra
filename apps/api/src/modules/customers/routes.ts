@@ -53,6 +53,7 @@ function toNote(
     customerId: row.customerId,
     authorUserId: row.authorUserId,
     authorDisplayName: authorDisplayName?.trim() || null,
+    parentNoteId: row.parentNoteId ?? null,
     body: row.body,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -72,11 +73,33 @@ async function loadNotesForCustomer(customerId: string) {
   return rows.map((r) => toNote(r.note, r.authorDisplayName))
 }
 
-function toCustomer(row: typeof customers.$inferSelect) {
+function composeDisplayName(opts: {
+  kind?: string | null
+  displayName?: string | null
+  firstName?: string | null
+  lastName?: string | null
+}): string {
+  const dn = (opts.displayName || '').trim()
+  if (opts.kind === 'org' && dn) return dn
+  const parts = [(opts.firstName || '').trim(), (opts.lastName || '').trim()].filter(Boolean)
+  if (parts.length) return parts.join(' ')
+  return dn
+}
+
+function toCustomer(
+  row: typeof customers.$inferSelect,
+  org?: { id: string; displayName: string } | null,
+) {
   return {
     id: row.id,
     kind: row.kind,
     displayName: row.displayName,
+    firstName: row.firstName ?? null,
+    lastName: row.lastName ?? null,
+    orgCustomerId: row.orgCustomerId ?? null,
+    orgCustomer: org
+      ? { id: org.id, displayName: org.displayName }
+      : null,
     email: row.email,
     phone: row.phone,
     address:
@@ -103,6 +126,22 @@ function toCustomer(row: typeof customers.$inferSelect) {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   }
+}
+
+async function loadOrgSummary(businessId: string, orgCustomerId: string | null) {
+  if (!orgCustomerId) return null
+  const [org] = await db
+    .select({ id: customers.id, displayName: customers.displayName, kind: customers.kind })
+    .from(customers)
+    .where(
+      and(
+        eq(customers.id, orgCustomerId),
+        eq(customers.businessId, businessId),
+        eq(customers.kind, 'org'),
+      ),
+    )
+    .limit(1)
+  return org ? { id: org.id, displayName: org.displayName } : null
 }
 
 function customerDayCount(since: Date): number {
@@ -235,7 +274,28 @@ export async function customerRoutes(app: FastifyInstance) {
       .from(customers)
       .where(and(...conds))
       .orderBy(desc(customers.updatedAt))
-    return { customers: rows.map(toCustomer) }
+    const orgIds = [
+      ...new Set(rows.map((r) => r.orgCustomerId).filter((x): x is string => Boolean(x))),
+    ]
+    const orgMap = new Map<string, { id: string; displayName: string }>()
+    if (orgIds.length) {
+      const orgs = await db
+        .select({ id: customers.id, displayName: customers.displayName })
+        .from(customers)
+        .where(
+          and(
+            eq(customers.businessId, m.businessId),
+            eq(customers.kind, 'org'),
+            inArray(customers.id, orgIds),
+          ),
+        )
+      for (const o of orgs) orgMap.set(o.id, o)
+    }
+    return {
+      customers: rows.map((r) =>
+        toCustomer(r, r.orgCustomerId ? orgMap.get(r.orgCustomerId) ?? null : null),
+      ),
+    }
   })
 
   app.get('/api/b/:slug/customers/:id', async (req, reply) => {
@@ -245,7 +305,7 @@ export async function customerRoutes(app: FastifyInstance) {
     if (!m) return reply.code(404).send({ error: 'not_found' })
     const row = await loadCustomer(m.businessId, id)
     if (!row) return reply.code(404).send({ error: 'not_found' })
-    const [notes, consents, events, stats] = await Promise.all([
+    const [notes, consents, events, stats, org] = await Promise.all([
       loadNotesForCustomer(id),
       db
         .select()
@@ -269,6 +329,7 @@ export async function customerRoutes(app: FastifyInstance) {
         .orderBy(desc(customerEvents.createdAt))
         .limit(100),
       loadCustomerStats(m.businessId, row),
+      loadOrgSummary(m.businessId, row.orgCustomerId ?? null),
     ])
     const linkedTasks = await db
       .select()
@@ -294,7 +355,7 @@ export async function customerRoutes(app: FastifyInstance) {
               and(eq(projects.businessId, m.businessId), inArray(projects.id, projectIds)),
             )
     return {
-      customer: toCustomer(row),
+      customer: toCustomer(row, org),
       notes,
       consents,
       events: events.map((ev) => ({
@@ -327,12 +388,31 @@ export async function customerRoutes(app: FastifyInstance) {
     const postalCode = body.postalCode ?? null
     const city = body.city ?? null
     const country = body.country ?? null
+    const firstName = body.firstName?.trim() || null
+    const lastName = body.lastName?.trim() || null
+    const displayName = composeDisplayName({
+      kind: body.kind,
+      displayName: body.displayName,
+      firstName,
+      lastName,
+    })
+    if (!displayName) return reply.code(400).send({ error: 'invalid_name' })
+    let orgCustomerId: string | null = body.orgCustomerId ?? null
+    if (orgCustomerId) {
+      if (body.kind === 'org') return reply.code(400).send({ error: 'org_cannot_link_org' })
+      const org = await loadOrgSummary(m.businessId, orgCustomerId)
+      if (!org) return reply.code(400).send({ error: 'invalid_org' })
+      orgCustomerId = org.id
+    }
     const [row] = await db
       .insert(customers)
       .values({
         businessId: m.businessId,
         kind: body.kind,
-        displayName: body.displayName,
+        displayName,
+        firstName: body.kind === 'person' ? firstName : null,
+        lastName: body.kind === 'person' ? lastName : null,
+        orgCustomerId: body.kind === 'person' ? orgCustomerId : null,
         email: body.email ?? null,
         phone: body.phone ?? null,
         street,
@@ -359,7 +439,8 @@ export async function customerRoutes(app: FastifyInstance) {
       action: 'customer.create',
       resourceRef: `customer:${row!.id}`,
     })
-    return reply.code(201).send({ customer: toCustomer(row!) })
+    const org = await loadOrgSummary(m.businessId, row!.orgCustomerId ?? null)
+    return reply.code(201).send({ customer: toCustomer(row!, org) })
   })
 
   app.patch('/api/b/:slug/customers/:id', async (req, reply) => {
@@ -378,6 +459,36 @@ export async function customerRoutes(app: FastifyInstance) {
         .limit(1)
       if (!persona) return reply.code(400).send({ error: 'invalid_persona' })
     }
+    const nextKind = body.kind !== undefined ? body.kind : existing.kind
+    let nextOrgId =
+      body.orgCustomerId !== undefined ? body.orgCustomerId : existing.orgCustomerId
+    if (nextKind === 'org') nextOrgId = null
+    if (nextOrgId) {
+      if (nextOrgId === id) return reply.code(400).send({ error: 'invalid_org' })
+      const org = await loadOrgSummary(m.businessId, nextOrgId)
+      if (!org) return reply.code(400).send({ error: 'invalid_org' })
+      nextOrgId = org.id
+    }
+    const nextFirst =
+      body.firstName !== undefined ? body.firstName?.trim() || null : existing.firstName
+    const nextLast =
+      body.lastName !== undefined ? body.lastName?.trim() || null : existing.lastName
+    const nameTouched =
+      body.displayName !== undefined ||
+      body.firstName !== undefined ||
+      body.lastName !== undefined ||
+      body.kind !== undefined
+    const nextDisplayName = nameTouched
+      ? composeDisplayName({
+          kind: nextKind,
+          displayName:
+            body.displayName !== undefined ? body.displayName : existing.displayName,
+          firstName: nextKind === 'person' ? nextFirst : null,
+          lastName: nextKind === 'person' ? nextLast : null,
+        })
+      : existing.displayName
+    if (nameTouched && !nextDisplayName) return reply.code(400).send({ error: 'invalid_name' })
+
     const nextStreet = body.street !== undefined ? body.street : existing.street
     const nextPostal = body.postalCode !== undefined ? body.postalCode : existing.postalCode
     const nextCity = body.city !== undefined ? body.city : existing.city
@@ -391,7 +502,16 @@ export async function customerRoutes(app: FastifyInstance) {
       .update(customers)
       .set({
         ...(body.kind !== undefined ? { kind: body.kind } : {}),
-        ...(body.displayName !== undefined ? { displayName: body.displayName } : {}),
+        ...(nameTouched ? { displayName: nextDisplayName } : {}),
+        ...(body.firstName !== undefined || body.kind !== undefined
+          ? { firstName: nextKind === 'person' ? nextFirst : null }
+          : {}),
+        ...(body.lastName !== undefined || body.kind !== undefined
+          ? { lastName: nextKind === 'person' ? nextLast : null }
+          : {}),
+        ...(body.orgCustomerId !== undefined || body.kind !== undefined
+          ? { orgCustomerId: nextKind === 'person' ? nextOrgId : null }
+          : {}),
         ...(body.email !== undefined ? { email: body.email } : {}),
         ...(body.phone !== undefined ? { phone: body.phone } : {}),
         ...(body.street !== undefined ? { street: body.street } : {}),
@@ -432,7 +552,8 @@ export async function customerRoutes(app: FastifyInstance) {
       action: 'customer.update',
       resourceRef: `customer:${id}`,
     })
-    return { customer: toCustomer(row!) }
+    const org = await loadOrgSummary(m.businessId, row!.orgCustomerId ?? null)
+    return { customer: toCustomer(row!, org) }
   })
 
   app.post('/api/b/:slug/customers/:id/archive', async (req, reply) => {
@@ -475,11 +596,32 @@ export async function customerRoutes(app: FastifyInstance) {
     const existing = await loadCustomer(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     const body = CustomerNoteSchema.parse(req.body)
+    let parentNoteId: string | null = body.parentNoteId ?? null
+    if (parentNoteId) {
+      const [parent] = await db
+        .select()
+        .from(customerNotes)
+        .where(and(eq(customerNotes.id, parentNoteId), eq(customerNotes.customerId, id)))
+        .limit(1)
+      if (!parent) return reply.code(400).send({ error: 'invalid_parent' })
+      // One-level threads: replies always hang off the root note
+      parentNoteId = parent.parentNoteId ?? parent.id
+    }
     const [note] = await db
       .insert(customerNotes)
-      .values({ customerId: id, authorUserId: user.id, body: body.body })
+      .values({
+        customerId: id,
+        authorUserId: user.id,
+        parentNoteId,
+        body: body.body,
+      })
       .returning()
-    await addEvent(id, 'note', 'Notiz hinzugefügt', user.id)
+    await addEvent(
+      id,
+      'note',
+      parentNoteId ? 'Notiz-Antwort hinzugefügt' : 'Notiz hinzugefügt',
+      user.id,
+    )
     return reply.code(201).send({
       note: toNote(note!, user.displayName ?? null),
     })
@@ -605,9 +747,14 @@ export async function customerRoutes(app: FastifyInstance) {
         purchasedAt,
       })
       .returning()
-    await addEvent(id, 'purchase', `Kauf: ${label}`, user.id, {
+    const amountLabel = new Intl.NumberFormat('de-DE', {
+      style: 'currency',
+      currency: (body.currency || 'EUR').toUpperCase(),
+    }).format(body.amountCents / 100)
+    await addEvent(id, 'purchase', `Kauf: ${label} · ${amountLabel}`, user.id, {
       amountCents: body.amountCents,
       productId,
+      label,
     })
     return reply.code(201).send({
       purchase,

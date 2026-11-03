@@ -3,7 +3,7 @@
  * Location: apps/web/src/features/personas/PersonasPage.tsx
  */
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { Plus } from '@phosphor-icons/react'
 import { api } from '../../lib/api'
 import { useI18n } from '../../lib/i18n'
@@ -23,21 +23,31 @@ type Persona = {
 
 export function PersonasPage() {
   const { slug } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { t } = useI18n()
   const [rows, setRows] = useState<Persona[]>([])
   const [name, setName] = useState('')
   const [summary, setSummary] = useState('')
   const [selected, setSelected] = useState<Persona | null>(null)
   const [busy, setBusy] = useState(false)
+  const deepPersonaId = searchParams.get('persona')
 
   async function refresh() {
     const r = await api<{ personas: Persona[] }>(`/api/b/${slug}/personas`)
     setRows(r.personas)
+    return r.personas
   }
 
   useEffect(() => {
-    refresh().catch(console.error)
-  }, [slug])
+    refresh()
+      .then((list) => {
+        if (!deepPersonaId) return
+        const hit = list.find((p) => p.id === deepPersonaId)
+        if (hit) setSelected(hit)
+      })
+      .catch(console.error)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug, deepPersonaId])
 
   async function create() {
     if (!name.trim()) return
@@ -144,7 +154,17 @@ export function PersonasPage() {
               key={p.id}
               type="button"
               className={`panel product-card${selected?.id === p.id ? ' is-active' : ''}`}
-              onClick={() => setSelected(p)}
+              onClick={() => {
+                setSelected(p)
+                setSearchParams(
+                  (prev) => {
+                    const next = new URLSearchParams(prev)
+                    next.set('persona', p.id)
+                    return next
+                  },
+                  { replace: true },
+                )
+              }}
             >
               <strong className="product-card-name">{p.name}</strong>
               <p className="muted product-card-desc">{p.summary || '—'}</p>

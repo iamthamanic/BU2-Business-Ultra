@@ -283,6 +283,9 @@ CREATE TABLE IF NOT EXISTS customers (
   business_id uuid NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
   kind varchar(16) NOT NULL DEFAULT 'person',
   display_name varchar(200) NOT NULL,
+  first_name varchar(100),
+  last_name varchar(100),
+  org_customer_id uuid REFERENCES customers(id) ON DELETE SET NULL,
   email varchar(320),
   phone varchar(64),
   address text,
@@ -304,6 +307,10 @@ CREATE TABLE IF NOT EXISTS customers (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS customers_business_idx ON customers (business_id);
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS first_name varchar(100);
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS last_name varchar(100);
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS org_customer_id uuid REFERENCES customers(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS customers_org_customer_idx ON customers (org_customer_id);
 
 CREATE TABLE IF NOT EXISTS business_tags (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -311,10 +318,14 @@ CREATE TABLE IF NOT EXISTS business_tags (
   scope varchar(24) NOT NULL DEFAULT 'customer',
   name varchar(40) NOT NULL,
   color varchar(16),
+  description text NOT NULL DEFAULT '',
+  created_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
--- Existing installs may have created the table before `scope` existed.
+-- Existing installs may have created the table before `scope` / details existed.
 ALTER TABLE business_tags ADD COLUMN IF NOT EXISTS scope varchar(24) NOT NULL DEFAULT 'customer';
+ALTER TABLE business_tags ADD COLUMN IF NOT EXISTS description text NOT NULL DEFAULT '';
+ALTER TABLE business_tags ADD COLUMN IF NOT EXISTS created_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL;
 DROP INDEX IF EXISTS business_tags_biz_name_uidx;
 CREATE UNIQUE INDEX IF NOT EXISTS business_tags_biz_scope_name_uidx ON business_tags (business_id, scope, name);
 
@@ -336,10 +347,13 @@ CREATE TABLE IF NOT EXISTS customer_notes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
   author_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  parent_note_id uuid REFERENCES customer_notes(id) ON DELETE CASCADE,
   body text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE customer_notes ADD COLUMN IF NOT EXISTS parent_note_id uuid REFERENCES customer_notes(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS customer_notes_parent_idx ON customer_notes (parent_note_id);
 
 CREATE TABLE IF NOT EXISTS customer_consents (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

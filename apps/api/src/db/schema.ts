@@ -359,6 +359,9 @@ export const customers = pgTable('customers', {
     .references(() => businesses.id, { onDelete: 'cascade' }),
   kind: varchar('kind', { length: 16 }).notNull().default('person'),
   displayName: varchar('display_name', { length: 200 }).notNull(),
+  firstName: varchar('first_name', { length: 100 }),
+  lastName: varchar('last_name', { length: 100 }),
+  orgCustomerId: uuid('org_customer_id'),
   email: varchar('email', { length: 320 }),
   phone: varchar('phone', { length: 64 }),
   address: text('address'),
@@ -392,6 +395,10 @@ export const businessTags = pgTable(
     scope: varchar('scope', { length: 24 }).notNull().default('customer'),
     name: varchar('name', { length: 40 }).notNull(),
     color: varchar('color', { length: 16 }),
+    description: text('description').notNull().default(''),
+    createdByUserId: uuid('created_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('business_tags_biz_scope_name_uidx').on(t.businessId, t.scope, t.name)],
@@ -420,6 +427,7 @@ export const customerNotes = pgTable('customer_notes', {
     .notNull()
     .references(() => customers.id, { onDelete: 'cascade' }),
   authorUserId: uuid('author_user_id').references(() => users.id, { onDelete: 'set null' }),
+  parentNoteId: uuid('parent_note_id'),
   body: text('body').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

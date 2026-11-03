@@ -1,6 +1,6 @@
 /**
  * SettingsPage — company settings with MktTabs surface strip:
- * Übersicht | Verbindungen | Funnel | Team | Labels | Logo.
+ * Details | Verbindungen | Funnel | Team | Labels.
  * Hash deep-links (#connections etc.) from Marketing Hub.
  * Location: apps/web/src/features/settings/SettingsPage.tsx
  */
@@ -8,36 +8,42 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   Funnel,
-  Image,
+  IdentificationCard,
   LinkSimple,
-  SquaresFour,
   Tag,
   UsersThree,
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
+import { canManageMembers, type Role } from '@bu2/shared'
 import { MktTab, MktTabs } from '../../components/MktTabs'
 import { api } from '../../lib/api'
 import { writeLastCompany } from '../../lib/lastCompany'
 import { useI18n } from '../../lib/i18n'
+import { SettingsCompanyTab } from './SettingsCompanyTab'
 import { SettingsConnectionsTab } from './SettingsConnectionsTab'
 import { SettingsFunnelTab } from './SettingsFunnelTab'
 import { SettingsHeader, type SettingsStatus } from './SettingsHeader'
 import { SettingsLabelsTab } from './SettingsLabelsTab'
-import { SettingsLogoTab } from './SettingsLogoTab'
-import { SettingsOverviewTab } from './SettingsOverviewTab'
 import { SettingsTeamTab } from './SettingsTeamTab'
 import { SETTINGS_TABS, hashForTab, tabFromHash, type SettingsTab } from './settingsTabs'
 
 const TAB_ICONS: Record<SettingsTab, Icon> = {
-  overview: SquaresFour,
+  details: IdentificationCard,
   connections: LinkSimple,
   funnel: Funnel,
   team: UsersThree,
   labels: Tag,
-  logo: Image,
 }
 
 type SecretRow = { provider: string; valid: boolean; keyHint?: string | null }
+
+type CompanyMeta = {
+  name: string
+  logoPath?: string | null
+  status: string
+  createdAt?: string | null
+  role?: string | null
+}
 
 export function SettingsPage() {
   const { slug } = useParams()
@@ -48,12 +54,7 @@ export function SettingsPage() {
   const [tab, setTab] = useState<SettingsTab>(() => tabFromHash(window.location.hash))
   const [secrets, setSecrets] = useState<SecretRow[]>([])
   const [status, setStatus] = useState<SettingsStatus | null>(null)
-  const [companyMeta, setCompanyMeta] = useState<{
-    name: string
-    logoPath?: string | null
-    status: string
-  } | null>(null)
-  const [memberCount, setMemberCount] = useState(0)
+  const [companyMeta, setCompanyMeta] = useState<CompanyMeta | null>(null)
   const [dangerMsg, setDangerMsg] = useState('')
 
   function setTabAndHash(next: SettingsTab) {
@@ -90,25 +91,31 @@ export function SettingsPage() {
     if (!slug) return
     let cancelled = false
     Promise.all([
-      api<{ business: { name: string; logoPath?: string | null; status: string } }>(
-        `/api/b/${slug}`,
-      ),
+      api<{
+        business: {
+          name: string
+          logoPath?: string | null
+          status: string
+          createdAt?: string
+        }
+        membership: { role: string } | null
+      }>(`/api/b/${slug}`),
       api<{ secrets: SecretRow[] }>(`/api/b/${slug}/settings/secrets`).catch(() => ({
         secrets: [] as SecretRow[],
       })),
       api<{ status: SettingsStatus }>(`/api/b/${slug}/settings/status`),
-      api<{ members: unknown[] }>(`/api/b/${slug}/members`).catch(() => ({ members: [] })),
     ])
-      .then(([biz, sec, st, mem]) => {
+      .then(([biz, sec, st]) => {
         if (cancelled) return
         setCompanyMeta({
           name: biz.business.name,
           logoPath: biz.business.logoPath,
           status: biz.business.status,
+          createdAt: biz.business.createdAt ?? null,
+          role: biz.membership?.role ?? null,
         })
         setSecrets(sec.secrets)
         setStatus(st.status)
-        setMemberCount(mem.members.length)
       })
       .catch(console.error)
     return () => {
@@ -158,13 +165,14 @@ export function SettingsPage() {
 
   if (!slug) return null
 
+  const canEdit = canManageMembers((companyMeta?.role as Role) || 'viewer')
+
   const tabLabels: Record<SettingsTab, string> = {
-    overview: t('overview'),
+    details: t('settingsDetails'),
     connections: t('connections'),
     funnel: t('funnelAssignment'),
     team: t('team'),
     labels: t('settingsLabels'),
-    logo: t('companyLogo'),
   }
 
   return (
@@ -191,15 +199,19 @@ export function SettingsPage() {
       </MktTabs>
 
       <div className="co-settings-pane" role="tabpanel">
-        {tab === 'overview' ? (
-          <SettingsOverviewTab
+        {tab === 'details' ? (
+          <SettingsCompanyTab
             slug={slug}
             name={companyMeta?.name ?? slug}
-            status={status}
+            logoPath={companyMeta?.logoPath}
             companyStatus={companyMeta?.status ?? 'active'}
-            memberCount={memberCount}
+            createdAt={companyMeta?.createdAt}
+            role={companyMeta?.role}
             msg={dangerMsg}
-            onJump={setTabAndHash}
+            canEdit={canEdit}
+            onMetaChanged={(next) =>
+              setCompanyMeta((c) => (c ? { ...c, ...next } : c))
+            }
             onArchive={archive}
             onReactivate={reactivate}
             onDelete={deleteCompany}
@@ -222,20 +234,8 @@ export function SettingsPage() {
             }}
           />
         ) : null}
-        {tab === 'team' ? (
-          <SettingsTeamTab slug={slug} onMembersChanged={setMemberCount} />
-        ) : null}
+        {tab === 'team' ? <SettingsTeamTab slug={slug} /> : null}
         {tab === 'labels' ? <SettingsLabelsTab slug={slug} /> : null}
-        {tab === 'logo' ? (
-          <SettingsLogoTab
-            slug={slug}
-            name={companyMeta?.name ?? slug}
-            logoPath={companyMeta?.logoPath}
-            onChanged={(logoPath) =>
-              setCompanyMeta((c) => (c ? { ...c, logoPath } : c))
-            }
-          />
-        ) : null}
       </div>
     </div>
   )

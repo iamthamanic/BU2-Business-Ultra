@@ -249,25 +249,37 @@ export function StyleguidePage() {
     setErr('')
   }
 
-  function runExport() {
+  async function runExport() {
     if (!view) return
-    exportStyleguidePdf({
-      brandName,
-      year,
-      doc: view,
-      labels: {
-        title: t('styleguideTitle'),
-        kicker: t('styleguideKicker'),
-        company: t('styleguideSec_company'),
-        logo: t('styleguideSec_logo'),
-        colors: t('styleguideSec_colors'),
-        type: t('styleguideSec_type'),
-        surfaces: t('styleguideSec_surfaces'),
-        rules: t('styleguideSec_rules'),
-        dos: t('styleguideDos'),
-        donts: t('styleguideDonts'),
-      },
-    })
+    try {
+      setErr('')
+      await exportStyleguidePdf({
+        brandName,
+        year,
+        doc: view,
+        logoPath: company?.logoPath,
+        labels: {
+          title: t('styleguideTitle'),
+          kicker: t('styleguideKicker'),
+          toc: t('styleguideToc'),
+          tocBody: t('styleguideTocBody'),
+          company: t('styleguideSec_company'),
+          logo: t('styleguideSec_logo'),
+          colors: t('styleguideSec_colors'),
+          type: t('styleguideSec_type'),
+          typeDisplay: t('styleguideTypeDisplay'),
+          typeBody: t('styleguideTypeBody'),
+          typeMono: t('styleguideTypeMono'),
+          surfaces: t('styleguideSec_surfaces'),
+          icons: t('styleguideSec_icons'),
+          rules: t('styleguideSec_rules'),
+          dos: t('styleguideDos'),
+          donts: t('styleguideDonts'),
+        },
+      })
+    } catch (e) {
+      setErr((e as Error).message || String(e))
+    }
   }
 
   if (!loaded || !view) {
@@ -285,7 +297,12 @@ export function StyleguidePage() {
           </div>
         </div>
         <div className="mkt-sg-toolbar-actions">
-          <button type="button" className="btn" onClick={runExport} disabled={saving}>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => void runExport()}
+            disabled={saving}
+          >
             <DownloadSimple size={14} weight="bold" aria-hidden />
             {t('styleguideExportPdf')}
           </button>
@@ -505,9 +522,7 @@ export function StyleguidePage() {
                     rows={2}
                   />
                 ) : (
-                  <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-                    {view.logoClearSpace}
-                  </p>
+                  <p>{view.logoClearSpace}</p>
                 )}
               </div>
             </div>

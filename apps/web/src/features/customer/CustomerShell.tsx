@@ -59,6 +59,7 @@ export function CustomerShell() {
   const routes = companyRoutes(slug)
 
   const [customers, setCustomers] = useState<BuCustomer[]>([])
+  const [labelColors, setLabelColors] = useState<Record<string, string | null>>({})
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('')
@@ -74,8 +75,21 @@ export function CustomerShell() {
       const qs = new URLSearchParams()
       qs.set('archive', archive === 'archived' ? '1' : '0')
       if (status) qs.set('status', status)
-      const r = await api<{ customers: BuCustomer[] }>(`/api/b/${slug}/customers?${qs}`)
+      const [r, labelRes] = await Promise.all([
+        api<{ customers: BuCustomer[] }>(`/api/b/${slug}/customers?${qs}`),
+        api<{
+          labels?: { name: string; color: string | null }[]
+          tags?: { name: string; color: string | null }[]
+        }>(`/api/b/${slug}/labels?scope=customer`).catch(() => ({
+          labels: [] as { name: string; color: string | null }[],
+          tags: [] as { name: string; color: string | null }[],
+        })),
+      ])
       setCustomers(r.customers)
+      const catalog = labelRes.labels || labelRes.tags || []
+      const map: Record<string, string | null> = {}
+      for (const lab of catalog) map[lab.name] = lab.color
+      setLabelColors(map)
     } finally {
       setLoading(false)
     }
@@ -210,7 +224,7 @@ export function CustomerShell() {
           <div className="product-archive-toggle" role="group" aria-label={t('archived')}>
             <button
               type="button"
-              className={`archive-seg${archive === 'active' ? ' is-on' : ''}`}
+              className={`archive-seg archive-seg--active${archive === 'active' ? ' is-on' : ''}`}
               aria-pressed={archive === 'active'}
               onClick={() => setArchive('active')}
             >
@@ -218,7 +232,7 @@ export function CustomerShell() {
             </button>
             <button
               type="button"
-              className={`archive-seg${archive === 'archived' ? ' is-on' : ''}`}
+              className={`archive-seg archive-seg--archived${archive === 'archived' ? ' is-on' : ''}`}
               aria-pressed={archive === 'archived'}
               onClick={() => setArchive('archived')}
             >
@@ -287,11 +301,26 @@ export function CustomerShell() {
                   <td>
                     {(c.tags || []).length ? (
                       <span className="crm-tag-row">
-                        {c.tags.slice(0, 4).map((tag) => (
-                          <span key={tag} className="crm-tag">
-                            {tag}
-                          </span>
-                        ))}
+                        {c.tags.slice(0, 4).map((tag) => {
+                          const color = labelColors[tag] || null
+                          return (
+                            <span
+                              key={tag}
+                              className="crm-tag"
+                              style={
+                                color
+                                  ? {
+                                      borderColor: `color-mix(in srgb, ${color} 45%, var(--border))`,
+                                      background: `color-mix(in srgb, ${color} 16%, var(--panel2))`,
+                                      color,
+                                    }
+                                  : undefined
+                              }
+                            >
+                              {tag}
+                            </span>
+                          )
+                        })}
                       </span>
                     ) : (
                       <span className="muted">—</span>

@@ -5,6 +5,10 @@ export type BuCustomer = {
   id: string
   kind: string
   displayName: string
+  firstName?: string | null
+  lastName?: string | null
+  orgCustomerId?: string | null
+  orgCustomer?: { id: string; displayName: string } | null
   email: string | null
   phone: string | null
   address: string | null
@@ -51,6 +55,7 @@ export type BuCustomerNote = {
   body: string
   authorUserId: string | null
   authorDisplayName?: string | null
+  parentNoteId?: string | null
   createdAt: string
   updatedAt?: string
 }

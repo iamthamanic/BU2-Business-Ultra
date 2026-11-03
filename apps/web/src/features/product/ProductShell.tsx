@@ -3,7 +3,7 @@
  * Location: apps/web/src/features/product/ProductShell.tsx
  */
 import { useEffect, useMemo, useState } from 'react'
-import { useOutletContext, useParams } from 'react-router-dom'
+import { useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import {
   MagnifyingGlass,
   Plus,
@@ -44,6 +44,7 @@ function sortValue(p: BuProduct, key: SortKey): string | number {
 
 export function ProductShell() {
   const { slug: paramSlug } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const ctx = useOutletContext<CompanyOutletContext | null>()
   const slug = paramSlug || ctx?.slug || ''
   const { t, locale } = useI18n()
@@ -62,6 +63,7 @@ export function ProductShell() {
   const [query, setQuery] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('updated')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const deepProductId = searchParams.get('product')
 
   async function refresh() {
     if (!slug) return
@@ -77,15 +79,38 @@ export function ProductShell() {
       ])
       setProducts(p.products)
       setPersonas(pe.personas)
+      return p.products
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    refresh().catch(console.error)
+    let cancelled = false
+    refresh()
+      .then(async (list) => {
+        if (cancelled || !deepProductId || !slug) return
+        const hit = (list || []).find((p) => p.id === deepProductId)
+        if (hit) {
+          setEditing(hit)
+          setModalOpen(true)
+          return
+        }
+        // Deep link may point at an archived product while filter is "active"
+        const wantArchived = archive !== 'archived'
+        const other = await api<{ products: BuProduct[] }>(
+          `/api/b/${slug}/products?archive=${wantArchived ? '1' : '0'}`,
+        ).catch(() => ({ products: [] as BuProduct[] }))
+        if (cancelled) return
+        const found = other.products.find((p) => p.id === deepProductId)
+        if (found) setArchive(wantArchived ? 'archived' : 'active')
+      })
+      .catch(console.error)
+    return () => {
+      cancelled = true
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug, archive])
+  }, [slug, archive, deepProductId])
 
   const dateFmt = useMemo(
     () =>
@@ -154,6 +179,27 @@ export function ProductShell() {
   function openEdit(p: BuProduct) {
     setEditing(p)
     setModalOpen(true)
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.set('product', p.id)
+        return next
+      },
+      { replace: true },
+    )
+  }
+
+  function closeModal() {
+    setModalOpen(false)
+    setEditing(null)
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('product')
+        return next
+      },
+      { replace: true },
+    )
   }
 
   function onSaved(p: BuProduct) {
@@ -212,7 +258,7 @@ export function ProductShell() {
           <div className="product-archive-toggle" role="group" aria-label={t('productArchiveFilter')}>
             <button
               type="button"
-              className={`archive-seg${archive === 'active' ? ' is-on' : ''}`}
+              className={`archive-seg archive-seg--active${archive === 'active' ? ' is-on' : ''}`}
               aria-pressed={archive === 'active'}
               onClick={() => setArchive('active')}
             >
@@ -220,7 +266,7 @@ export function ProductShell() {
             </button>
             <button
               type="button"
-              className={`archive-seg${archive === 'archived' ? ' is-on' : ''}`}
+              className={`archive-seg archive-seg--archived${archive === 'archived' ? ' is-on' : ''}`}
               aria-pressed={archive === 'archived'}
               onClick={() => setArchive('archived')}
             >
@@ -348,7 +394,7 @@ export function ProductShell() {
         slug={slug}
         canWrite={canWrite}
         personas={personas}
-        onClose={() => setModalOpen(false)}
+        onClose={closeModal}
         onSaved={onSaved}
         onArchived={onArchived}
         onPersonaCreated={(p) =>

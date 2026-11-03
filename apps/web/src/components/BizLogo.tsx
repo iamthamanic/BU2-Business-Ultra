@@ -1,5 +1,6 @@
 /**
  * BizLogo — company logo thumbnail or initials fallback for list/switcher rows.
+ * Always constrains <img> to the box (custom classNames must set width/height).
  * Location: apps/web/src/components/BizLogo.tsx
  */
 function initials(name: string) {
@@ -13,15 +14,23 @@ export function BizLogo({
   name,
   logoPath,
   className = 'biz-logo',
+  fit = 'contain',
 }: {
   name: string
   logoPath?: string | null
   className?: string
+  /** How the image fills the box — contain for brand marks, cover for avatars. */
+  fit?: 'contain' | 'cover'
 }) {
   if (logoPath) {
     return (
       <span className={`${className} has-img`}>
-        <img src={logoPath} alt="" />
+        <img
+          src={logoPath}
+          alt=""
+          draggable={false}
+          style={{ width: '100%', height: '100%', objectFit: fit, display: 'block' }}
+        />
       </span>
     )
   }

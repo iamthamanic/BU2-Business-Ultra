@@ -2,16 +2,18 @@
  * CustomerDetail — Dark-Ops CRM detail: identity header, icon tabs, panel workstations.
  * Location: apps/web/src/features/customer/CustomerDetail.tsx
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import {
+  ArrowBendUpLeft,
   ArrowSquareOut,
   Buildings,
   ChartBar,
   ChatCircle,
   ClipboardText,
   Copy,
+  CurrencyEur,
   DotsThree,
   DotsThreeCircle,
   EnvelopeSimple,
@@ -134,7 +136,93 @@ function formatWhen(iso: string): string {
   })
 }
 
-const HISTORY_TYPES = ['created', 'updated', 'note', 'communication', 'consent'] as const
+/** Stats-card label chip: hover shows description; click opens label settings. */
+function CustomerStatsTagChip({
+  tag,
+  color,
+  description,
+  to,
+  emptyDescription,
+}: {
+  tag: string
+  color: string | null
+  description: string
+  to: string
+  emptyDescription: string
+}) {
+  const ref = useRef<HTMLAnchorElement>(null)
+  const [open, setOpen] = useState(false)
+  const [tipStyle, setTipStyle] = useState<CSSProperties>({})
+  const tip = description || emptyDescription
+
+  function place() {
+    const el = ref.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    const width = Math.min(260, Math.max(160, window.innerWidth * 0.5))
+    let left = r.left
+    if (left + width > window.innerWidth - 12) left = Math.max(12, window.innerWidth - width - 12)
+    const below = r.bottom + 6
+    const preferBelow = below + 80 < window.innerHeight
+    setTipStyle({
+      position: 'fixed',
+      top: preferBelow ? below : Math.max(8, r.top - 6),
+      left,
+      width,
+      transform: preferBelow ? undefined : 'translateY(-100%)',
+    })
+  }
+
+  return (
+    <>
+      <Link
+        ref={ref}
+        to={to}
+        className="crm-tag customer-tag-chip customer-tag-chip--link"
+        aria-label={description ? `${tag}: ${description}` : tag}
+        onMouseEnter={() => {
+          place()
+          setOpen(true)
+        }}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={() => {
+          place()
+          setOpen(true)
+        }}
+        onBlur={() => setOpen(false)}
+        style={
+          color
+            ? {
+                borderColor: `color-mix(in srgb, ${color} 45%, var(--border))`,
+                background: `color-mix(in srgb, ${color} 16%, var(--panel2))`,
+                color,
+              }
+            : undefined
+        }
+      >
+        {tag}
+      </Link>
+      {open
+        ? createPortal(
+            <div className="customer-tag-tip" role="tooltip" style={tipStyle}>
+              <strong className="customer-tag-tip-name">{tag}</strong>
+              <span className={description ? undefined : 'muted'}>{tip}</span>
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
+  )
+}
+
+const HISTORY_TYPES = [
+  'created',
+  'updated',
+  'note',
+  'communication',
+  'consent',
+  'purchase',
+] as const
 
 function historyTypeLabel(type: string, t: TFn): string {
   const key = `customerHistoryType_${type}` as MessageKey
@@ -147,6 +235,7 @@ function historyTypeTone(type: string): string {
   if (type === 'communication') return 'good'
   if (type === 'consent') return 'warn'
   if (type === 'created') return 'good'
+  if (type === 'purchase') return 'good'
   if (type === 'updated') return 'dim'
   return 'dim'
 }
@@ -157,6 +246,7 @@ function HistoryTypeIcon({ type }: { type: string }) {
   if (type === 'consent') return <SealCheck size={15} weight="regular" aria-hidden />
   if (type === 'created') return <UserPlus size={15} weight="regular" aria-hidden />
   if (type === 'updated') return <PencilSimple size={15} weight="regular" aria-hidden />
+  if (type === 'purchase') return <CurrencyEur size={15} weight="regular" aria-hidden />
   return <ClockCounterClockwise size={15} weight="regular" aria-hidden />
 }
 
@@ -195,14 +285,17 @@ export function CustomerDetail() {
   const [noteDateRange, setNoteDateRange] = useState(() => defaultDateRange('all'))
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [editingNoteBody, setEditingNoteBody] = useState('')
+  const [replyParentId, setReplyParentId] = useState<string | null>(null)
+  const [replyBody, setReplyBody] = useState('')
+  const [replyBusy, setReplyBusy] = useState(false)
   const [noteBusyId, setNoteBusyId] = useState<string | null>(null)
   const [noteMenuId, setNoteMenuId] = useState<string | null>(null)
   const [noteMenuPos, setNoteMenuPos] = useState<{ top: number; left: number } | null>(null)
   const noteMenuRef = useRef<HTMLDivElement | null>(null)
   const noteMenuBtnRef = useRef<HTMLButtonElement | null>(null)
-  const [catalogTags, setCatalogTags] = useState<{ id: string; name: string; color: string | null }[]>(
-    [],
-  )
+  const [catalogTags, setCatalogTags] = useState<
+    { id: string; name: string; color: string | null; description?: string }[]
+  >([])
   const [tagPickerOpen, setTagPickerOpen] = useState(false)
   const [newTagName, setNewTagName] = useState('')
   const [tagsBusy, setTagsBusy] = useState(false)
@@ -222,6 +315,10 @@ export function CustomerDetail() {
   const [purchaseProductId, setPurchaseProductId] = useState('')
   const [purchaseDate, setPurchaseDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [statsBusy, setStatsBusy] = useState(false)
+  const [orgOptions, setOrgOptions] = useState<{ id: string; displayName: string }[]>([])
+  const [orgPick, setOrgPick] = useState('')
+  const [newOrgName, setNewOrgName] = useState('')
+  const [orgBusy, setOrgBusy] = useState(false)
   const [err, setErr] = useState('')
 
   async function refresh() {
@@ -231,11 +328,21 @@ export function CustomerDetail() {
       const [r, tagRes] = await Promise.all([
         api<DetailPayload>(`/api/b/${slug}/customers/${id}`),
         api<{
-          labels?: { id: string; name: string; color: string | null }[]
-          tags?: { id: string; name: string; color: string | null }[]
+          labels?: { id: string; name: string; color: string | null; description?: string }[]
+          tags?: { id: string; name: string; color: string | null; description?: string }[]
         }>(`/api/b/${slug}/labels?scope=customer`).catch(() => ({
-          labels: [] as { id: string; name: string; color: string | null }[],
-          tags: [] as { id: string; name: string; color: string | null }[],
+          labels: [] as {
+            id: string
+            name: string
+            color: string | null
+            description?: string
+          }[],
+          tags: [] as {
+            id: string
+            name: string
+            color: string | null
+            description?: string
+          }[],
         })),
       ])
       setData({ ...r, stats: r.stats || emptyStats() })
@@ -262,6 +369,25 @@ export function CustomerDetail() {
   }, [slug, id])
 
   useEffect(() => {
+    if (!slug || tab !== 'profile') return
+    api<{ customers: BuCustomer[] }>(`/api/b/${slug}/customers?archive=0`)
+      .then((r) => {
+        setOrgOptions(
+          (r.customers || [])
+            .filter((x) => x.kind === 'org' && x.id !== id)
+            .map((x) => ({ id: x.id, displayName: x.displayName })),
+        )
+      })
+      .catch(() => setOrgOptions([]))
+  }, [slug, id, tab])
+
+  useEffect(() => {
+    if (!data) return
+    setOrgPick(data.customer.orgCustomerId || '')
+    setNewOrgName('')
+  }, [data?.customer.id, data?.customer.orgCustomerId])
+
+  useEffect(() => {
     if (!statsOpen) return
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape' && !statsBusy) setStatsOpen(false)
@@ -282,10 +408,10 @@ export function CustomerDetail() {
     return data.linkedTasks.filter((task) => task.status === caseFilter)
   }, [data, caseFilter])
 
-  const filteredNotes = useMemo(() => {
-    if (!data) return []
+  const noteThreads = useMemo(() => {
+    if (!data) return [] as { root: BuCustomerNote; replies: BuCustomerNote[] }[]
     const q = noteSearch.trim().toLowerCase()
-    return data.notes.filter((n) => {
+    const matches = (n: BuCustomerNote) => {
       if (q) {
         const author = (n.authorDisplayName || '').toLowerCase()
         const body = notePlainText(n.body).toLowerCase()
@@ -293,7 +419,28 @@ export function CustomerDetail() {
       }
       if (!dateInRange(n.createdAt, noteDateRange.from, noteDateRange.to)) return false
       return true
-    })
+    }
+    const byParent = new Map<string, BuCustomerNote[]>()
+    const roots: BuCustomerNote[] = []
+    for (const n of data.notes) {
+      const parentId = n.parentNoteId || null
+      if (!parentId) {
+        roots.push(n)
+        continue
+      }
+      const list = byParent.get(parentId) || []
+      list.push(n)
+      byParent.set(parentId, list)
+    }
+    const sortAsc = (a: BuCustomerNote, b: BuCustomerNote) =>
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    // Roots stay newest-first (API order); replies oldest-first under each root
+    return roots
+      .map((root) => {
+        const replies = (byParent.get(root.id) || []).slice().sort(sortAsc)
+        return { root, replies }
+      })
+      .filter(({ root, replies }) => matches(root) || replies.some(matches))
   }, [data, noteSearch, noteDateRange])
 
   const commEvents = useMemo(
@@ -313,7 +460,7 @@ export function CustomerDetail() {
     }
     const r = btn.getBoundingClientRect()
     const menuW = 176
-    const menuH = 118
+    const menuH = 152
     let top = r.bottom + 4
     let left = r.right - menuW
     if (left < 8) left = 8
@@ -324,8 +471,14 @@ export function CustomerDetail() {
     setNoteMenuId(noteId)
   }
 
+  function noteRootId(note: BuCustomerNote): string {
+    return note.parentNoteId || note.id
+  }
+
   function startEditNote(note: BuCustomerNote) {
     closeNoteMenu()
+    setReplyParentId(null)
+    setReplyBody('')
     setEditingNoteId(note.id)
     setEditingNoteBody(note.body)
   }
@@ -333,6 +486,18 @@ export function CustomerDetail() {
   function cancelEditNote() {
     setEditingNoteId(null)
     setEditingNoteBody('')
+  }
+
+  function startReplyNote(note: BuCustomerNote) {
+    closeNoteMenu()
+    cancelEditNote()
+    setReplyParentId(noteRootId(note))
+    setReplyBody('')
+  }
+
+  function cancelReplyNote() {
+    setReplyParentId(null)
+    setReplyBody('')
   }
 
   async function createNote() {
@@ -350,6 +515,26 @@ export function CustomerDetail() {
       setErr((e as Error).message)
     } finally {
       setNoteCreating(false)
+    }
+  }
+
+  async function submitReplyNote() {
+    if (!slug || !id || !replyParentId || !notePlainText(replyBody)) return
+    setReplyBusy(true)
+    try {
+      await api(`/api/b/${slug}/customers/${id}/notes`, {
+        method: 'POST',
+        body: JSON.stringify({
+          body: sanitizeNoteHtml(replyBody),
+          parentNoteId: replyParentId,
+        }),
+      })
+      cancelReplyNote()
+      await refresh()
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setReplyBusy(false)
     }
   }
 
@@ -416,7 +601,15 @@ export function CustomerDetail() {
       setPurchaseLabel('')
       setPurchaseAmount('')
       setPurchaseProductId('')
-      if (data) setData({ ...data, stats: r.stats })
+      const detail = await api<DetailPayload>(`/api/b/${slug}/customers/${id}`).catch(() => null)
+      if (detail) {
+        setData({
+          ...detail,
+          stats: r.stats || detail.stats || emptyStats(),
+        })
+      } else if (data) {
+        setData({ ...data, stats: r.stats })
+      }
     } catch (e) {
       setErr((e as Error).message)
     } finally {
@@ -433,7 +626,15 @@ export function CustomerDetail() {
         `/api/b/${slug}/customers/${id}/purchases/${purchaseId}`,
         { method: 'DELETE' },
       )
-      if (data) setData({ ...data, stats: r.stats })
+      const detail = await api<DetailPayload>(`/api/b/${slug}/customers/${id}`).catch(() => null)
+      if (detail) {
+        setData({
+          ...detail,
+          stats: r.stats || detail.stats || emptyStats(),
+        })
+      } else if (data) {
+        setData({ ...data, stats: r.stats })
+      }
     } catch (e) {
       setErr((e as Error).message)
     } finally {
@@ -481,7 +682,10 @@ export function CustomerDetail() {
     try {
       await api(`/api/b/${slug}/customers/${id}/notes`, {
         method: 'POST',
-        body: JSON.stringify({ body: note.body.trim() }),
+        body: JSON.stringify({
+          body: note.body.trim(),
+          parentNoteId: note.parentNoteId || null,
+        }),
       })
       await refresh()
     } catch (e) {
@@ -591,6 +795,102 @@ export function CustomerDetail() {
     [t],
   )
 
+  const companySelectOptions = useMemo<CrmIconSelectOption[]>(
+    () => [
+      {
+        value: '',
+        label: t('customerCompanyNone'),
+        tone: 'none',
+        icon: <Buildings size={14} weight="regular" aria-hidden />,
+      },
+      ...orgOptions.map((o) => ({
+        value: o.id,
+        label: o.displayName,
+        tone: 'area' as const,
+        icon: <Buildings size={14} weight="regular" aria-hidden />,
+      })),
+      {
+        value: '__create__',
+        label: t('customerCompanyCreate'),
+        icon: <Plus size={14} weight="bold" aria-hidden />,
+      },
+    ],
+    [orgOptions, t],
+  )
+
+  function syncPersonDisplayName(next: Partial<BuCustomer>) {
+    if (!data) return
+    const cur = data.customer
+    const kind = next.kind ?? cur.kind
+    if (kind !== 'person') {
+      setData({ ...data, customer: { ...cur, ...next } })
+      return
+    }
+    const firstName = next.firstName !== undefined ? next.firstName : cur.firstName
+    const lastName = next.lastName !== undefined ? next.lastName : cur.lastName
+    const displayName = [firstName || '', lastName || ''].map((s) => s.trim()).filter(Boolean).join(' ')
+    setData({
+      ...data,
+      customer: {
+        ...cur,
+        ...next,
+        firstName,
+        lastName,
+        displayName: displayName || cur.displayName,
+      },
+    })
+  }
+
+  async function applyCompanyLink(nextPick: string) {
+    if (!canWrite || !slug || !id || !data) return
+    setOrgPick(nextPick)
+    if (nextPick === '__create__') return
+    setOrgBusy(true)
+    try {
+      const r = await api<{ customer: BuCustomer }>(`/api/b/${slug}/customers/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ orgCustomerId: nextPick || null }),
+      })
+      setData({ ...data, customer: r.customer })
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setOrgBusy(false)
+    }
+  }
+
+  async function createAndLinkCompany() {
+    const name = newOrgName.trim()
+    if (!name || !slug || !id || !data) return
+    setOrgBusy(true)
+    try {
+      const created = await api<{ customer: BuCustomer }>(`/api/b/${slug}/customers`, {
+        method: 'POST',
+        body: JSON.stringify({
+          kind: 'org',
+          displayName: name,
+          relationStatus: data.customer.relationStatus || 'lead',
+        }),
+      })
+      const r = await api<{ customer: BuCustomer }>(`/api/b/${slug}/customers/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ orgCustomerId: created.customer.id }),
+      })
+      setOrgOptions((prev) =>
+        prev.some((o) => o.id === created.customer.id)
+          ? prev
+          : [...prev, { id: created.customer.id, displayName: created.customer.displayName }],
+      )
+      setNewOrgName('')
+      setOrgPick(created.customer.id)
+      setData({ ...data, customer: r.customer })
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setOrgBusy(false)
+    }
+  }
+
   if (loading && !data) {
     return (
       <div className="stack mkt-shell product-shell crm-shell crm-detail-loading" aria-busy>
@@ -691,6 +991,10 @@ export function CustomerDetail() {
 
   function tagColor(name: string): string | null {
     return catalogTags.find((t) => t.name === name)?.color ?? null
+  }
+
+  function tagDescription(name: string): string {
+    return (catalogTags.find((t) => t.name === name)?.description || '').trim()
   }
 
   return (
@@ -842,91 +1146,147 @@ export function CustomerDetail() {
                     {t('customerNotesEmpty')}
                   </p>
                 </div>
-              ) : filteredNotes.length === 0 ? (
+              ) : noteThreads.length === 0 ? (
                 <p className="muted" style={{ margin: 0 }}>
                   {t('customerNotesFilterEmpty')}
                 </p>
               ) : (
                 <ul className="customer-note-list">
-                  {filteredNotes.map((n) => {
-                    const author =
-                      n.authorDisplayName?.trim() || t('customerNoteAuthorUnknown')
-                    const isEditing = editingNoteId === n.id
-                    const busy = noteBusyId === n.id
-                    const edited =
-                      n.updatedAt &&
-                      n.createdAt &&
-                      new Date(n.updatedAt).getTime() - new Date(n.createdAt).getTime() > 1000
-                    return (
-                      <li key={n.id} className="customer-note-card">
-                        {isEditing ? (
-                          <div className="customer-note-edit">
-                            <CustomerNoteEditor
-                              key={n.id}
-                              value={editingNoteBody}
-                              onChange={setEditingNoteBody}
-                              disabled={busy}
-                              placeholder={t('customerNotePh')}
-                              autoFocus
-                              rows={4}
-                            />
-                            <div className="customer-note-edit-actions">
-                              <button
-                                type="button"
-                                className="btn"
+                  {noteThreads.map(({ root, replies }) => {
+                    const renderCard = (n: BuCustomerNote, opts?: { reply?: boolean }) => {
+                      const author =
+                        n.authorDisplayName?.trim() || t('customerNoteAuthorUnknown')
+                      const isEditing = editingNoteId === n.id
+                      const busy = noteBusyId === n.id
+                      const edited =
+                        n.updatedAt &&
+                        n.createdAt &&
+                        new Date(n.updatedAt).getTime() - new Date(n.createdAt).getTime() > 1000
+                      return (
+                        <li
+                          key={n.id}
+                          className={`customer-note-card${opts?.reply ? ' is-reply' : ''}`}
+                        >
+                          {isEditing ? (
+                            <div className="customer-note-edit">
+                              <CustomerNoteEditor
+                                key={n.id}
+                                value={editingNoteBody}
+                                onChange={setEditingNoteBody}
                                 disabled={busy}
-                                onClick={cancelEditNote}
-                              >
-                                {t('customerNoteCancel')}
-                              </button>
-                              <button
-                                type="button"
-                                className="btn primary"
-                                disabled={busy || !notePlainText(editingNoteBody)}
-                                onClick={() => void saveEditNote(n.id)}
-                              >
-                                {t('customerNoteSave')}
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="customer-note-main">
-                            <NoteBodyHtml body={n.body} />
-                            {canWrite ? (
-                              <div className="customer-note-actions">
+                                placeholder={t('customerNotePh')}
+                                autoFocus
+                                rows={4}
+                              />
+                              <div className="customer-note-edit-actions">
                                 <button
                                   type="button"
-                                  className="btn icon-btn customer-note-menu-btn"
+                                  className="btn"
                                   disabled={busy}
-                                  aria-label={t('customerNoteMenu')}
-                                  title={t('customerNoteMenu')}
-                                  aria-haspopup="menu"
-                                  aria-expanded={noteMenuId === n.id}
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    openNoteMenu(n.id, e.currentTarget)
-                                  }}
+                                  onClick={cancelEditNote}
                                 >
-                                  <DotsThree size={14} weight="bold" aria-hidden />
+                                  {t('customerNoteCancel')}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn primary"
+                                  disabled={busy || !notePlainText(editingNoteBody)}
+                                  onClick={() => void saveEditNote(n.id)}
+                                >
+                                  {t('customerNoteSave')}
                                 </button>
                               </div>
-                            ) : null}
-                          </div>
-                        )}
-                        <footer className="customer-note-meta">
-                          <div className="customer-note-author">
-                            <span className="customer-note-av" aria-hidden>
-                              {initials(author)}
-                            </span>
-                            <div className="customer-note-author-text">
-                              <span className="customer-note-author-name">{author}</span>
-                              <span className="muted customer-note-when">
-                                {formatWhen(n.createdAt)}
-                                {edited ? ` · ${t('customerNoteEdited')}` : ''}
-                              </span>
                             </div>
-                          </div>
-                        </footer>
+                          ) : (
+                            <div className="customer-note-main">
+                              <NoteBodyHtml body={n.body} />
+                              {canWrite ? (
+                                <div className="customer-note-actions">
+                                  <button
+                                    type="button"
+                                    className="btn icon-btn customer-note-menu-btn"
+                                    disabled={busy}
+                                    aria-label={t('customerNoteMenu')}
+                                    title={t('customerNoteMenu')}
+                                    aria-haspopup="menu"
+                                    aria-expanded={noteMenuId === n.id}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      openNoteMenu(n.id, e.currentTarget)
+                                    }}
+                                  >
+                                    <DotsThree size={14} weight="bold" aria-hidden />
+                                  </button>
+                                </div>
+                              ) : null}
+                            </div>
+                          )}
+                          <footer className="customer-note-meta">
+                            <div className="customer-note-author">
+                              <span className="customer-note-av" aria-hidden>
+                                {initials(author)}
+                              </span>
+                              <div className="customer-note-author-text">
+                                <span className="customer-note-author-name">{author}</span>
+                                <span className="muted customer-note-when">
+                                  {formatWhen(n.createdAt)}
+                                  {edited ? ` · ${t('customerNoteEdited')}` : ''}
+                                </span>
+                              </div>
+                            </div>
+                            {canWrite && !isEditing ? (
+                              <button
+                                type="button"
+                                className="btn customer-note-reply-btn"
+                                disabled={busy || replyBusy}
+                                onClick={() => startReplyNote(n)}
+                              >
+                                <ArrowBendUpLeft size={12} weight="bold" aria-hidden />
+                                {t('customerNoteReply')}
+                              </button>
+                            ) : null}
+                          </footer>
+                        </li>
+                      )
+                    }
+
+                    return (
+                      <li key={root.id} className="customer-note-thread">
+                        <ul className="customer-note-thread-list">
+                          {renderCard(root)}
+                          {replies.map((r) => renderCard(r, { reply: true }))}
+                          {replyParentId === root.id ? (
+                            <li className="customer-note-card customer-note-reply-composer is-reply">
+                              <CustomerNoteEditor
+                                key={`reply-${root.id}`}
+                                value={replyBody}
+                                onChange={setReplyBody}
+                                disabled={replyBusy}
+                                placeholder={t('customerNoteReplyPh')}
+                                autoFocus
+                                rows={3}
+                              />
+                              <div className="customer-note-edit-actions">
+                                <button
+                                  type="button"
+                                  className="btn"
+                                  disabled={replyBusy}
+                                  onClick={cancelReplyNote}
+                                >
+                                  {t('customerNoteCancel')}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn primary"
+                                  disabled={replyBusy || !notePlainText(replyBody)}
+                                  onClick={() => void submitReplyNote()}
+                                >
+                                  {t('customerNoteReplySave')}
+                                </button>
+                              </div>
+                            </li>
+                          ) : null}
+                        </ul>
                       </li>
                     )
                   })}
@@ -1009,11 +1369,21 @@ export function CustomerDetail() {
                           <span className="muted">{t('customerStatsProductsEmpty')}</span>
                         ) : (
                           <span className="crm-tag-row">
-                            {topProducts.map((p) => (
-                              <span key={`${p.productId || p.name}`} className="crm-tag">
-                                {p.name}
-                              </span>
-                            ))}
+                            {topProducts.map((p) =>
+                              p.productId ? (
+                                <Link
+                                  key={p.productId}
+                                  to={`${routes.product}?product=${encodeURIComponent(p.productId)}`}
+                                  className="crm-tag customer-stats-product-link"
+                                >
+                                  {p.name}
+                                </Link>
+                              ) : (
+                                <span key={p.name} className="crm-tag">
+                                  {p.name}
+                                </span>
+                              ),
+                            )}
                             {s.products.length > topProducts.length ? (
                               <span className="crm-tag muted">+{s.products.length - topProducts.length}</span>
                             ) : null}
@@ -1025,12 +1395,36 @@ export function CustomerDetail() {
                       <dt>{t('customerStatsPersona')}</dt>
                       <dd>
                         {s.persona ? (
-                          <span className="customer-stats-persona">
+                          <Link
+                            to={`${routes.personas}?persona=${encodeURIComponent(s.persona.id)}`}
+                            className="customer-stats-persona customer-stats-persona-link"
+                          >
                             <ChartBar size={13} weight="regular" aria-hidden />
                             {s.persona.name}
-                          </span>
+                          </Link>
                         ) : (
                           <span className="muted">{t('customerStatsPersonaEmpty')}</span>
+                        )}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{t('customerTags')}</dt>
+                      <dd>
+                        {(c.tags || []).length === 0 ? (
+                          <span className="muted">{t('customerTagsEmpty')}</span>
+                        ) : (
+                          <span className="crm-tag-row">
+                            {c.tags.map((tag) => (
+                              <CustomerStatsTagChip
+                                key={tag}
+                                tag={tag}
+                                color={tagColor(tag)}
+                                description={tagDescription(tag)}
+                                to={routes.settingsLabels}
+                                emptyDescription={t('settingsLabelsDescriptionEmpty')}
+                              />
+                            ))}
+                          </span>
                         )}
                       </dd>
                     </div>
@@ -1078,6 +1472,14 @@ export function CustomerDetail() {
                     }
                 await patch({
                   displayName: c.displayName,
+                  firstName: c.kind === 'person' ? c.firstName || null : null,
+                  lastName: c.kind === 'person' ? c.lastName || null : null,
+                  orgCustomerId:
+                    c.kind === 'person'
+                      ? orgPick && orgPick !== '__create__'
+                        ? orgPick
+                        : c.orgCustomerId || null
+                      : null,
                   email: c.email,
                   phone: c.phone,
                   birthDate: c.birthDate,
@@ -1096,17 +1498,40 @@ export function CustomerDetail() {
                   {t('customerMasterData')}
                 </h2>
               </header>
-              <label className="field">
-                <span className="label">{t('name')}</span>
-                <input
-                  className="input"
-                  disabled={!canWrite}
-                  value={c.displayName}
-                  onChange={(e) =>
-                    setData({ ...data, customer: { ...c, displayName: e.target.value } })
-                  }
-                />
-              </label>
+              {c.kind === 'person' ? (
+                <div className="customer-settings-row">
+                  <label className="field">
+                    <span className="label">{t('customerFirstName')}</span>
+                    <input
+                      className="input"
+                      disabled={!canWrite}
+                      value={c.firstName || ''}
+                      onChange={(e) => syncPersonDisplayName({ firstName: e.target.value || null })}
+                    />
+                  </label>
+                  <label className="field">
+                    <span className="label">{t('customerLastName')}</span>
+                    <input
+                      className="input"
+                      disabled={!canWrite}
+                      value={c.lastName || ''}
+                      onChange={(e) => syncPersonDisplayName({ lastName: e.target.value || null })}
+                    />
+                  </label>
+                </div>
+              ) : (
+                <label className="field">
+                  <span className="label">{t('customerCompany')}</span>
+                  <input
+                    className="input"
+                    disabled={!canWrite}
+                    value={c.displayName}
+                    onChange={(e) =>
+                      setData({ ...data, customer: { ...c, displayName: e.target.value } })
+                    }
+                  />
+                </label>
+              )}
               <div className="customer-settings-row">
                 <div className="field">
                   <span className="label">{t('customerStatus')}</span>
@@ -1129,10 +1554,42 @@ export function CustomerDetail() {
                     options={kindOptions}
                     disabled={!canWrite}
                     aria-label={t('customerKind')}
-                    onChange={(v) => setData({ ...data, customer: { ...c, kind: v } })}
+                    onChange={(v) => syncPersonDisplayName({ kind: v })}
                   />
                 </div>
               </div>
+              {c.kind === 'person' ? (
+                <div className="field">
+                  <span className="label">{t('customerCompany')}</span>
+                  <CrmIconSelect
+                    name="orgCustomerId"
+                    value={orgPick}
+                    options={companySelectOptions}
+                    disabled={!canWrite || orgBusy}
+                    aria-label={t('customerCompany')}
+                    onChange={(v) => void applyCompanyLink(v)}
+                  />
+                  {orgPick === '__create__' ? (
+                    <div className="customer-company-create">
+                      <input
+                        className="input"
+                        disabled={!canWrite || orgBusy}
+                        value={newOrgName}
+                        placeholder={t('customerCompanyNamePh')}
+                        onChange={(e) => setNewOrgName(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className="btn primary"
+                        disabled={!canWrite || orgBusy || !newOrgName.trim()}
+                        onClick={() => void createAndLinkCompany()}
+                      >
+                        {orgBusy ? '…' : t('customerCompanyCreate')}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="customer-profile-contact-row">
                 <label className="field">
                   <span className="label">{t('email')}</span>
@@ -1359,12 +1816,28 @@ export function CustomerDetail() {
                 <h2 className="crm-section-title" style={{ margin: 0 }}>
                   {t('customerRelations')}
                 </h2>
-                <p style={{ margin: 0 }}>
-                  {c.kind === 'org' ? t('customerKindOrg') : t('customerRelationsPrivate')}
+                <p className="customer-relation-kind" style={{ margin: 0 }}>
+                  {c.kind === 'org' ? (
+                    <Buildings size={15} weight="regular" aria-hidden />
+                  ) : (
+                    <User size={15} weight="regular" aria-hidden />
+                  )}
+                  <span>
+                    {c.kind === 'org' ? t('customerKindOrg') : t('customerKindPerson')}
+                  </span>
                 </p>
-                <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-                  {t('customerRelationsOrgNone')}
-                </p>
+                {c.kind === 'person' && c.orgCustomer ? (
+                  <p className="customer-relation-org" style={{ margin: 0 }}>
+                    <Buildings size={14} weight="regular" aria-hidden />
+                    <Link to={routes.customerDetail(c.orgCustomer.id)}>
+                      {c.orgCustomer.displayName}
+                    </Link>
+                  </p>
+                ) : (
+                  <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+                    {t('customerRelationsOrgNone')}
+                  </p>
+                )}
               </section>
 
               <section className="panel customer-card customer-tags-card">
@@ -1869,6 +2342,16 @@ export function CustomerDetail() {
                     >
                       <PencilSimple size={13} weight="regular" aria-hidden />
                       {t('customerNoteEdit')}
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="customer-note-menu-item"
+                      disabled={busy || replyBusy}
+                      onClick={() => startReplyNote(n)}
+                    >
+                      <ArrowBendUpLeft size={13} weight="regular" aria-hidden />
+                      {t('customerNoteReply')}
                     </button>
                     <button
                       type="button"

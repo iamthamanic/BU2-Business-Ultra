@@ -14,7 +14,7 @@ type Member = {
   role: string
 }
 
-type Props = { slug: string; onMembersChanged: (count: number) => void }
+type Props = { slug: string; onMembersChanged?: (count: number) => void }
 
 export function SettingsTeamTab({ slug, onMembersChanged }: Props) {
   const { t } = useI18n()
@@ -28,7 +28,7 @@ export function SettingsTeamTab({ slug, onMembersChanged }: Props) {
   async function refresh() {
     const r = await api<{ members: Member[] }>(`/api/b/${slug}/members`)
     setMembers(r.members)
-    onMembersChanged(r.members.length)
+    onMembersChanged?.(r.members.length)
     setLoading(false)
   }
 

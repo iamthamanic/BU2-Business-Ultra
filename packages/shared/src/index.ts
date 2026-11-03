@@ -30,6 +30,10 @@ export const CreateBusinessSchema = z.object({
   slug: slugSchema,
 })
 
+export const UpdateBusinessSchema = z.object({
+  name: z.string().min(1).max(120),
+})
+
 export const InviteSchema = z.object({
   email: z.string().email(),
   role: z.enum(['admin', 'editor', 'viewer']),
@@ -234,10 +238,13 @@ export const CustomerAddressSchema = z.object({
   country: z.string().max(120).nullable().optional(),
 })
 
-/** CRM customer create/update. */
-export const CustomerSchema = z.object({
+/** CRM customer fields (shared by create + patch). */
+const CustomerFieldsSchema = z.object({
   kind: z.enum(['person', 'org']).default('person'),
-  displayName: z.string().min(1).max(200),
+  displayName: z.string().max(200).optional(),
+  firstName: z.string().max(100).nullable().optional(),
+  lastName: z.string().max(100).nullable().optional(),
+  orgCustomerId: z.string().uuid().nullable().optional(),
   email: z.string().email().max(320).nullable().optional(),
   phone: z.string().max(64).nullable().optional(),
   /** @deprecated Prefer street/postalCode/city/country — kept for legacy payloads. */
@@ -261,7 +268,23 @@ export const CustomerSchema = z.object({
   buyerPersonaId: z.string().uuid().nullable().optional(),
   tags: z.array(z.string().max(40)).max(40).default([]),
 })
-export const CustomerPatchSchema = CustomerSchema.partial()
+
+/** CRM customer create. */
+export const CustomerSchema = CustomerFieldsSchema.superRefine((v, ctx) => {
+  const dn = (v.displayName || '').trim()
+  const fn = (v.firstName || '').trim()
+  const ln = (v.lastName || '').trim()
+  if (v.kind === 'org') {
+    if (!dn && !fn && !ln) {
+      ctx.addIssue({ code: 'custom', message: 'displayName_required', path: ['displayName'] })
+    }
+    return
+  }
+  if (!dn && !fn && !ln) {
+    ctx.addIssue({ code: 'custom', message: 'name_required', path: ['firstName'] })
+  }
+})
+export const CustomerPatchSchema = CustomerFieldsSchema.partial()
 
 export const BusinessLabelScopeSchema = z.enum([
   'customer',
@@ -274,6 +297,7 @@ export type BusinessLabelScope = z.infer<typeof BusinessLabelScopeSchema>
 export const BusinessLabelSchema = z.object({
   scope: BusinessLabelScopeSchema.default('customer'),
   name: z.string().trim().min(1).max(40),
+  description: z.string().trim().max(500).optional().default(''),
   color: z
     .string()
     .regex(/^#[0-9A-Fa-f]{6}$/)
@@ -304,8 +328,11 @@ export const CustomerPurchaseSchema = z
 
 export const CustomerNoteSchema = z.object({
   body: z.string().min(1).max(8000),
+  parentNoteId: z.string().uuid().nullable().optional(),
 })
-export const CustomerNotePatchSchema = CustomerNoteSchema.partial()
+export const CustomerNotePatchSchema = z.object({
+  body: z.string().min(1).max(8000).optional(),
+})
 
 export const CustomerConsentSchema = z.object({
   purpose: z.string().min(1).max(120),
