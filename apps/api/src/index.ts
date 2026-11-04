@@ -23,6 +23,12 @@ import { tagsRoutes } from './modules/tags/routes.js'
 import { sortanizeRoutes } from './modules/sortanize/routes.js'
 import { openseoRoutes } from './modules/openseo/routes.js'
 import { adminRoutes } from './modules/admin/routes.js'
+import { integrationRoutes } from './modules/integrations/routes.js'
+import { oauthIntegrationRoutes } from './modules/integrations/oauthRoutes.js'
+import { inboxRoutes } from './modules/inbox/routes.js'
+import { ensureMockAdapterRegistered } from './lib/integrations/core/mockAdapter.js'
+import { ensureTelegramAdapterRegistered } from './lib/integrations/telegram/adapter.js'
+import { ensureUnipileAdapterRegistered } from './lib/integrations/unipile/adapter.js'
 
 async function main() {
   const env = loadEnv()
@@ -47,6 +53,9 @@ async function main() {
   })
 
   await registerAuth(app)
+  ensureMockAdapterRegistered()
+  ensureTelegramAdapterRegistered()
+  ensureUnipileAdapterRegistered()
 
   app.get('/api/health', async () => ({
     ok: true,
@@ -67,6 +76,9 @@ async function main() {
   await checkmapRoutes(app)
   await personasRoutes(app)
   await tagsRoutes(app)
+  await integrationRoutes(app)
+  await oauthIntegrationRoutes(app)
+  await inboxRoutes(app)
   await sortanizeRoutes(app)
   await openseoRoutes(app)
   await adminRoutes(app)

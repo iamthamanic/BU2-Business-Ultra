@@ -1,19 +1,19 @@
 /**
  * BusinessShell — `/co/:slug` layout with department sidebar IA.
- * Flat Marketing · Product · Customer · Projects · Tools (Sortanize, CheckMap).
+ * Flat Inbox · Marketing · Product · Customer · Projects · Tools (Sortanize).
  * Settings in footer; company switcher in sidebar. Nav filtered by membership.tabs.
  * API calls remain `/api/b/:slug`. Location: apps/web/src/components/BusinessShell.tsx
  */
 import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useParams } from 'react-router-dom'
 import {
-  MapTrifold,
   ArrowsDownUp,
   GearSix,
   Megaphone,
   Cube,
   UsersThree,
   Folders,
+  Tray,
 } from '@phosphor-icons/react'
 import { canSeeNavTab } from '@bu2/shared'
 import { api } from '../lib/api'
@@ -74,7 +74,16 @@ export function BusinessShell({
   const topItems: RailItem[] = useMemo(() => {
     if (!routes) return []
     const items: RailItem[] = []
-    // Order: Marketing → Product → Customer
+    // Order: Inbox → Marketing → Product → Customer → Projects
+    if (canSeeNavTab(tabs, 'inbox') || canSeeNavTab(tabs, 'projects')) {
+      items.push({
+        key: 'inbox',
+        to: routes.inbox,
+        label: t('inbox'),
+        icon: Tray,
+        dataIc: 'inbox',
+      })
+    }
     if (canSeeNavTab(tabs, 'overview') || canSeeNavTab(tabs, 'home') || canSeeNavTab(tabs, 'instagram')) {
       items.push({
         key: 'marketing',
@@ -126,15 +135,6 @@ export function BusinessShell({
         label: t('sortanize'),
         icon: ArrowsDownUp,
         dataIc: 'sortanize',
-      })
-    }
-    if (canSeeNavTab(tabs, 'checkmap')) {
-      toolItems.push({
-        key: 'checkmap',
-        to: routes.checkmap,
-        label: t('checkmap'),
-        icon: MapTrifold,
-        dataIc: 'checkmap',
       })
     }
     if (toolItems.length) {

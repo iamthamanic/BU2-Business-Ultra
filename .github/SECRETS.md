@@ -16,3 +16,13 @@ Documented names only — configure in GitHub → Settings → Secrets and varia
 - `PUBLIC_API_URL`
 - `CORS_ORIGIN`
 - `SORTANIZE_URL` (optional override)
+
+## Optional — messaging OAuth (Inbox connect)
+
+Redirect URIs are derived from `PUBLIC_API_URL` at runtime (see Settings → Verbindungen). Register those URIs in Google / Azure / Meta; do not hardcode localhost in production.
+
+- `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`
+- `MICROSOFT_OAUTH_CLIENT_ID` / `MICROSOFT_OAUTH_CLIENT_SECRET`
+- `MICROSOFT_OAUTH_TENANT` (optional, default `common`)
+- `META_OAUTH_APP_ID` / `META_OAUTH_APP_SECRET`
+- `UNIPILE_DSN` / `UNIPILE_ACCESS_TOKEN` (personal Telegram via Unipile)

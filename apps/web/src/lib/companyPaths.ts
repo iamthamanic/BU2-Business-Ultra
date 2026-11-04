@@ -65,7 +65,10 @@ export function companyRoutes(slug: string) {
     product: `${base}/product`,
     customer: `${base}/customer`,
     customerDetail: (id: string) => `${base}/customer/${encodeURIComponent(id)}`,
+    /** Omnichannel messaging inbox */
+    inbox: `${base}/inbox`,
     projects: `${base}/projects`,
+    /** Assigned / project-less tasks */
     projectsMine: `${base}/projects/mine`,
     projectsRecurring: `${base}/projects/recurring`,
     projectDetail: (id: string) => `${base}/projects/${encodeURIComponent(id)}`,
@@ -201,6 +204,8 @@ export function mapOldBu2FrontendPath(slug: string, rest: string): string {
     product: routes.product,
     customer: routes.customer,
     projects: routes.projects,
+    inbox: routes.inbox,
+    'projects/mine': routes.inbox,
     ads: routes.ads,
     cmb: routes.cmb,
     costmybusiness: routes.cmb,

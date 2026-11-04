@@ -731,6 +731,9 @@ select.input,
 .sb-item[data-ic='marketing'] {
   --sb-ic: #60a5fa;
 }
+.sb-item[data-ic='inbox'] {
+  --sb-ic: #facc15;
+}
 .sb-item[data-ic='catalog'] {
   --sb-ic: #f59e0b;
 }
@@ -781,9 +784,6 @@ select.input,
 }
 .sb-item[data-ic='personas'] {
   --sb-ic: #60a5fa;
-}
-.sb-item[data-ic='checkmap'] {
-  --sb-ic: #34d399;
 }
 .sb-item[data-ic='seo'] {
   --sb-ic: #34d399;
@@ -10845,5 +10845,479 @@ a.customer-tag-chip--link:focus-visible {
   .customer-dl > div {
     grid-template-columns: 1fr;
     gap: 2px;
+  }
+}
+
+/* —— Omnichannel Inbox (Telegram E2E) —— */
+.inbox-shell {
+  min-height: 0;
+}
+
+.inbox-error {
+  color: var(--bad, #f87171);
+  margin: 0;
+  font-size: 13px;
+}
+
+.inbox-connect {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel, rgba(255, 255, 255, 0.02));
+}
+
+.inbox-connect .input {
+  min-width: min(320px, 100%);
+}
+
+.inbox-panes {
+  display: grid;
+  grid-template-columns: minmax(200px, 280px) minmax(0, 1fr) minmax(180px, 240px);
+  gap: 0;
+  min-height: 420px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--panel, rgba(255, 255, 255, 0.02));
+}
+
+.inbox-list,
+.inbox-thread,
+.inbox-context {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.inbox-list {
+  border-right: 1px solid var(--border);
+  padding: 8px;
+}
+
+.inbox-thread {
+  border-right: 1px solid var(--border);
+  padding: 0;
+}
+
+.inbox-context {
+  padding: 12px;
+}
+
+.inbox-conv-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  flex: 1;
+}
+
+.inbox-conv {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 10px 10px;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inbox-conv:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.inbox-conv.is-active {
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.inbox-conv-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.inbox-conv-title {
+  font-weight: 600;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inbox-channel-badge {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #38bdf8;
+  flex-shrink: 0;
+}
+
+.inbox-conv-preview {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inbox-empty {
+  padding: 16px 12px;
+  font-size: 13px;
+}
+
+.inbox-thread-head {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.inbox-thread-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.inbox-messages {
+  flex: 1;
+  overflow: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.inbox-bubble {
+  max-width: min(520px, 92%);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.inbox-bubble-inbound {
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.inbox-bubble-outbound {
+  align-self: flex-end;
+  background: rgba(56, 189, 248, 0.1);
+  border-color: rgba(56, 189, 248, 0.25);
+}
+
+.inbox-bubble-body {
+  margin: 0;
+  font-size: 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.inbox-bubble-meta {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+}
+
+.inbox-bubble[data-status='failed'] {
+  border-color: rgba(248, 113, 113, 0.45);
+}
+
+.inbox-composer {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+}
+
+.inbox-composer-input {
+  flex: 1;
+  resize: vertical;
+  min-height: 64px;
+}
+
+.inbox-context-title {
+  margin: 0 0 10px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--dim);
+}
+
+.inbox-context-name {
+  margin: 0;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.inbox-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.inbox-empty-connect {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.inbox-filter-tabs {
+  margin-bottom: 10px;
+}
+
+.inbox-reply-via {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.conn-messaging .co-card-head {
+  align-items: flex-start;
+}
+
+.conn-info-banner {
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  font-size: 13px;
+  color: var(--text);
+}
+
+.conn-table-wrap {
+  overflow-x: auto;
+}
+
+.conn-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.conn-table th,
+.conn-table td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.conn-table th {
+  color: var(--dim);
+  font-weight: 500;
+}
+
+.conn-prov-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.conn-usage-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.conn-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.conn-detail-row td {
+  background: var(--panel2);
+}
+
+.conn-detail-panel {
+  padding: 4px 0 8px;
+}
+
+.conn-detail-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.conn-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.conn-provider-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.conn-provider-card {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel2);
+  color: var(--text);
+  cursor: pointer;
+  --conn-ic: var(--dim);
+}
+
+button.conn-provider-card:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.conn-provider-card.is-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.conn-provider-icon {
+  flex-shrink: 0;
+  color: var(--conn-ic);
+}
+
+.conn-provider-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.conn-provider-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.conn-provider-redirect {
+  display: block;
+  font-size: 11px;
+  word-break: break-all;
+  margin-top: 2px;
+  opacity: 0.85;
+}
+
+.conn-redirect-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+}
+
+.conn-redirect-uri {
+  flex: 1 1 200px;
+  font-size: 12px;
+  word-break: break-all;
+  color: var(--text);
+}
+
+.conn-provider-card[data-ic='google'] {
+  --conn-ic: #ea4335;
+}
+.conn-provider-card[data-ic='microsoft'] {
+  --conn-ic: #00a4ef;
+}
+.conn-provider-card[data-ic='imap'] {
+  --conn-ic: #a78bfa;
+}
+.conn-provider-card[data-ic='whatsapp'] {
+  --conn-ic: #25d366;
+}
+.conn-provider-card[data-ic='instagram'] {
+  --conn-ic: #e4405f;
+}
+.conn-provider-card[data-ic='facebook'] {
+  --conn-ic: #1877f2;
+}
+.conn-provider-card[data-ic='telegram'] {
+  --conn-ic: #2aabee;
+}
+.conn-provider-card[data-ic='unipile'] {
+  --conn-ic: #2aabee;
+}
+
+.conn-legacy-heading {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.conn-connect-modal {
+  max-width: 480px;
+}
+
+.conn-qr-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 8px;
+  background: #fff;
+  border-radius: var(--radius-sm);
+  width: fit-content;
+  margin: 0 auto;
+}
+
+.conn-qr-img {
+  display: block;
+  width: 220px;
+  height: 220px;
+}
+
+.conn-or-sep {
+  text-align: center;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.inbox-channel-badge[data-ch='telegram_user'] {
+  color: #facc15;
+}
+
+@media (max-width: 960px) {
+  .inbox-panes {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .inbox-list,
+  .inbox-thread {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .inbox-panes[data-has-thread='true'] .inbox-list {
+    display: none;
+  }
+
+  .inbox-panes[data-has-thread='false'] .inbox-thread,
+  .inbox-panes[data-has-thread='false'] .inbox-context {
+    display: none;
   }
 }

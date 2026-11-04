@@ -14,7 +14,7 @@ import {
   UsersThree,
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
-import { canManageMembers, type Role } from '@bu2/shared'
+import { canManageCredentials, canManageMembers, type Role } from '@bu2/shared'
 import { MktTab, MktTabs } from '../../components/MktTabs'
 import { api } from '../../lib/api'
 import { writeLastCompany } from '../../lib/lastCompany'
@@ -221,6 +221,7 @@ export function SettingsPage() {
           <SettingsConnectionsTab
             slug={slug}
             secrets={secrets}
+            canManage={canManageCredentials((companyMeta?.role as Role) || 'viewer')}
             onSecretsChanged={() => {
               refreshAll().catch(console.error)
             }}

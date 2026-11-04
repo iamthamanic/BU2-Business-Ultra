@@ -1,5 +1,5 @@
 /**
- * MyTasksPage — assignee + inbox tasks with stats and enriched table.
+ * MyTasksPage — assignee + project-less tasks with stats and enriched table.
  * Location: apps/web/src/features/projects/MyTasksPage.tsx
  */
 import { useEffect, useMemo, useState } from 'react'
@@ -86,7 +86,7 @@ export function MyTasksPage() {
       .catch(() => setMembers([]))
   }, [slug])
 
-  const empty = tasks.length === 0
+  const empty = !loading && tasks.length === 0
 
   return (
     <div className="stack mkt-shell product-shell crm-shell">
@@ -131,7 +131,7 @@ export function MyTasksPage() {
 
       {empty ? (
         <CrmEmptyPreview
-          canWrite={canWrite && !loading}
+          canWrite={canWrite}
           ctaLabel={t('taskCreate')}
           hint={t('projectsMineLede')}
           onCta={() => setCreateOpen(true)}

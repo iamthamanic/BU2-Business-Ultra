@@ -453,6 +453,7 @@ export const NAV_TAB_KEYS = [
   'product',
   'customer',
   'projects',
+  'inbox',
   'instagram',
   'facebook',
   'tiktok',
@@ -484,6 +485,7 @@ export const STUB_MEMBER_NAV_TABS: NavTabKey[] = [
   'product',
   'customer',
   'projects',
+  'inbox',
   'instagram',
   'facebook',
   'tiktok',
@@ -500,8 +502,7 @@ export const STUB_MEMBER_NAV_TABS: NavTabKey[] = [
   'cmb',
   'sortanize',
   'personas',
-  'checkmap',
-  // seo/geo gated separately via grantSeoOpen; settings owner/admin only in shell
+  // checkmap: no sidebar; seo/geo gated via grantSeoOpen; settings owner/admin only in shell
 ]
 
 /**
@@ -639,3 +640,186 @@ export type StyleguideDoc = z.infer<typeof StyleguideDocSchema>
 export type StyleguideColor = z.infer<typeof StyleguideColorSchema>
 
 export const StyleguidePutSchema = StyleguideDocSchema
+
+/** Integration Core — provider catalog (code registry, not settings_secrets). */
+export const IntegrationProviderSchema = z.enum([
+  'mock',
+  'google',
+  'microsoft',
+  'imap',
+  'whatsapp',
+  'instagram',
+  'facebook',
+  /** @deprecated Prefer whatsapp / instagram / facebook in the connect UI. */
+  'meta',
+  'telegram',
+  'unipile',
+])
+export type IntegrationProvider = z.infer<typeof IntegrationProviderSchema>
+
+export const ConnectionAuthMethodSchema = z.enum([
+  'oauth_pkce',
+  'bot_token',
+  'api_key',
+  'aggregator_session',
+  'password',
+  'mock',
+])
+export type ConnectionAuthMethod = z.infer<typeof ConnectionAuthMethodSchema>
+
+export const ConnectionStatusSchema = z.enum([
+  'pending',
+  'active',
+  'degraded',
+  'revoked',
+  'error',
+])
+export type ConnectionStatus = z.infer<typeof ConnectionStatusSchema>
+
+/** BU2 modules that may bind a connection. */
+export const IntegrationModuleSchema = z.enum([
+  'inbox',
+  'marketing',
+  'ads',
+  'crm',
+  'projects',
+  'calendar',
+])
+export type IntegrationModule = z.infer<typeof IntegrationModuleSchema>
+
+export const BindingPurposeSchema = z.enum([
+  'read_mail',
+  'send_mail',
+  'read_dm',
+  'send_dm',
+  'publish',
+  'insights',
+  'calendar_read',
+  'calendar_write',
+  'sync',
+])
+export type BindingPurpose = z.infer<typeof BindingPurposeSchema>
+
+/** Structured capability — not a boolean map. */
+export const CapabilityWindowSchema = z.object({
+  kind: z.enum(['none', 'customer_care_hours', 'custom']),
+  /** Hours after last inbound customer message (e.g. WhatsApp 24). */
+  freeReplyHours: z.number().nonnegative().nullable().optional(),
+  notes: z.string().max(500).optional(),
+})
+
+export const StructuredCapabilitySchema = z.object({
+  operation: z.string().min(1).max(64),
+  allowed: z.boolean(),
+  reason: z.string().max(240).optional(),
+  scopes: z.array(z.string().max(120)).max(40).default([]),
+  accountType: z.string().max(80).optional(),
+  messageFormats: z.array(z.string().max(40)).max(20).default([]),
+  window: CapabilityWindowSchema.optional(),
+  availability: z.enum(['available', 'degraded', 'unavailable']).default('available'),
+})
+export type StructuredCapability = z.infer<typeof StructuredCapabilitySchema>
+
+export const ConnectMockSchema = z.object({
+  provider: z.literal('mock').default('mock'),
+  externalAccountId: z.string().min(1).max(160),
+  displayName: z.string().min(1).max(160).optional(),
+  /** Opaque mock credential — stored encrypted; never returned. */
+  credential: z.string().min(4).max(500),
+  accountType: z.string().max(80).optional(),
+})
+export type ConnectMockInput = z.infer<typeof ConnectMockSchema>
+
+export const CreateModuleBindingSchema = z.object({
+  connectionId: z.string().uuid(),
+  module: IntegrationModuleSchema,
+  purpose: BindingPurposeSchema,
+  enabled: z.boolean().default(true),
+})
+export type CreateModuleBindingInput = z.infer<typeof CreateModuleBindingSchema>
+
+/** UX: enable/disable all bindings for a connection × module (Inbox / CRM / Marketing tags). */
+export const SetModuleBindingSchema = z.object({
+  connectionId: z.string().uuid(),
+  module: IntegrationModuleSchema,
+  enabled: z.boolean(),
+})
+export type SetModuleBindingInput = z.infer<typeof SetModuleBindingSchema>
+
+export const UpsertSyncCursorSchema = z.object({
+  stream: z.string().min(1).max(80),
+  cursor: z.string().max(4000),
+})
+export type UpsertSyncCursorInput = z.infer<typeof UpsertSyncCursorSchema>
+
+export const ConnectTelegramSchema = z.object({
+  /** Bot token from @BotFather — stored encrypted; never returned. */
+  botToken: z.string().min(20).max(200),
+  displayName: z.string().min(1).max(160).optional(),
+})
+export type ConnectTelegramInput = z.infer<typeof ConnectTelegramSchema>
+
+export const ConnectImapSchema = z.object({
+  host: z.string().min(1).max(200),
+  port: z.number().int().min(1).max(65535).optional(),
+  user: z.string().min(1).max(200),
+  password: z.string().min(1).max(500),
+  secure: z.boolean().default(true),
+  protocol: z.enum(['imap', 'pop3']).default('imap'),
+  displayName: z.string().min(1).max(160).optional(),
+})
+export type ConnectImapInput = z.infer<typeof ConnectImapSchema>
+
+export const OAuthProviderParamSchema = z.enum([
+  'google',
+  'microsoft',
+  'whatsapp',
+  'instagram',
+  'facebook',
+])
+export type OAuthProviderParam = z.infer<typeof OAuthProviderParamSchema>
+
+/** Link personal Telegram via Unipile (existing account_id or after QR finalize). */
+export const LinkUnipileTelegramSchema = z.object({
+  accountId: z.string().min(4).max(160),
+  displayName: z.string().min(1).max(160).optional(),
+})
+export type LinkUnipileTelegramInput = z.infer<typeof LinkUnipileTelegramSchema>
+
+export const FinalizeUnipileTelegramSchema = z.object({
+  accountId: z.string().min(4).max(160),
+  displayName: z.string().min(1).max(160).optional(),
+})
+export type FinalizeUnipileTelegramInput = z.infer<typeof FinalizeUnipileTelegramSchema>
+
+export const InboxChannelSchema = z.enum([
+  'telegram',
+  'telegram_user',
+  'email',
+  'whatsapp',
+  'mock',
+])
+export type InboxChannel = z.infer<typeof InboxChannelSchema>
+
+export const ConversationStatusSchema = z.enum(['open', 'closed'])
+export type ConversationStatus = z.infer<typeof ConversationStatusSchema>
+
+export const MessageDirectionSchema = z.enum(['inbound', 'outbound'])
+export type MessageDirection = z.infer<typeof MessageDirectionSchema>
+
+export const DeliveryStatusSchema = z.enum(['pending', 'sent', 'failed', 'received'])
+export type DeliveryStatus = z.infer<typeof DeliveryStatusSchema>
+
+export const InboxReplySchema = z.object({
+  body: z.string().min(1).max(4000),
+})
+export type InboxReplyInput = z.infer<typeof InboxReplySchema>
+
+export const ContactIdentityKindSchema = z.enum([
+  'telegram_user',
+  'email',
+  'phone',
+  'instagram',
+  'other',
+])
+export type ContactIdentityKind = z.infer<typeof ContactIdentityKindSchema>

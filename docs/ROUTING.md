@@ -20,7 +20,7 @@ Admin stays **global** (no company prefix): `/admin`. Auth: `/login`, `/login/ve
 | **Product** | Katalog (default) · CostMyBusiness |
 | **Customer** | Kunden list + detail tabs |
 | **Projects** | Overview · Mine · Recurring · Detail |
-| **Tools** | Sortanize · CheckMap |
+| **Tools** | Sortanize |
 | Footer | Einstellungen · language · logout |
 | Topbar | Company switcher (unchanged) |
 
@@ -40,12 +40,13 @@ SEO/GEO stay under Marketing in the sidebar; URLs remain `/tools/seo` and `/tool
 | Custom funnel | `/co/:slug/marketing/funnel/custom/:channel` | same | email, offline |
 | CostMyBusiness | `/co/:slug/product/costmybusiness` | same | Under Product; `/tools/cmb` + `/cmb` redirect here |
 | Sortanize | `/co/:slug/tools/sortanize` | same | Tools dept |
-| CheckMap | `/co/:slug/tools/checkmap` (+ `/m/:mapId`) | same | Tools dept |
+| CheckMap | `/co/:slug/tools/checkmap` (+ `/m/:mapId`) | same | No sidebar entry (direct URL / API only) |
 | Personas / journey | `/co/:slug/tools/persona-journey` | same | Marketing dept (nav); alias `/tools/personas` |
 | OpenSEO / SEO | `/co/:slug/tools/seo` | same | Marketing dept (nav) |
 | GEO | `/co/:slug/tools/geo` | same page family as SEO | Marketing dept; AI Visibility surface |
 | Catalog / Katalog | _(none)_ | `/co/:slug/product/katalog` | Under Product; `/catalog` + `/katalog` redirect here |
 | Kunden | — | `/co/:slug/customer`, `/co/:slug/customer/:id` | CRM list + 5 tabs |
+| Inbox | — | `/co/:slug/inbox` | Omnichannel messaging (Telegram Bot first) |
 | Projekte | — | `/co/:slug/projects`, `/mine`, `/recurring`, `/:id` | Area/custom + tasks/board |
 | Settings / keys | _(in-admin / overlays)_ | `/co/:slug/settings` (+ `#connections`) | Footer |
 | Comments | `/comments` → overview | → marketing hub | |

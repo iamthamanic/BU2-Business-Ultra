@@ -325,7 +325,7 @@ export function ProjectsShell() {
 
       <div className="crm-subnav project-index-toolbar" role="navigation" aria-label={t('projects')}>
         <div className="project-index-nav">
-          <Link className="btn project-mine-cta" to={`${routes.projects}/mine`}>
+          <Link className="btn project-mine-cta" to={routes.projectsMine}>
             <ListChecks size={14} weight="bold" aria-hidden />
             {t('projectsMine')}
           </Link>

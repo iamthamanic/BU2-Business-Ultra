@@ -94,6 +94,10 @@ scripts/           backup/restore
 
 ## Recent changes
 
+- **2026-11-04** — Unipile Telegram User (02b): QR/link personal account → sync private DMs → reply; env `UNIPILE_DSN` + `UNIPILE_ACCESS_TOKEN`
+- **2026-11-04** — Omnichannel UX shell: Verbindungen hub (table + connect wizard + usage toggles); Inbox sources/filters; connect moved out of Inbox
+- **2026-11-04** — Inbox Telegram E2E: connect bot → sync → thread → reply/outbox; three-pane Dark-Ops UI
+- **2026-11-04** — Integration Core step 01: `connections` / credentials / bindings / sync cursors + mock adapter (`/api/b/:slug/integrations/…`)
 - **2026-11-03** — CRM (Kunden), Produkte, Projekte/Tasks, Labels/Tags, Styleguide + Create-Post flow; migrations `0002`–`0010`; Dark-Ops CRM UI
 - **2026-11-01** — Shell IA: Marketing (Hub/Organic/Paid/Custom/Persona/SEO/GEO) + Tools; Marketing Hub default landing; no Website dept ([docs/ROUTING.md](./docs/ROUTING.md))
 - **2026-11-01** — Topbar company switcher restored (legacy-style dropdown); sidebar Companies nav removed; `/` + post-login land on `bu2_last_company`; create-first when empty

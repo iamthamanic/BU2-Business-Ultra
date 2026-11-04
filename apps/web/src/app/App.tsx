@@ -22,6 +22,7 @@ import { ProjectsShell } from '../features/projects/ProjectsShell'
 import { ProjectDetail } from '../features/projects/ProjectDetail'
 import { MyTasksPage } from '../features/projects/MyTasksPage'
 import { RecurringRulesPage } from '../features/projects/RecurringRulesPage'
+import { InboxPage } from '../features/inbox/InboxPage'
 import { MarketingShell } from '../features/marketing/MarketingShell'
 import { MarketingPage } from '../features/marketing/MarketingPage'
 import { AdsPage } from '../features/ads/AdsPage'
@@ -125,6 +126,7 @@ export function App() {
         <Route path="customer" element={<CustomerShell />}>
           <Route path=":id" element={<CustomerDetail />} />
         </Route>
+        <Route path="inbox" element={<InboxPage />} />
         <Route path="projects" element={<ProjectsShell />}>
           <Route path="mine" element={<MyTasksPage />} />
           <Route path="recurring" element={<RecurringRulesPage />} />

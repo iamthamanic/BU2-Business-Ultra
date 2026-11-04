@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { companyRoutes } from '../../lib/companyPaths'
 import { useI18n } from '../../lib/i18n'
+import { MessagingConnectionsPanel } from './MessagingConnectionsPanel'
 
 const DIRECT_PROVIDERS = ['google_ads', 'meta_ads', 'tiktok_ads', 'chatgpt_ads'] as const
 
@@ -23,10 +24,11 @@ type MetricoolPayload = {
 type Props = {
   slug: string
   secrets: SecretRow[]
+  canManage: boolean
   onSecretsChanged: () => void
 }
 
-export function SettingsConnectionsTab({ slug, secrets, onSecretsChanged }: Props) {
+export function SettingsConnectionsTab({ slug, secrets, canManage, onSecretsChanged }: Props) {
   const { t } = useI18n()
   const routes = companyRoutes(slug)
   const [mc, setMc] = useState<MetricoolPayload | null>(null)
@@ -122,6 +124,10 @@ export function SettingsConnectionsTab({ slug, secrets, onSecretsChanged }: Prop
 
   return (
     <div className="stack" id="connections">
+      <MessagingConnectionsPanel slug={slug} canManage={canManage} />
+
+      <h3 className="conn-legacy-heading">{t('connLegacyHeading')}</h3>
+
       {/* Metricool */}
       <section className="panel stack">
         <div className="co-card-head">

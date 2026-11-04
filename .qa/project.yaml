@@ -63,6 +63,7 @@ viewports:
     height: 720
 
 navigation:
+  - Inbox
   - Marketing
   - Produkt
   - Kunden

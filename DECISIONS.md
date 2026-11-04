@@ -35,6 +35,15 @@ Source of truth for implementation. Overrides conflicting Cursor user-rules (no 
 | Marketing | Metricool-first scheduler SoR; master draft + target variants |
 | Catalog | Catalog SoR; CMB internal simulation |
 | Lifecycle | Archive not delete |
+| Inbox | **First-party Omnichannel Inbox** — own Dark-Ops UI + message model; no Chatwoot/Yuva fork or iframe |
+| Integration Core | Shared **Provider → Connection → Binding** (+ credentials, capability resolver, sync/webhooks, outbox); modules own domain tables |
+| Connections ≠ secrets | Keep `settings_secrets` for single API-key gates; **multi-account** mailboxes/pages use new `connections` / credentials tables |
+| Capabilities | Structured (scopes, account type, formats, time windows, live availability) — not booleans alone |
+| Identity | `contact_identities` provisional; uncertain CRM match needs confirm; never cross-business merge |
+| Adapters | Direct where official APIs cover the use case; Unipile (or peer) for restricted/user-session channels (e.g. Telegram personal DMs); diligence before prod |
+| Omnichannel accounts | Product goal = connect bot **and** personal channel accounts into one Inbox; auth method per Connection (`bot_token` vs `aggregator_session` vs OAuth) |
+| Inbox build order | 01 Connection Core → 02 Telegram Bot E2E → **02b Telegram User via Unipile** → 03 Gmail/Outlook → 04 CRM/team → 05 Meta → 06 long-tail/automations |
+| Gmail launch | Restricted scopes; OAuth verification / assessment in public release plan (OK for local/dev) |
 
 ## Precedence notes (from PRD S-058)
 
