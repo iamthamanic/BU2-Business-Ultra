@@ -72,6 +72,8 @@ export function companyRoutes(slug: string) {
     projectsMine: `${base}/projects/mine`,
     projectsRecurring: `${base}/projects/recurring`,
     projectDetail: (id: string) => `${base}/projects/${encodeURIComponent(id)}`,
+    /** Finance department (placeholder) */
+    finance: `${base}/finance`,
     marketingPersonas: `${base}/marketing/personas`,
     marketingStyleguide: `${base}/marketing/styleguide`,
     organic: (ch: string) => `${base}/marketing/funnel/organic/${ch}`,

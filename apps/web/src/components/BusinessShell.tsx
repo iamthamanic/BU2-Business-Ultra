@@ -1,6 +1,6 @@
 /**
  * BusinessShell — `/co/:slug` layout with department sidebar IA.
- * Flat Inbox · Marketing · Product · Customer · Projects · Tools (Sortanize).
+ * Flat Inbox · Marketing · Product · Customer · Projects · Finance · Tools (Sortanize).
  * Settings in footer; company switcher in sidebar. Nav filtered by membership.tabs.
  * API calls remain `/api/b/:slug`. Location: apps/web/src/components/BusinessShell.tsx
  */
@@ -13,6 +13,7 @@ import {
   Cube,
   UsersThree,
   Folders,
+  CurrencyEur,
   Tray,
 } from '@phosphor-icons/react'
 import { canSeeNavTab } from '@bu2/shared'
@@ -74,7 +75,7 @@ export function BusinessShell({
   const topItems: RailItem[] = useMemo(() => {
     if (!routes) return []
     const items: RailItem[] = []
-    // Order: Inbox → Marketing → Product → Customer → Projects
+    // Order: Inbox → Marketing → Product → Customer → Projects → Finance
     if (canSeeNavTab(tabs, 'inbox') || canSeeNavTab(tabs, 'projects')) {
       items.push({
         key: 'inbox',
@@ -118,6 +119,15 @@ export function BusinessShell({
         label: t('projects'),
         icon: Folders,
         dataIc: 'projects',
+      })
+    }
+    if (canSeeNavTab(tabs, 'finance')) {
+      items.push({
+        key: 'finance',
+        to: routes.finance,
+        label: t('finance'),
+        icon: CurrencyEur,
+        dataIc: 'finance',
       })
     }
     return items
