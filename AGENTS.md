@@ -36,9 +36,11 @@ Business Ultra 2 (BU2) ist ein modularer Monolith für Marketing-, Produkt-, Kun
 
 ## Architektur
 
+Kanonischer Vertrag: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** (modular monolith + sharpening target). Kurzüberblick:
+
 ```
-apps/web/          Dark-Ops shell, features (customer, projects, product, …)
-apps/api/          Fastify modules + DB
+apps/web/          Dark-Ops shell, features (match API module names), shared components/
+apps/api/          Fastify modules (routes + service) + DB
 apps/e2e/          Playwright
 packages/shared/   Zod contracts
 packages/finance-calc/
@@ -49,6 +51,8 @@ packages/finance-calc/
 1. UI spricht nur Shared-Contracts / API-Client — keine SQL im Frontend
 2. AuthZ serverseitig; Tenant-Slug aus Route, nicht aus Client-Trust
 3. Neue UI: bestehende Shell-/Product-/CRM-Klassen vor neuen One-offs
+4. API-Module: HTTP in `routes.ts`, Logik in `service.ts` (siehe ARCHITECTURE module template)
+5. Kein SagaTree-`domains/`-Frontend; Structure-Refactors ohne Contract-Breaks
 
 ---
 

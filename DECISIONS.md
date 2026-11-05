@@ -44,6 +44,7 @@ Source of truth for implementation. Overrides conflicting Cursor user-rules (no 
 | Omnichannel accounts | Product goal = connect bot **and** personal channel accounts into one Inbox; auth method per Connection (`bot_token` vs `aggregator_session` vs OAuth) |
 | Inbox build order | 01 Connection Core → 02 Telegram Bot E2E → **02b Telegram User via Unipile** → 03 Gmail/Outlook → 04 CRM/team → 05 Meta → 06 long-tail/automations |
 | Gmail launch | Restricted scopes; OAuth verification / assessment in public release plan (OK for local/dev) |
+| Arch-sharpen (2026-11-05) | **Stay modular monolith**; sharpen for navigability — API modules = `routes` + `service`; Drizzle schema split by ownership with stable `db/schema` barrel; web `features/` names match API modules (`customers`, `products`); `components/` = shared-only. **Anti-goals:** no microservices; no SagaTree `#94` `domains/` + eradicated-`components/` frontend; no HTTP/URL/table renames as part of structure-only refactors. Detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 
 ## Precedence notes (from PRD S-058)
 
