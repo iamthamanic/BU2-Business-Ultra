@@ -1,6 +1,6 @@
 # Composition Gate — arch-customers-service-split
 
-- HEAD_SHA: WORKTREE (uncommitted customers split)
+- HEAD_SHA: 19a00503a810eef91270bf7e0039f5dd866dea14
 - Date: 2026-11-05
 - Verdict: SKIPPED
 
