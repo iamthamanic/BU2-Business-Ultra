@@ -14,19 +14,7 @@ import {
 } from '../../lib/integrations/oauth/redirects.js'
 import { parseOAuthState } from '../../lib/integrations/oauth/state.js'
 import { loadMembership, requireUser } from '../../plugins/auth.js'
-
-function httpError(e: unknown): { status: number; error: string } {
-  const err = e as Error & { statusCode?: number }
-  return {
-    status: err.statusCode && err.statusCode >= 400 ? err.statusCode : 500,
-    error: err.message || 'error',
-  }
-}
-
-function settingsReturnUrl(slug: string): string {
-  const web = loadEnv().PUBLIC_WEB_URL.replace(/\/$/, '')
-  return `${web}/co/${encodeURIComponent(slug)}/settings?tab=connections&oauth=1`
-}
+import { httpError, settingsReturnUrl } from './oauthService.js'
 
 export async function oauthIntegrationRoutes(app: FastifyInstance) {
   /** Public helper — redirect URIs to paste into Google / Azure / Meta consoles. */

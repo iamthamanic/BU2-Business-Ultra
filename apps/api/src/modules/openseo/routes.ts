@@ -15,35 +15,7 @@ import { loadMembership, requireUser } from '../../plugins/auth.js'
 import { hashToken, randomToken, safeEqualHex } from '../../lib/crypto.js'
 import { loadEnv } from '../../lib/env.js'
 import { writeAudit } from '../../lib/audit.js'
-
-function mapRole(role: string): 'admin' | 'member' | 'viewer' {
-  if (role === 'owner' || role === 'admin') return 'admin'
-  if (role === 'editor') return 'member'
-  return 'viewer'
-}
-
-function editorCapabilities() {
-  return {
-    allowed: ['research', 'analyze', 'audit', 'reports'] as const,
-    denied: [
-      'team_admin',
-      'credentials',
-      'global_integrations',
-      'budgets',
-      'irreversible_delete',
-    ] as const,
-  }
-}
-
-function verifyInternalSecret(header: string | undefined): boolean {
-  const env = loadEnv()
-  if (!header) return false
-  const expected = `Bearer ${env.OPENSEO_SSO_SHARED_SECRET}`
-  const a = Buffer.from(header)
-  const b = Buffer.from(expected)
-  if (a.length !== b.length) return false
-  return timingSafeEqual(a, b)
-}
+import { mapRole, editorCapabilities, verifyInternalSecret } from './service.js'
 
 export async function openseoRoutes(app: FastifyInstance) {
   app.get('/api/b/:slug/openseo', async (req, reply) => {

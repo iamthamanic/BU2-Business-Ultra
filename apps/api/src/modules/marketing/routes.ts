@@ -30,6 +30,7 @@ import {
   organicSurface,
   resolveFunnelSource,
 } from '../../lib/funnel-source.js'
+import { listSocialDrafts } from './service.js'
 
 export async function marketingRoutes(app: FastifyInstance) {
   app.get('/api/b/:slug/marketing/capabilities', async (req, reply) => {
@@ -100,10 +101,7 @@ export async function marketingRoutes(app: FastifyInstance) {
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
     if (!m) return reply.code(404).send({ error: 'not_found' })
-    const drafts = await db
-      .select()
-      .from(socialDrafts)
-      .where(and(eq(socialDrafts.businessId, m.businessId), isNull(socialDrafts.archivedAt)))
+    const drafts = await listSocialDrafts(m.businessId)
     return { drafts }
   })
 

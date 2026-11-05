@@ -1,6 +1,6 @@
 /**
  * Company settings — secrets, logo, Metricool brand links, funnel bindings.
- * Location: apps/api/src/modules/settings/routes.ts
+ * Location: apps/api/src/modules/settings/routes.ts — helpers in ./service.ts
  */
 import type { FastifyInstance } from 'fastify'
 import { and, eq } from 'drizzle-orm'
@@ -31,16 +31,7 @@ import { join } from 'node:path'
 import { loadEnv } from '../../lib/env.js'
 import { randomToken } from '../../lib/crypto.js'
 import { listBrands } from '../../lib/integrations/metricool.js'
-
-const UpsertSecretSchema = z.object({
-  provider: SecretProviderSchema,
-  apiKey: z.string().min(8).max(4000),
-})
-
-const LinkMetricoolSchema = z.object({
-  blogId: z.string().min(1).max(80),
-  label: z.string().max(160).optional(),
-})
+import { UpsertSecretSchema, LinkMetricoolSchema } from './service.js'
 
 export async function settingsRoutes(app: FastifyInstance) {
   app.get('/api/b/:slug/settings/secrets', async (req, reply) => {
