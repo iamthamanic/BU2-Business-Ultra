@@ -165,12 +165,13 @@ Document approved exceptions in [DECISIONS.md](../DECISIONS.md). Do not weaken t
 |-------|--------------------|--------|
 | Lint + typecheck + web build | `pnpm run checks` | project gate |
 | E2E | `pnpm test:e2e` | project gate |
-| Architecture boundary script | `scripts/check-boundaries.sh` | **UNRESOLVED** — wire into checks (queued) |
+| Architecture boundary script | `scripts/check-boundaries.sh` (via `pnpm run checks`) | enforces: no Drizzle/SQL/`apps/api`/db imports in `apps/web` |
 
 ## Open items
 
-- [ ] Executable import-boundary checks in `pnpm run checks` (web must not import Drizzle/SQL/api db)
+- [x] Executable import-boundary checks in `pnpm run checks` (web must not import Drizzle/SQL/api db)
+- [x] Apply module template to fat API modules (projects, customers, …)
+- [x] Schema ownership file split (stable barrel)
+- [x] Web feature naming sync (`customers` / `products`)
 - [ ] Per-module public API list beyond route folders
-- [ ] Apply module template to fat API modules (projects, customers, …)
-- [ ] Schema ownership file split (stable barrel)
-- [ ] Web feature naming sync (`customers` / `products`)
+- [ ] Optional: per-table write ownership enforcement (warn-only)
