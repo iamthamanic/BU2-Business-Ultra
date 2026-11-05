@@ -19,6 +19,8 @@ export type MembershipCtx = {
   slug: string
   role: Role
   grantSeoOpen: boolean
+  grantToolsUse: boolean
+  grantToolsManage: boolean
   status: string
 }
 
@@ -83,6 +85,8 @@ export async function loadMembership(
       status: businesses.status,
       role: memberships.role,
       grantSeoOpen: memberships.grantSeoOpen,
+      grantToolsUse: memberships.grantToolsUse,
+      grantToolsManage: memberships.grantToolsManage,
     })
     .from(businesses)
     .innerJoin(memberships, eq(memberships.businessId, businesses.id))
@@ -95,6 +99,8 @@ export async function loadMembership(
     slug: row.slug,
     role: row.role as Role,
     grantSeoOpen: row.grantSeoOpen,
+    grantToolsUse: row.grantToolsUse,
+    grantToolsManage: row.grantToolsManage,
     status: row.status,
   }
 }

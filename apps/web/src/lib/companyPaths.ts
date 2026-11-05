@@ -85,8 +85,10 @@ export function companyRoutes(slug: string) {
     customCh: (ch: string) => `${base}/marketing/funnel/custom/${ch}`,
     /** CMB bookmarks resolve to Product placeholder for now */
     cmb: `${base}/product`,
+    tools: `${base}/tools`,
     sortanize: `${base}/tools/sortanize`,
-    checkmap: `${base}/tools/checkmap`,
+    /** @deprecated CheckMap removed — redirects to tools hub */
+    checkmap: `${base}/tools`,
     /** Persona Journey lives under Marketing tabs */
     personas: `${base}/marketing/personas`,
     /** Website / SEO under Organic → Website */
@@ -214,7 +216,8 @@ export function mapOldBu2FrontendPath(slug: string, rest: string): string {
     'product/costmybusiness': routes.cmb,
     'product/cmb': routes.cmb,
     'tools/cmb': routes.cmb,
-    checkmap: routes.checkmap,
+    checkmap: routes.tools,
+    tools: routes.tools,
     personas: routes.personas,
     sortanize: routes.sortanize,
     openseo: routes.openseo,

@@ -39,8 +39,9 @@ SEO/GEO stay under Marketing in the sidebar; URLs remain `/tools/seo` and `/tool
 | Paid ads | `/co/:slug/marketing/funnel/paid/:channel` | same | Channels: google, meta, tiktok, chatgpt |
 | Custom funnel | `/co/:slug/marketing/funnel/custom/:channel` | same | email, offline |
 | CostMyBusiness | `/co/:slug/product/costmybusiness` | same | Under Product; `/tools/cmb` + `/cmb` redirect here |
-| Sortanize | `/co/:slug/tools/sortanize` | same | Tools dept |
-| CheckMap | `/co/:slug/tools/checkmap` (+ `/m/:mapId`) | same | No sidebar entry (direct URL / API only) |
+| Tools hub | `/co/:slug/tools` | same | Top-level Tools nav; custom installs + Sortanize tile |
+| Sortanize | `/co/:slug/tools/sortanize` | same | Opened from Tools hub |
+| CheckMap | removed | — | Hard-removed; legacy URLs redirect to Tools hub |
 | Personas / journey | `/co/:slug/tools/persona-journey` | same | Marketing dept (nav); alias `/tools/personas` |
 | OpenSEO / SEO | `/co/:slug/tools/seo` | same | Marketing dept (nav) |
 | GEO | `/co/:slug/tools/geo` | same page family as SEO | Marketing dept; AI Visibility surface |

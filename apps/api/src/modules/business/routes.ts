@@ -309,6 +309,8 @@ export async function businessRoutes(app: FastifyInstance) {
         id: memberships.id,
         role: memberships.role,
         grantSeoOpen: memberships.grantSeoOpen,
+        grantToolsUse: memberships.grantToolsUse,
+        grantToolsManage: memberships.grantToolsManage,
         email: users.email,
         displayName: users.displayName,
         userId: users.id,

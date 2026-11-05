@@ -27,10 +27,10 @@ import { FinancePage } from '../features/finance/FinancePage'
 import { MarketingShell } from '../features/marketing/MarketingShell'
 import { MarketingPage } from '../features/marketing/MarketingPage'
 import { AdsPage } from '../features/ads/AdsPage'
-import { CheckMapPage } from '../features/checkmap/CheckMapPage'
 import { StyleguidePage } from '../features/marketing/StyleguidePage'
 import { PersonasPage } from '../features/personas/PersonasPage'
 import { SortanizePage } from '../features/sortanize/SortanizePage'
+import { ToolsPage } from '../features/tools/ToolsPage'
 import { OpenSeoPage } from '../features/openseo/OpenSeoPage'
 import { SettingsPage } from '../features/settings/SettingsPage'
 import { AdminPage } from '../features/admin/AdminPage'
@@ -156,13 +156,13 @@ export function App() {
           <Route path="funnel/paid" element={<Navigate to={DEFAULT_PAID_CHANNEL} replace />} />
         </Route>
 
+        <Route path="tools" element={<ToolsPage />} />
         <Route path="tools/cmb/*" element={<CoRedirect to="product" />} />
         <Route path="tools/cmb" element={<CoRedirect to="product" />} />
         <Route path="tools/sortanize/*" element={<SortanizePage />} />
         <Route path="tools/sortanize" element={<SortanizePage />} />
-        <Route path="tools/checkmap/m/:mapId" element={<CheckMapPage />} />
-        <Route path="tools/checkmap/*" element={<CheckMapPage />} />
-        <Route path="tools/checkmap" element={<CheckMapPage />} />
+        <Route path="tools/checkmap/*" element={<CoRedirect to="tools" />} />
+        <Route path="tools/checkmap" element={<CoRedirect to="tools" />} />
         <Route path="tools/persona-journey/*" element={<CoRedirect to="marketing/personas" />} />
         <Route path="tools/persona-journey" element={<CoRedirect to="marketing/personas" />} />
         <Route path="tools/personas/*" element={<CoRedirect to="marketing/personas" />} />
@@ -186,7 +186,7 @@ export function App() {
         <Route path="c/:channel" element={<CoRedirectOrganic />} />
         <Route path="cmb" element={<CoRedirect to="product/costmybusiness" />} />
         <Route path="costmybusiness" element={<CoRedirect to="product/costmybusiness" />} />
-        <Route path="checkmap" element={<CoRedirect to="tools/checkmap" />} />
+        <Route path="checkmap" element={<CoRedirect to="tools" />} />
         <Route path="personas" element={<CoRedirect to="marketing/personas" />} />
         <Route path="sortanize" element={<CoRedirect to="tools/sortanize" />} />
         <Route path="openseo" element={<CoRedirect to="marketing/funnel/organic/website" />} />

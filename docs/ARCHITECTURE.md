@@ -82,7 +82,7 @@ schema/
   inbox.ts
   integrations.ts
   marketing.ts
-  tools.ts         # checkmap, personas, cmb, openseo, …
+  tools.ts         # tool_installs, personas, cmb, openseo, …
   index.ts         # re-export
 schema.ts          # stable barrel re-export (keep import path `db/schema`)
 ```
@@ -120,7 +120,7 @@ Approximate ownership by table group in `apps/api/src/db/schema.ts`:
 | Product / catalog | `products`, `catalog_products` |
 | Projects | `projects`, `tasks`, `task_*`, `recurrence_rules`, `task_occurrences`, `project_events` |
 | Marketing / ads | `social_drafts`, `ads_campaigns`, `funnel_bindings`, `brevo_campaigns` |
-| Tools | `checkmap_*`, `personas`, `cmb_*`, `openseo_*` |
+| Tools | `tool_installs`, `personas`, `cmb_*`, `openseo_*` |
 | Audit | `audit_log` |
 
 **UNRESOLVED:** formal “only this module may write table X” enforcement (optional later; not required for sharpening).

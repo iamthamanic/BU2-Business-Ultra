@@ -1,13 +1,12 @@
 /**
  * BusinessShell — `/co/:slug` layout with department sidebar IA.
- * Flat Inbox · Marketing · Product · Customer · Projects · Finance · Tools (Sortanize).
+ * Flat Inbox · Marketing · Product · Customer · Projects · Finance · Tools hub.
  * Settings in footer; company switcher in sidebar. Nav filtered by membership.tabs.
  * API calls remain `/api/b/:slug`. Location: apps/web/src/components/BusinessShell.tsx
  */
 import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useParams } from 'react-router-dom'
 import {
-  ArrowsDownUp,
   GearSix,
   Megaphone,
   Cube,
@@ -15,8 +14,9 @@ import {
   Folders,
   CurrencyEur,
   Tray,
+  Wrench,
 } from '@phosphor-icons/react'
-import { canSeeNavTab } from '@bu2/shared'
+import { canSeeNavTab, canUseTools } from '@bu2/shared'
 import { api } from '../lib/api'
 import { companyRoutes } from '../lib/companyPaths'
 import { writeLastCompany } from '../lib/lastCompany'
@@ -28,6 +28,8 @@ import type { RailGroup, RailItem } from './IconRail'
 export type MembershipPayload = {
   role: 'owner' | 'admin' | 'editor' | 'viewer'
   grantSeoOpen: boolean
+  grantToolsUse: boolean
+  grantToolsManage: boolean
   tabs: string[] | null
 }
 
@@ -130,29 +132,26 @@ export function BusinessShell({
         dataIc: 'finance',
       })
     }
-    return items
-  }, [routes, t, tabs])
-
-  const groups: RailGroup[] = useMemo(() => {
-    if (!routes) return []
-    const out: RailGroup[] = []
-
-    const toolItems: RailItem[] = []
-    if (canSeeNavTab(tabs, 'sortanize')) {
-      toolItems.push({
-        key: 'sortanize',
-        to: routes.sortanize,
-        label: t('sortanize'),
-        icon: ArrowsDownUp,
-        dataIc: 'sortanize',
+    const toolsGranted =
+      !membership ||
+      canUseTools(
+        membership.role,
+        membership.grantToolsUse ?? false,
+        membership.grantToolsManage ?? false,
+      )
+    if (toolsGranted && (canSeeNavTab(tabs, 'tools') || canSeeNavTab(tabs, 'sortanize'))) {
+      items.push({
+        key: 'tools',
+        to: routes.tools,
+        label: t('toolsHub'),
+        icon: Wrench,
+        dataIc: 'tools',
       })
     }
-    if (toolItems.length) {
-      out.push({ id: 'tools', label: t('navTools'), items: toolItems })
-    }
+    return items
+  }, [routes, t, tabs, membership])
 
-    return out
-  }, [routes, t, tabs])
+  const groups: RailGroup[] = useMemo(() => [], [])
 
   const settingsItem: RailItem | null =
     routes && canSeeNavTab(tabs, 'settings') && (membership?.role === 'owner' || membership?.role === 'admin' || user.isSuperadmin)

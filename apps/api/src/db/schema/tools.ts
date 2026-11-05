@@ -2,19 +2,7 @@
  * Drizzle schema — tools ownership tables.
  * Location: apps/api/src/db/schema/tools.ts
  */
-import {
-  boolean,
-  date,
-  integer,
-  jsonb,
-  pgTable,
-  primaryKey,
-  text,
-  timestamp,
-  uniqueIndex,
-  uuid,
-  varchar,
-} from 'drizzle-orm/pg-core'
+import { jsonb, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core'
 
 import { businesses, users } from './identity.js'
 
@@ -41,34 +29,26 @@ export const cmbSnapshots = pgTable('cmb_snapshots', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
-export const checkmapBoards = pgTable('checkmap_boards', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  businessId: uuid('business_id')
-    .notNull()
-    .references(() => businesses.id, { onDelete: 'cascade' }),
-  title: varchar('title', { length: 200 }).notNull(),
-  nodes: jsonb('nodes').$type<unknown[]>().notNull().default([]),
-  edges: jsonb('edges').$type<unknown[]>().notNull().default([]),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-})
-
-export const checkmapAttachments = pgTable('checkmap_attachments', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  businessId: uuid('business_id')
-    .notNull()
-    .references(() => businesses.id, { onDelete: 'cascade' }),
-  boardId: uuid('board_id')
-    .notNull()
-    .references(() => checkmapBoards.id, { onDelete: 'cascade' }),
-  nodeId: varchar('node_id', { length: 80 }),
-  filename: varchar('filename', { length: 255 }).notNull(),
-  mimeType: varchar('mime_type', { length: 120 }).notNull(),
-  sizeBytes: integer('size_bytes').notNull(),
-  storagePath: text('storage_path').notNull(),
-  createdByUserId: uuid('created_by_user_id').references(() => users.id),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
+/** Tenant-installed tools (custom URL apps + future manifests). One row per manifest_id. */
+export const toolInstalls = pgTable(
+  'tool_installs',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    businessId: uuid('business_id')
+      .notNull()
+      .references(() => businesses.id, { onDelete: 'cascade' }),
+    manifestId: varchar('manifest_id', { length: 80 }).notNull(),
+    name: varchar('name', { length: 120 }).notNull(),
+    entryUrl: text('entry_url').notNull(),
+    iconKey: varchar('icon_key', { length: 40 }).notNull().default('puzzle'),
+    scopes: jsonb('scopes').$type<Record<string, { read?: boolean; write?: boolean }>>().notNull().default({}),
+    kind: varchar('kind', { length: 24 }).notNull().default('custom'),
+    createdByUserId: uuid('created_by_user_id').references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('tool_installs_biz_manifest_uidx').on(t.businessId, t.manifestId)],
+)
 
 export const personas = pgTable('personas', {
   id: uuid('id').defaultRandom().primaryKey(),

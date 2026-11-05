@@ -18,7 +18,7 @@ import { settingsRoutes } from './modules/settings/routes.js'
 import { marketingRoutes } from './modules/marketing/routes.js'
 import { adsRoutes } from './modules/ads/routes.js'
 import { cmbRoutes } from './modules/cmb/routes.js'
-import { checkmapRoutes } from './modules/checkmap/routes.js'
+import { toolsRoutes } from './modules/tools/routes.js'
 import { personasRoutes } from './modules/personas/routes.js'
 import { tagsRoutes } from './modules/tags/routes.js'
 import { sortanizeRoutes } from './modules/sortanize/routes.js'
@@ -81,7 +81,7 @@ async function main() {
   await marketingRoutes(app)
   await adsRoutes(app)
   await cmbRoutes(app)
-  await checkmapRoutes(app)
+  await toolsRoutes(app)
   await personasRoutes(app)
   await tagsRoutes(app)
   await integrationRoutes(app)

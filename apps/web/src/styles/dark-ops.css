@@ -785,6 +785,90 @@ select.input,
 .sb-item[data-ic='sortanize'] {
   --sb-ic: #a78bfa;
 }
+.sb-item[data-ic='tools'] {
+  --sb-ic: #c4b5fd;
+}
+
+.tools-hub-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.tools-hub-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+.tools-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  min-height: 160px;
+}
+.tools-card-ic {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--panel2) 80%, var(--bg));
+  color: var(--accent);
+}
+.tools-card-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+}
+.tools-card-meta {
+  margin: 0;
+  font-size: 12px;
+  flex: 1;
+}
+.tools-card-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.tools-add-form {
+  padding: 16px;
+  gap: 12px;
+}
+.tools-scope-matrix {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  margin: 0;
+}
+.tools-scope-grid {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px 12px;
+  align-items: center;
+  margin-top: 8px;
+}
+.tools-scope-row {
+  display: contents;
+}
+.tools-list-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.tools-list-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
 .sb-item[data-ic='personas'] {
   --sb-ic: #60a5fa;
 }

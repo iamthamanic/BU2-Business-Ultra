@@ -581,9 +581,9 @@ export const MODULE_KEYS = [
   'marketing',
   'ads',
   'cmb',
-  'checkmap',
   'personas',
   'sortanize',
+  'tools',
   'openseo',
   'settings',
 ] as const
@@ -617,9 +617,9 @@ export const NAV_TAB_KEYS = [
   'email',
   'offline',
   'cmb',
+  'tools',
   'sortanize',
   'personas',
-  'checkmap',
   'seo',
   'geo',
   'settings',
@@ -650,9 +650,9 @@ export const STUB_MEMBER_NAV_TABS: NavTabKey[] = [
   'email',
   'offline',
   'cmb',
-  'sortanize',
+  'tools',
   'personas',
-  // checkmap: no sidebar; seo/geo gated via grantSeoOpen; settings owner/admin only in shell
+  // seo/geo gated via grantSeoOpen; tools use also gated via grantTools*; settings owner/admin only in shell
 ]
 
 /**
@@ -695,6 +695,81 @@ export function canOpenSeo(role: Role, grantSeoOpen: boolean): boolean {
   if (role === 'editor' && grantSeoOpen) return true
   return false
 }
+
+/** Open / list Tools hub (first-party + installed). Owner/admin always. */
+export function canUseTools(role: Role, grantToolsUse: boolean, grantToolsManage = false): boolean {
+  if (role === 'owner' || role === 'admin') return true
+  return grantToolsUse || grantToolsManage
+}
+
+/** Install / configure / uninstall custom tools. Owner/admin always. */
+export function canManageTools(role: Role, grantToolsManage: boolean): boolean {
+  if (role === 'owner' || role === 'admin') return true
+  return grantToolsManage
+}
+
+/** BU2 resources that custom tools may request (visual scope matrix). */
+export const TOOL_SCOPE_RESOURCES = [
+  'customers',
+  'projects',
+  'inbox',
+  'marketing',
+  'products',
+  'finance',
+  'settings',
+  'integrations',
+] as const
+export type ToolScopeResource = (typeof TOOL_SCOPE_RESOURCES)[number]
+
+export const ToolScopeAccessSchema = z.object({
+  read: z.boolean().optional(),
+  write: z.boolean().optional(),
+})
+
+export const ToolScopesSchema = z.record(z.string(), ToolScopeAccessSchema)
+
+export const ToolManifestIdSchema = z
+  .string()
+  .min(2)
+  .max(80)
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+
+export const CreateToolInstallSchema = z.object({
+  manifestId: ToolManifestIdSchema,
+  name: z.string().min(1).max(120),
+  entryUrl: z
+    .string()
+    .url()
+    .refine((u) => u.startsWith('https://'), { message: 'entry_url_https_required' }),
+  iconKey: z.string().min(1).max(40).optional(),
+  scopes: ToolScopesSchema.default({}),
+})
+export type CreateToolInstallInput = z.infer<typeof CreateToolInstallSchema>
+
+export const UpdateToolInstallSchema = z.object({
+  name: z.string().min(1).max(120).optional(),
+  entryUrl: z
+    .string()
+    .url()
+    .refine((u) => u.startsWith('https://'), { message: 'entry_url_https_required' })
+    .optional(),
+  iconKey: z.string().min(1).max(40).optional(),
+  scopes: ToolScopesSchema.optional(),
+})
+export type UpdateToolInstallInput = z.infer<typeof UpdateToolInstallSchema>
+
+export const ToolInstallDtoSchema = z.object({
+  id: z.string().uuid(),
+  manifestId: z.string(),
+  name: z.string(),
+  entryUrl: z.string(),
+  iconKey: z.string(),
+  scopes: ToolScopesSchema,
+  kind: z.enum(['custom', 'system']),
+  openMode: z.enum(['route', 'external']),
+  openPath: z.string().nullable(),
+})
+export type ToolInstallDto = z.infer<typeof ToolInstallDtoSchema>
 
 /** Canonical funnel surfaces for company settings matrix (legacy parity). */
 export type FunnelSurfaceDef = {

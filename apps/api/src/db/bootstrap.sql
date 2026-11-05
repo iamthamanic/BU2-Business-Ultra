@@ -53,6 +53,8 @@ CREATE TABLE IF NOT EXISTS memberships (
   user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   role varchar(16) NOT NULL,
   grant_seo_open boolean NOT NULL DEFAULT false,
+  grant_tools_use boolean NOT NULL DEFAULT false,
+  grant_tools_manage boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (business_id, user_id)
 );
@@ -156,27 +158,19 @@ CREATE TABLE IF NOT EXISTS cmb_snapshots (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS checkmap_boards (
+CREATE TABLE IF NOT EXISTS tool_installs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   business_id uuid NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
-  title varchar(200) NOT NULL,
-  nodes jsonb NOT NULL DEFAULT '[]'::jsonb,
-  edges jsonb NOT NULL DEFAULT '[]'::jsonb,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS checkmap_attachments (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  business_id uuid NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
-  board_id uuid NOT NULL REFERENCES checkmap_boards(id) ON DELETE CASCADE,
-  node_id varchar(80),
-  filename varchar(255) NOT NULL,
-  mime_type varchar(120) NOT NULL,
-  size_bytes integer NOT NULL,
-  storage_path text NOT NULL,
+  manifest_id varchar(80) NOT NULL,
+  name varchar(120) NOT NULL,
+  entry_url text NOT NULL,
+  icon_key varchar(40) NOT NULL DEFAULT 'puzzle',
+  scopes jsonb NOT NULL DEFAULT '{}'::jsonb,
+  kind varchar(24) NOT NULL DEFAULT 'custom',
   created_by_user_id uuid REFERENCES users(id),
-  created_at timestamptz NOT NULL DEFAULT now()
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (business_id, manifest_id)
 );
 
 CREATE TABLE IF NOT EXISTS personas (

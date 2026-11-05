@@ -42,7 +42,7 @@ test.describe('core 23B @core23b', () => {
     expect(body.service).toBe('bu2-api')
   })
 
-  test('login + create business + catalog + cmb + checkmap', async ({ request }) => {
+  test('login + create business + catalog + cmb + tools hub', async ({ request }) => {
     await loginAsBootstrap(request)
 
     const slug = `e2e-${Date.now().toString(36)}`
@@ -68,14 +68,20 @@ test.describe('core 23B @core23b', () => {
     const snap = (await calc.json()).snapshot
     expect(snap.contributionNet).toBe(3000)
 
-    const board = await request.post(`${API}/api/b/${slug}/checkmap`, {
+    const tools = await request.get(`${API}/api/b/${slug}/tools`)
+    expect(tools.ok()).toBeTruthy()
+    const toolsBody = (await tools.json()) as { tools: { manifestId: string }[] }
+    expect(toolsBody.tools.some((t) => t.manifestId === 'sortanize')).toBeTruthy()
+
+    const install = await request.post(`${API}/api/b/${slug}/tools`, {
       data: {
-        title: 'Map',
-        nodes: [{ id: 'n1', type: 'todo', title: 'Task', x: 10, y: 10, status: 'open', priority: 'p2' }],
-        edges: [],
+        name: 'E2E App',
+        manifestId: `e2e-app-${Date.now().toString(36)}`,
+        entryUrl: 'https://example.com/app',
+        scopes: { customers: { read: true } },
       },
     })
-    expect(board.ok()).toBeTruthy()
+    expect(install.ok()).toBeTruthy()
 
     const persona = await request.post(`${API}/api/b/${slug}/personas`, {
       data: { name: 'Buyer', summary: 'Test', goals: [], pains: [], channels: [], journey: [] },
@@ -100,7 +106,7 @@ test.describe('core 23B @core23b', () => {
     expect([200, 409]).toContain(res.status())
   })
 
-  test('customers + projects + recurrence tick idempotent + checkmap smoke', async ({
+  test('customers + projects + recurrence tick idempotent + tools smoke', async ({
     request,
   }) => {
     await loginAsBootstrap(request)
@@ -176,7 +182,7 @@ test.describe('core 23B @core23b', () => {
     )
     expect(neg.status()).toBe(404)
 
-    const checkmap = await request.get(`${API}/api/b/${slug}/checkmap`)
-    expect(checkmap.ok()).toBeTruthy()
+    const tools = await request.get(`${API}/api/b/${slug}/tools`)
+    expect(tools.ok()).toBeTruthy()
   })
 })

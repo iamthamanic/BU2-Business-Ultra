@@ -79,6 +79,8 @@ export const memberships = pgTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     role: varchar('role', { length: 16 }).notNull(),
     grantSeoOpen: boolean('grant_seo_open').notNull().default(false),
+    grantToolsUse: boolean('grant_tools_use').notNull().default(false),
+    grantToolsManage: boolean('grant_tools_manage').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('memberships_business_user_uidx').on(t.businessId, t.userId)],
