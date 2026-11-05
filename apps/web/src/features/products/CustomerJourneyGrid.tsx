@@ -19,7 +19,7 @@ import {
   X,
 } from '@phosphor-icons/react'
 import { useMemo, useState } from 'react'
-import { FunnelTip } from '../FunnelTip'
+import { FunnelTip } from '../../components/FunnelTip'
 import { useI18n } from '../../lib/i18n'
 import {
   LANE_GROUPS,

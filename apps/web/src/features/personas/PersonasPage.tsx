@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { Package, Plus, UserFocus } from '@phosphor-icons/react'
-import { CustomerJourneyGrid } from '../../components/product/CustomerJourneyGrid'
+import { CustomerJourneyGrid } from '../products/CustomerJourneyGrid'
 import { api } from '../../lib/api'
 import { companyRoutes } from '../../lib/companyPaths'
 import { useI18n } from '../../lib/i18n'
@@ -13,9 +13,9 @@ import {
   defaultJourneyMap,
   normalizeJourneyMap,
   type JourneyMap,
-} from '../product/customerJourney'
-import type { BuProduct } from '../product/productTypes'
-import { initials } from '../product/productTypes'
+} from '../products/customerJourney'
+import type { BuProduct } from '../products/productTypes'
+import { initials } from '../products/productTypes'
 import { PersonaCreateModal } from './PersonaCreateModal'
 
 type Persona = {
