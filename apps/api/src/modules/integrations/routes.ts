@@ -12,6 +12,7 @@ import {
   SetModuleBindingSchema,
   UpsertSyncCursorSchema,
   canManageCredentials,
+  canMutateContent,
 } from '@bu2/shared'
 import {
   connectImapAccount,
@@ -25,23 +26,20 @@ import {
   upsertSyncCursor,
 } from '../../lib/integrations/core/connections.js'
 import { PROVIDER_CATALOG } from '../../lib/integrations/core/providers.js'
-import { ensureMockAdapterRegistered } from '../../lib/integrations/core/mockAdapter.js'
 import { ensureImapAdapterRegistered } from '../../lib/integrations/imap/adapter.js'
+import { and, eq } from 'drizzle-orm'
+import { db } from '../../db/client.js'
+import { connections } from '../../db/schema.js'
+import { httpError } from '../../lib/httpError.js'
+import { getGoogleAccessToken } from '../../lib/integrations/google/tokens.js'
+import { listAccessibleCustomers, listCampaigns } from '../../lib/integrations/googleAds/client.js'
 import { oauthClientConfiguredForProvider } from '../../lib/integrations/oauth/config.js'
 import { oauthRedirectUriForProvider } from '../../lib/integrations/oauth/redirects.js'
 import { isUnipileConfigured } from '../../lib/integrations/unipile/inboxSync.js'
+import { uploadYoutubeVideo } from '../../lib/integrations/youtube/client.js'
 import { loadMembership, requireUser } from '../../plugins/auth.js'
 
-ensureMockAdapterRegistered()
 ensureImapAdapterRegistered()
-
-function httpError(e: unknown): { status: number; error: string } {
-  const err = e as Error & { statusCode?: number }
-  return {
-    status: err.statusCode && err.statusCode >= 400 ? err.statusCode : 500,
-    error: err.message || 'error',
-  }
-}
 
 export async function integrationRoutes(app: FastifyInstance) {
   app.get('/api/b/:slug/integrations/providers', async (req, reply) => {
@@ -254,6 +252,121 @@ export async function integrationRoutes(app: FastifyInstance) {
         body.data.cursor,
       )
       return { cursor: { stream: cursor.stream, updatedAt: cursor.updatedAt, renewedAt: cursor.renewedAt } }
+    } catch (e) {
+      const { status, error } = httpError(e)
+      return reply.code(status).send({ error })
+    }
+  })
+
+  /** Google Ads — list accessible customer IDs (OAuth; Cloud project must have Ads API enabled). */
+  app.get('/api/b/:slug/integrations/google-ads/connections/:id/customers', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug, id } = req.params as { slug: string; id: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m) return reply.code(403).send({ error: 'forbidden' })
+    const conn = await getConnectionForBusiness(m.businessId, id)
+    if (!conn || conn.provider !== 'google_ads') {
+      return reply.code(404).send({ error: 'not_found' })
+    }
+    try {
+      const { accessToken } = await getGoogleAccessToken(m.businessId, id)
+      const customers = await listAccessibleCustomers(accessToken)
+      return { customers }
+    } catch (e) {
+      const { status, error } = httpError(e)
+      return reply.code(status).send({ error })
+    }
+  })
+
+  /** Bind selected Google Ads customer id onto the connection (multi-account picker). */
+  app.post('/api/b/:slug/integrations/google-ads/connections/:id/select-customer', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug, id } = req.params as { slug: string; id: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m || (!canManageCredentials(m.role) && !user.isSuperadmin)) {
+      return reply.code(403).send({ error: 'forbidden' })
+    }
+    const customerId = String((req.body as { customerId?: string })?.customerId || '')
+      .replace(/-/g, '')
+      .trim()
+    if (!/^\d{6,12}$/.test(customerId)) {
+      return reply.code(400).send({ error: 'invalid_customer_id' })
+    }
+    const conn = await getConnectionForBusiness(m.businessId, id)
+    if (!conn || conn.provider !== 'google_ads') {
+      return reply.code(404).send({ error: 'not_found' })
+    }
+    const health = { ...(conn.health || {}), customerId, pendingCustomerPick: false }
+    await db
+      .update(connections)
+      .set({
+        health,
+        displayName: conn.displayName || `Ads ${customerId}`,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(connections.id, id), eq(connections.businessId, m.businessId)))
+    return { ok: true, customerId }
+  })
+
+  app.get('/api/b/:slug/integrations/google-ads/connections/:id/campaigns', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug, id } = req.params as { slug: string; id: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m) return reply.code(403).send({ error: 'forbidden' })
+    const conn = await getConnectionForBusiness(m.businessId, id)
+    if (!conn || conn.provider !== 'google_ads') {
+      return reply.code(404).send({ error: 'not_found' })
+    }
+    const customerId = String((conn.health as { customerId?: string })?.customerId || '')
+    if (!customerId) {
+      return reply.code(409).send({ error: 'customer_not_selected' })
+    }
+    try {
+      const { accessToken } = await getGoogleAccessToken(m.businessId, id)
+      const campaigns = await listCampaigns(accessToken, customerId)
+      return { campaigns, customerId, mode: 'live' as const }
+    } catch (e) {
+      const { status, error } = httpError(e)
+      return reply.code(status).send({ error })
+    }
+  })
+
+  /** YouTube — upload / schedule from Planen (multipart: file + title/description/publishAt). */
+  app.post('/api/b/:slug/integrations/youtube/connections/:id/upload', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug, id } = req.params as { slug: string; id: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m || (!canMutateContent(m.role) && !user.isSuperadmin)) {
+      return reply.code(403).send({ error: 'forbidden' })
+    }
+    const conn = await getConnectionForBusiness(m.businessId, id)
+    if (!conn || conn.provider !== 'youtube') {
+      return reply.code(404).send({ error: 'not_found' })
+    }
+    const data = await req.file()
+    if (!data) return reply.code(400).send({ error: 'file_required' })
+    const chunks: Buffer[] = []
+    for await (const c of data.file) chunks.push(Buffer.from(c))
+    const body = Buffer.concat(chunks)
+    if (body.length === 0) return reply.code(400).send({ error: 'empty_file' })
+    if (body.length > 256 * 1024 * 1024) {
+      return reply.code(413).send({ error: 'file_too_large' })
+    }
+    const fields = data.fields as Record<string, { value?: string } | undefined>
+    const title = String(fields.title?.value || data.filename || 'Untitled').slice(0, 100)
+    const description = String(fields.description?.value || '').slice(0, 5000)
+    const publishAt = fields.publishAt?.value ? String(fields.publishAt.value) : null
+    try {
+      const { accessToken } = await getGoogleAccessToken(m.businessId, id)
+      const uploaded = await uploadYoutubeVideo({
+        accessToken,
+        title,
+        description,
+        mimeType: data.mimetype || 'video/mp4',
+        body,
+        publishAt,
+      })
+      return { ok: true, videoId: uploaded.id, status: uploaded.status }
     } catch (e) {
       const { status, error } = httpError(e)
       return reply.code(status).send({ error })

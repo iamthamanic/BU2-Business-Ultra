@@ -71,7 +71,7 @@ export function ProjectDetail() {
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
   const [createStatus, setCreateStatus] = useState<TaskStatus>('open')
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+  const [selected, setSelected] = useState<{ id: string; source: 'task' | 'rule' } | null>(null)
   const [memberDraft, setMemberDraft] = useState<string[]>([])
   const [startDraft, setStartDraft] = useState('')
   const [dueDraft, setDueDraft] = useState('')
@@ -104,6 +104,7 @@ export function ProjectDetail() {
   }
 
   async function toggleTaskDone(task: BuTask, done: boolean) {
+    if (task.source === 'rule') return
     await api(`/api/b/${slug}/tasks/${task.id}/status`, {
       method: 'POST',
       body: JSON.stringify({
@@ -112,6 +113,14 @@ export function ProjectDetail() {
       }),
     })
     await refresh()
+  }
+
+  function openTask(task: BuTask | string) {
+    if (typeof task === 'string') {
+      setSelected({ id: task, source: 'task' })
+      return
+    }
+    setSelected({ id: task.id, source: task.source === 'rule' ? 'rule' : 'task' })
   }
 
   function openCreate(status: TaskStatus = 'open') {
@@ -140,11 +149,6 @@ export function ProjectDetail() {
     }
     return [...ids].map((uid) => memberById[uid]).filter(Boolean) as MemberInfo[]
   }, [project, tasks, memberById])
-
-  const openTasks = useMemo(
-    () => tasks.filter((task) => task.status !== 'done').slice(0, 6),
-    [tasks],
-  )
 
   if (loading && !project) return <p className="muted">…</p>
   if (!project) return <p className="error">{t('notFound')}</p>
@@ -286,47 +290,19 @@ export function ProjectDetail() {
               </button>
             </section>
 
-            <div className="project-overview-side">
-              <section className="panel project-overview-panel">
-                <header className="project-overview-panel-head">
-                  <h2 className="crm-section-title" style={{ margin: 0 }}>
-                    {t('projectOpenTasks')}
-                  </h2>
-                  <span className="project-overview-count">{openTasks.length}</span>
-                </header>
-                {tasks.length === 0 ? (
-                  <CrmEmptyPreview
-                    canWrite={canWrite}
-                    ctaLabel={t('taskCreateFirst')}
-                    hint={t('taskEmptyHint')}
-                    onCta={() => openCreate('open')}
-                  >
-                    <EmptyTaskTable t={t} />
-                  </CrmEmptyPreview>
-                ) : openTasks.length === 0 ? (
-                  <p className="muted project-overview-empty">{t('projectOpenTasksEmpty')}</p>
-                ) : (
-                  <TaskTable
-                    tasks={openTasks}
-                    onOpen={setSelectedTaskId}
-                    t={t}
-                    memberById={memberById}
-                    compact
-                    canWrite={canWrite}
-                    onToggleDone={toggleTaskDone}
-                  />
-                )}
-              </section>
-
-              <section className="panel project-overview-panel">
+            <aside className="project-overview-side">
+              <section className="panel project-overview-panel project-overview-activity">
                 <header className="project-overview-panel-head">
                   <h2 className="crm-section-title" style={{ margin: 0 }}>
                     {t('projectRecentActivity')}
                   </h2>
+                  {events.length > 0 ? (
+                    <span className="project-overview-count">{events.length}</span>
+                  ) : null}
                 </header>
-                <ActivityList events={events.slice(0, 5)} t={t} compact />
+                <ActivityList events={events} t={t} compact />
               </section>
-            </div>
+            </aside>
           </div>
         </div>
       ) : null}
@@ -345,7 +321,7 @@ export function ProjectDetail() {
           <div className="crm-tab-panel">
             <TaskTable
               tasks={tasks}
-              onOpen={setSelectedTaskId}
+              onOpen={openTask}
               t={t}
               memberById={memberById}
               showFilters
@@ -365,7 +341,7 @@ export function ProjectDetail() {
             laneOrder={project.boardLaneOrder}
             memberById={memberById}
             t={t}
-            onOpenTask={setSelectedTaskId}
+            onOpenTask={openTask}
             onCreate={(status) => openCreate(status || 'open')}
             onChanged={refresh}
             onLaneOrderChange={async (order: TaskStatus[]) => {
@@ -621,11 +597,12 @@ export function ProjectDetail() {
       />
       <TaskDetailModal
         slug={slug}
-        taskId={selectedTaskId}
+        taskId={selected?.id ?? null}
+        source={selected?.source ?? 'task'}
         canWrite={canWrite}
         memberById={memberById}
         members={members}
-        onClose={() => setSelectedTaskId(null)}
+        onClose={() => setSelected(null)}
         onChanged={() => {
           refresh().catch(console.error)
         }}

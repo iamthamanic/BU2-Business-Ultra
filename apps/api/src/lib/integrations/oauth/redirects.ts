@@ -19,7 +19,8 @@ const REDIRECT_PATH: Record<OAuthRedirectProvider, string> = {
 export function oauthRedirectKey(
   provider: IntegrationProvider | string,
 ): OAuthRedirectProvider | null {
-  if (provider === 'google') return 'google'
+  // Gmail + YouTube + Google Ads share one Google Cloud OAuth client / callback.
+  if (provider === 'google' || provider === 'youtube' || provider === 'google_ads') return 'google'
   if (provider === 'microsoft') return 'microsoft'
   if (provider === 'whatsapp' || provider === 'instagram' || provider === 'facebook' || provider === 'meta') {
     return 'meta'

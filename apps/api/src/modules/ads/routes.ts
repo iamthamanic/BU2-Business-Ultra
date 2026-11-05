@@ -1,20 +1,15 @@
 import type { FastifyInstance } from 'fastify'
 import { and, eq } from 'drizzle-orm'
 import { AdsCampaignDraftSchema, ConfirmMutationSchema, canMutateContent } from '@bu2/shared'
-import type { SecretProvider } from '@bu2/shared'
 import { db } from '../../db/client.js'
 import { adsCampaigns } from '../../db/schema.js'
 import { loadMembership, requireUser } from '../../plugins/auth.js'
-import { getBusinessSecret } from '../../lib/secrets.js'
 import { writeAudit } from '../../lib/audit.js'
 import { mutateAds, type AdsProvider } from '../../lib/integrations/ads.js'
-
-const providerGate: Record<string, SecretProvider> = {
-  google_ads: 'google_ads',
-  meta_ads: 'meta_ads',
-  tiktok_ads: 'tiktok_ads',
-  chatgpt_ads: 'chatgpt_ads',
-}
+import {
+  ADS_PROVIDER_SECRET_GATE,
+  resolveAdsCredential,
+} from '../../lib/integrations/adsCredentials.js'
 
 export async function adsRoutes(app: FastifyInstance) {
   app.get('/api/b/:slug/ads', async (req, reply) => {
@@ -35,10 +30,20 @@ export async function adsRoutes(app: FastifyInstance) {
     const m = await loadMembership(user.id, slug)
     if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
     const body = AdsCampaignDraftSchema.parse(req.body)
-    const gate = providerGate[body.provider]
-    const secret = gate ? await getBusinessSecret(m.businessId, gate) : null
-    if (!secret?.valid) {
-      return reply.code(409).send({ error: 'provider_key_required', gate: body.provider })
+    const provider = body.provider as AdsProvider
+    if (!ADS_PROVIDER_SECRET_GATE[provider]) {
+      return reply.code(400).send({ error: 'unknown_provider' })
+    }
+    const cred = await resolveAdsCredential(m.businessId, provider)
+    if (!cred) {
+      return reply.code(409).send({
+        error: 'provider_key_required',
+        gate: body.provider,
+        hint:
+          provider === 'google_ads'
+            ? 'Connect Google Ads under Settings → Connections (OAuth), or set a legacy API secret.'
+            : undefined,
+      })
     }
     const [campaign] = await db
       .insert(adsCampaigns)
@@ -52,7 +57,7 @@ export async function adsRoutes(app: FastifyInstance) {
         createdByUserId: user.id,
       })
       .returning()
-    return { campaign }
+    return { campaign, credentialSource: cred.source }
   })
 
   app.post('/api/b/:slug/ads/:id/publish', async (req, reply) => {
@@ -69,13 +74,13 @@ export async function adsRoutes(app: FastifyInstance) {
         .limit(1)
     )[0]
     if (!campaign) return reply.code(404).send({ error: 'not_found' })
-    const gate = providerGate[campaign.provider]
-    if (!gate) return reply.code(400).send({ error: 'unknown_provider' })
-    const secret = await getBusinessSecret(m.businessId, gate)
-    if (!secret?.valid) {
+    const provider = campaign.provider as AdsProvider
+    if (!ADS_PROVIDER_SECRET_GATE[provider]) return reply.code(400).send({ error: 'unknown_provider' })
+    const cred = await resolveAdsCredential(m.businessId, provider)
+    if (!cred) {
       return reply.code(409).send({ error: 'provider_key_required', gate: campaign.provider })
     }
-    const result = await mutateAds(campaign.provider as AdsProvider, secret.plaintext, {
+    const result = await mutateAds(provider, cred.plaintext, {
       name: campaign.name,
       budgetDailyCents: campaign.budgetDailyCents,
       objective: campaign.objective,
@@ -94,8 +99,14 @@ export async function adsRoutes(app: FastifyInstance) {
       actorUserId: user.id,
       action: 'ads.publish_confirmed',
       resourceRef: campaign.id,
-      meta: { provider: campaign.provider, mode: result.mode, detail: result.detail },
+      meta: {
+        provider: campaign.provider,
+        mode: result.mode,
+        detail: result.detail,
+        credentialSource: cred.source,
+        connectionId: cred.connectionId,
+      },
     })
-    return { ok: true, ...result }
+    return { ok: true, ...result, credentialSource: cred.source }
   })
 }

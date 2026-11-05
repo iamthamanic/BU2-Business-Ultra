@@ -11,7 +11,6 @@ import {
   Lightbulb,
   MagnifyingGlass,
   Plus,
-  Question,
   Smiley,
   Truck,
   User,
@@ -20,6 +19,7 @@ import {
   X,
 } from '@phosphor-icons/react'
 import { useMemo, useState } from 'react'
+import { FunnelTip } from '../FunnelTip'
 import { useI18n } from '../../lib/i18n'
 import {
   LANE_GROUPS,
@@ -170,9 +170,9 @@ export function CustomerJourneyGrid({
                         <div className="cj-ph-title">{ph.title}</div>
                         <div className="cj-ph-life">{life.label}</div>
                       </div>
-                      <span className="cj-tip" title={life.tip} aria-label={life.tip}>
-                        <Question size={12} weight="bold" aria-hidden />
-                      </span>
+                      <FunnelTip tip={life.tip} iconOnly className="cj-tip">
+                        {life.label}
+                      </FunnelTip>
                     </div>
                   </th>
                 )
@@ -188,9 +188,9 @@ export function CustomerJourneyGrid({
                     <div className="cj-lane-head">
                       <LaneIcon size={16} weight="regular" aria-hidden />
                       <span className="cj-lane-lab">{lane.label}</span>
-                      <span className="cj-tip" title={lane.tip} aria-label={lane.tip}>
-                        <Question size={12} weight="bold" aria-hidden />
-                      </span>
+                      <FunnelTip tip={lane.tip} iconOnly className="cj-tip">
+                        {lane.label}
+                      </FunnelTip>
                     </div>
                   </th>
                   {map.phases.map((ph) => {

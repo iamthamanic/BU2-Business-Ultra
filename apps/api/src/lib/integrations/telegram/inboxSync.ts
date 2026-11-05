@@ -520,6 +520,22 @@ export async function replyInConversation(opts: {
   const conn = connRows[0]
   if (!conn) throw Object.assign(new Error('connection_not_found'), { statusCode: 404 })
 
+  if (conn.provider === 'google') {
+    const sendCap = purposeAllowed(parseCapabilitiesCache(conn.capabilitiesCache), 'send_mail')
+    if (!sendCap.allowed) {
+      throw Object.assign(new Error(sendCap.reason || 'capability_denied'), { statusCode: 409 })
+    }
+    const { replyGmailConversation } = await import('../gmail/inboxSync.js')
+    return replyGmailConversation({
+      businessId: opts.businessId,
+      conversationId: conv.id,
+      connectionId: conv.connectionId,
+      threadId: conv.externalThreadId,
+      body: opts.body,
+      userId: opts.userId,
+    })
+  }
+
   const sendCap = purposeAllowed(parseCapabilitiesCache(conn.capabilitiesCache), 'send_dm')
   if (!sendCap.allowed) {
     throw Object.assign(new Error(sendCap.reason || 'capability_denied'), { statusCode: 409 })

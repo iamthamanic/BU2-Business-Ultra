@@ -1,6 +1,6 @@
 /**
- * CustomerNoteEditor — rich note toolbar (bold/italic/underline/list/color) + sanitized HTML body.
- * Location: apps/web/src/features/customer/CustomerNoteEditor.tsx
+ * NoteEditor — rich note toolbar (bold/italic/underline/list/color) + sanitized HTML body.
+ * Location: apps/web/src/components/notes/NoteEditor.tsx
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -161,7 +161,7 @@ type Props = {
   rows?: number
 }
 
-export function CustomerNoteEditor({
+export function NoteEditor({
   value,
   onChange,
   disabled,
@@ -334,3 +334,6 @@ export function CustomerNoteEditor({
     </div>
   )
 }
+
+/** @deprecated Prefer NoteEditor — kept for call-site compatibility. */
+export const CustomerNoteEditor = NoteEditor

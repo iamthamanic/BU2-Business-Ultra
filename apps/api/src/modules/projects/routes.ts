@@ -7,7 +7,7 @@ import { mkdir, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import type { FastifyInstance } from 'fastify'
-import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, lte, or } from 'drizzle-orm'
+import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, lte, ne, or } from 'drizzle-orm'
 import {
   ProjectPatchSchema,
   ProjectSchema,
@@ -102,13 +102,19 @@ async function assertTaskProjectAccess(
 }
 
 function toAttachment(row: typeof taskAttachments.$inferSelect, businessId: string) {
+  const folder = row.taskId
+    ? `tasks/${row.taskId}`
+    : row.ruleId
+      ? `rules/${row.ruleId}`
+      : 'orphan'
   return {
     id: row.id,
     taskId: row.taskId,
+    ruleId: row.ruleId ?? null,
     filename: row.filename,
     mimeType: row.mimeType,
     sizeBytes: row.sizeBytes,
-    url: `/uploads/${businessId}/tasks/${row.taskId}/${row.filename}`,
+    url: `/uploads/${businessId}/${folder}/${row.filename}`,
     createdByUserId: row.createdByUserId,
     createdAt: row.createdAt,
   }
@@ -131,7 +137,10 @@ async function addProjectEvent(
   })
 }
 
-function toTask(row: typeof tasks.$inferSelect) {
+function toTask(
+  row: typeof tasks.$inferSelect,
+  opts?: { mode?: 'once' | 'recurring' },
+) {
   return {
     id: row.id,
     projectId: row.projectId,
@@ -142,12 +151,92 @@ function toTask(row: typeof tasks.$inferSelect) {
     priority: row.priority,
     assigneeUserId: row.assigneeUserId,
     dueAt: row.dueAt,
+    reminders: Array.isArray(row.reminders) ? row.reminders : [],
+    mode: opts?.mode ?? 'once',
+    source: 'task' as const,
     sortOrder: row.sortOrder,
     version: row.version,
     archivedAt: row.archivedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   }
+}
+
+/** Period is closed until nextAt — show as done with reopen countdown. */
+function isPeriodDoneWaiting(row: typeof recurrenceRules.$inferSelect, now = new Date()) {
+  return Boolean(
+    row.lastCompletedAt && row.nextAt.getTime() > now.getTime() && !row.pausedAt,
+  )
+}
+
+/** Present a recurrence rule as a task-like row for list/board UI. */
+function ruleAsTask(row: typeof recurrenceRules.$inferSelect, now = new Date()) {
+  const waiting = isPeriodDoneWaiting(row, now)
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    customerId: row.customerId,
+    title: row.title,
+    description: row.description,
+    status: row.pausedAt ? 'blocked' : waiting ? 'done' : 'open',
+    priority: row.priority,
+    assigneeUserId: row.assigneeUserId,
+    dueAt: row.nextAt,
+    reminders: Array.isArray(row.reminders) ? row.reminders : [],
+    mode: 'recurring' as const,
+    source: 'rule' as const,
+    freq: row.freq,
+    weekday: row.weekday,
+    monthDay: row.monthDay,
+    /** ISO — when a completed period reopens (countdown target). */
+    reopensAt: waiting ? row.nextAt.toISOString() : null,
+    lastCompletedAt: row.lastCompletedAt ? row.lastCompletedAt.toISOString() : null,
+    sortOrder: 0,
+    version: 1,
+    archivedAt: null as string | null,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  }
+}
+
+function statsFromMerged(
+  merged: Array<{ status: string; dueAt: Date | string | null }>,
+) {
+  const now = Date.now()
+  const s = { total: 0, done: 0, open: 0, overdue: 0 }
+  for (const t of merged) {
+    s.total++
+    if (t.status === 'done') {
+      s.done++
+      continue
+    }
+    s.open++
+    const due = t.dueAt ? new Date(t.dueAt).getTime() : NaN
+    if (!Number.isNaN(due) && due < now) s.overdue++
+  }
+  return s
+}
+
+async function occurrenceTaskIdSet(taskIds: string[]): Promise<Set<string>> {
+  if (!taskIds.length) return new Set()
+  const rows = await db
+    .select({ taskId: taskOccurrences.taskId })
+    .from(taskOccurrences)
+    .where(inArray(taskOccurrences.taskId, taskIds))
+  return new Set(rows.map((r) => r.taskId))
+}
+
+/** One-shot tasks (excluding materializations) + recurrence rules as recurring rows. */
+async function mergeTasksWithRules(
+  taskRows: (typeof tasks.$inferSelect)[],
+  ruleRows: (typeof recurrenceRules.$inferSelect)[],
+) {
+  const occIds = await occurrenceTaskIdSet(taskRows.map((r) => r.id))
+  const once = taskRows
+    .filter((r) => !occIds.has(r.id))
+    .map((r) => toTask(r, { mode: 'once' }))
+  const recurring = filterActiveRules(ruleRows).map((r) => ruleAsTask(r))
+  return [...once, ...recurring]
 }
 
 function toRule(row: typeof recurrenceRules.$inferSelect) {
@@ -166,7 +255,9 @@ function toRule(row: typeof recurrenceRules.$inferSelect) {
     startsAt: row.startsAt,
     endsAt: row.endsAt,
     pausedAt: row.pausedAt,
+    lastCompletedAt: row.lastCompletedAt,
     nextAt: row.nextAt,
+    reminders: Array.isArray(row.reminders) ? row.reminders : [],
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   }
@@ -190,8 +281,90 @@ async function loadTask(businessId: string, id: string) {
   return rows[0] ?? null
 }
 
+async function loadRule(businessId: string, id: string) {
+  const rows = await db
+    .select()
+    .from(recurrenceRules)
+    .where(and(eq(recurrenceRules.id, id), eq(recurrenceRules.businessId, businessId)))
+    .limit(1)
+  return rows[0] ?? null
+}
+
+function isRuleActive(row: typeof recurrenceRules.$inferSelect, now = new Date()) {
+  return !(row.endsAt && row.endsAt.getTime() <= now.getTime())
+}
+
+function filterActiveRules(rows: (typeof recurrenceRules.$inferSelect)[]) {
+  const now = new Date()
+  return rows.filter((r) => isRuleActive(r, now))
+}
+
+async function loadRuleSideContent(businessId: string, ruleId: string) {
+  const [commentRows, checklist, attachments] = await Promise.all([
+    db
+      .select({
+        id: taskComments.id,
+        ruleId: taskComments.ruleId,
+        authorUserId: taskComments.authorUserId,
+        body: taskComments.body,
+        createdAt: taskComments.createdAt,
+        authorDisplayName: users.displayName,
+        authorEmail: users.email,
+      })
+      .from(taskComments)
+      .leftJoin(users, eq(users.id, taskComments.authorUserId))
+      .where(eq(taskComments.ruleId, ruleId))
+      .orderBy(asc(taskComments.createdAt)),
+    db
+      .select()
+      .from(taskChecklistItems)
+      .where(eq(taskChecklistItems.ruleId, ruleId))
+      .orderBy(asc(taskChecklistItems.sortOrder)),
+    db
+      .select()
+      .from(taskAttachments)
+      .where(
+        and(eq(taskAttachments.ruleId, ruleId), eq(taskAttachments.businessId, businessId)),
+      )
+      .orderBy(desc(taskAttachments.createdAt)),
+  ])
+  return {
+    comments: commentRows.map((c) => ({
+      id: c.id,
+      ruleId: c.ruleId,
+      authorUserId: c.authorUserId,
+      body: c.body,
+      createdAt: c.createdAt,
+      authorDisplayName: c.authorDisplayName?.trim() || c.authorEmail || null,
+    })),
+    checklist,
+    attachments: attachments.map((a) => toAttachment(a, businessId)),
+  }
+}
+
+async function copyRuleChecklistToTask(ruleId: string, taskId: string) {
+  const items = await db
+    .select()
+    .from(taskChecklistItems)
+    .where(eq(taskChecklistItems.ruleId, ruleId))
+    .orderBy(asc(taskChecklistItems.sortOrder))
+  if (!items.length) return
+  await db.insert(taskChecklistItems).values(
+    items.map((item) => ({
+      taskId,
+      title: item.title,
+      done: false,
+      sortOrder: item.sortOrder,
+    })),
+  )
+}
+
 function advanceNext(from: Date, freq: string, weekday: number | null, monthDay: number | null): Date {
   const d = new Date(from)
+  if (freq === 'hourly') {
+    d.setUTCHours(d.getUTCHours() + 1)
+    return d
+  }
   if (freq === 'daily') {
     d.setUTCDate(d.getUTCDate() + 1)
     return d
@@ -206,6 +379,14 @@ function advanceNext(from: Date, freq: string, weekday: number | null, monthDay:
       }
     } else {
       d.setUTCDate(d.getUTCDate() + 6)
+    }
+    return d
+  }
+  if (freq === 'yearly') {
+    d.setUTCFullYear(d.getUTCFullYear() + 1)
+    if (monthDay != null) {
+      const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate()
+      d.setUTCDate(Math.min(monthDay, last))
     }
     return d
   }
@@ -236,6 +417,8 @@ async function materializeDueRules(businessId: string, now = new Date()) {
   let created = 0
   for (const rule of rules) {
     if (rule.endsAt && rule.endsAt < now) continue
+    // Period closed until nextAt — keep done+countdown; don't pre-create the next slot.
+    if (isPeriodDoneWaiting(rule, now)) continue
     if (rule.projectId) {
       const proj = await loadProject(businessId, rule.projectId)
       if (!proj || proj.archivedAt) continue
@@ -258,6 +441,7 @@ async function materializeDueRules(businessId: string, now = new Date()) {
             assigneeUserId: rule.assigneeUserId,
             status: 'open',
             dueAt: scheduledFor,
+            reminders: Array.isArray(rule.reminders) ? rule.reminders : [],
           })
           .returning()
         await db.insert(taskOccurrences).values({
@@ -265,6 +449,7 @@ async function materializeDueRules(businessId: string, now = new Date()) {
           scheduledFor,
           taskId: task!.id,
         })
+        await copyRuleChecklistToTask(rule.id, task!.id)
         created++
       } catch (err) {
         // Unique (rule_id, scheduled_for) → already materialized; continue
@@ -276,7 +461,11 @@ async function materializeDueRules(businessId: string, now = new Date()) {
     }
     await db
       .update(recurrenceRules)
-      .set({ nextAt: next, updatedAt: new Date() })
+      .set({
+        nextAt: next,
+        lastCompletedAt: null,
+        updatedAt: new Date(),
+      })
       .where(eq(recurrenceRules.id, rule.id))
   }
   return { created, scanned: rules.length }
@@ -370,8 +559,14 @@ export async function projectRoutes(app: FastifyInstance) {
         ),
       )
       .orderBy(asc(tasks.sortOrder), desc(tasks.updatedAt))
-    const stats = (await taskStatsForProjects(m.businessId, [id])).get(id)!
-    return { project: { ...toProject(row), stats }, tasks: taskRows.map(toTask) }
+    const ruleRows = await db
+      .select()
+      .from(recurrenceRules)
+      .where(and(eq(recurrenceRules.businessId, m.businessId), eq(recurrenceRules.projectId, id)))
+      .orderBy(asc(recurrenceRules.nextAt))
+    const merged = await mergeTasksWithRules(taskRows, ruleRows)
+    const stats = statsFromMerged(merged)
+    return { project: { ...toProject(row), stats }, tasks: merged }
   })
 
   app.post('/api/b/:slug/projects', async (req, reply) => {
@@ -628,7 +823,18 @@ export async function projectRoutes(app: FastifyInstance) {
         out = rows.filter((r) => !r.projectId || allowed.has(r.projectId))
       }
     }
-    return { tasks: out.map(toTask) }
+    let ruleRows: (typeof recurrenceRules.$inferSelect)[] = []
+    if (q.projectId) {
+      ruleRows = await db
+        .select()
+        .from(recurrenceRules)
+        .where(
+          and(eq(recurrenceRules.businessId, m.businessId), eq(recurrenceRules.projectId, q.projectId)),
+        )
+        .orderBy(asc(recurrenceRules.nextAt))
+    }
+    const merged = await mergeTasksWithRules(out, ruleRows)
+    return { tasks: merged }
   })
 
   app.get('/api/b/:slug/tasks/mine', async (req, reply) => {
@@ -636,6 +842,7 @@ export async function projectRoutes(app: FastifyInstance) {
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
     if (!m) return reply.code(404).send({ error: 'not_found' })
+    // Only tasks / rules assigned to the current user (all projects).
     const rows = await db
       .select()
       .from(tasks)
@@ -643,10 +850,7 @@ export async function projectRoutes(app: FastifyInstance) {
         and(
           eq(tasks.businessId, m.businessId),
           isNull(tasks.archivedAt),
-          or(
-            eq(tasks.assigneeUserId, user.id),
-            and(isNull(tasks.assigneeUserId), isNull(tasks.projectId)),
-          )!,
+          eq(tasks.assigneeUserId, user.id),
         ),
       )
       .orderBy(asc(tasks.dueAt), desc(tasks.updatedAt))
@@ -662,7 +866,36 @@ export async function projectRoutes(app: FastifyInstance) {
       )
     }
     const out = rows.filter((r) => !r.projectId || allowed.has(r.projectId))
-    return { tasks: out.map(toTask) }
+    const ruleRows = await db
+      .select()
+      .from(recurrenceRules)
+      .where(
+        and(
+          eq(recurrenceRules.businessId, m.businessId),
+          eq(recurrenceRules.assigneeUserId, user.id),
+        ),
+      )
+      .orderBy(asc(recurrenceRules.nextAt))
+    // Rules may sit on projects not present in the one-shot task set — resolve access.
+    const extraProjectIds = [
+      ...new Set(
+        ruleRows
+          .map((r) => r.projectId)
+          .filter((pid): pid is string => typeof pid === 'string' && !allowed.has(pid)),
+      ),
+    ]
+    if (extraProjectIds.length) {
+      const prows = await db
+        .select()
+        .from(projects)
+        .where(and(eq(projects.businessId, m.businessId), inArray(projects.id, extraProjectIds)))
+      for (const p of prows) {
+        if (assertProjectAccess(p, user.id, m.role as Role)) allowed.add(p.id)
+      }
+    }
+    const rulesForMine = ruleRows.filter((r) => !r.projectId || allowed.has(r.projectId))
+    const merged = await mergeTasksWithRules(out, rulesForMine)
+    return { tasks: merged }
   })
 
   app.get('/api/b/:slug/tasks/:id', async (req, reply) => {
@@ -678,10 +911,19 @@ export async function projectRoutes(app: FastifyInstance) {
         return reply.code(404).send({ error: 'not_found' })
       }
     }
-    const [comments, checklist, attachments] = await Promise.all([
+    const [commentRows, checklist, attachments] = await Promise.all([
       db
-        .select()
+        .select({
+          id: taskComments.id,
+          taskId: taskComments.taskId,
+          authorUserId: taskComments.authorUserId,
+          body: taskComments.body,
+          createdAt: taskComments.createdAt,
+          authorDisplayName: users.displayName,
+          authorEmail: users.email,
+        })
         .from(taskComments)
+        .leftJoin(users, eq(users.id, taskComments.authorUserId))
         .where(eq(taskComments.taskId, id))
         .orderBy(asc(taskComments.createdAt)),
       db
@@ -697,6 +939,14 @@ export async function projectRoutes(app: FastifyInstance) {
         )
         .orderBy(desc(taskAttachments.createdAt)),
     ])
+    const comments = commentRows.map((c) => ({
+      id: c.id,
+      taskId: c.taskId,
+      authorUserId: c.authorUserId,
+      body: c.body,
+      createdAt: c.createdAt,
+      authorDisplayName: c.authorDisplayName?.trim() || c.authorEmail || null,
+    }))
     return {
       task: toTask(row),
       comments,
@@ -742,6 +992,7 @@ export async function projectRoutes(app: FastifyInstance) {
         priority: body.priority,
         assigneeUserId,
         dueAt: body.dueAt ? new Date(body.dueAt) : null,
+        reminders: body.reminders ?? [],
         sortOrder: body.sortOrder,
       })
       .returning()
@@ -795,6 +1046,7 @@ export async function projectRoutes(app: FastifyInstance) {
         ...(body.dueAt !== undefined
           ? { dueAt: body.dueAt ? new Date(body.dueAt) : null }
           : {}),
+        ...(body.reminders !== undefined ? { reminders: body.reminders } : {}),
         ...(body.sortOrder !== undefined ? { sortOrder: body.sortOrder } : {}),
         version: existing.version + 1,
         updatedAt: new Date(),
@@ -866,7 +1118,12 @@ export async function projectRoutes(app: FastifyInstance) {
       user.id,
       { taskId: id },
     )
-    return reply.code(201).send({ comment })
+    return reply.code(201).send({
+      comment: {
+        ...comment!,
+        authorDisplayName: user.displayName?.trim() || user.email || null,
+      },
+    })
   })
 
   app.post('/api/b/:slug/tasks/:id/checklist', async (req, reply) => {
@@ -1060,7 +1317,369 @@ export async function projectRoutes(app: FastifyInstance) {
       .from(recurrenceRules)
       .where(eq(recurrenceRules.businessId, m.businessId))
       .orderBy(asc(recurrenceRules.nextAt))
-    return { rules: rows.map(toRule), tick }
+    return { rules: filterActiveRules(rows).map(toRule), tick }
+  })
+
+  app.get('/api/b/:slug/recurrence/:id', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug, id } = req.params as { slug: string; id: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m) return reply.code(404).send({ error: 'not_found' })
+    const row = await loadRule(m.businessId, id)
+    if (!row) return reply.code(404).send({ error: 'not_found' })
+    if (row.projectId) {
+      const p = await loadProject(m.businessId, row.projectId)
+      if (!p || !assertProjectAccess(p, user.id, m.role as Role)) {
+        return reply.code(404).send({ error: 'not_found' })
+      }
+    }
+    const side = await loadRuleSideContent(m.businessId, id)
+    return { rule: toRule(row), task: ruleAsTask(row), ...side }
+  })
+
+  app.post('/api/b/:slug/recurrence/:id/comments', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug, id } = req.params as { slug: string; id: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    const existing = await loadRule(m.businessId, id)
+    if (!existing || !isRuleActive(existing)) return reply.code(404).send({ error: 'not_found' })
+    const body = TaskCommentSchema.parse(req.body)
+    const [comment] = await db
+      .insert(taskComments)
+      .values({ ruleId: id, authorUserId: user.id, body: body.body })
+      .returning()
+    await addProjectEvent(
+      existing.projectId,
+      'task_comment',
+      `Kommentar (Serie): ${existing.title}`,
+      user.id,
+      { ruleId: id },
+    )
+    return reply.code(201).send({
+      comment: {
+        ...comment!,
+        authorDisplayName: user.displayName?.trim() || user.email || null,
+      },
+    })
+  })
+
+  app.post('/api/b/:slug/recurrence/:id/checklist', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug, id } = req.params as { slug: string; id: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    const existing = await loadRule(m.businessId, id)
+    if (!existing || !isRuleActive(existing)) return reply.code(404).send({ error: 'not_found' })
+    const body = TaskChecklistItemSchema.parse(req.body)
+    const [item] = await db
+      .insert(taskChecklistItems)
+      .values({
+        ruleId: id,
+        title: body.title,
+        done: body.done,
+        sortOrder: body.sortOrder,
+      })
+      .returning()
+    await addProjectEvent(
+      existing.projectId,
+      'task_checklist',
+      `Checkliste (Serie): ${body.title}`,
+      user.id,
+      { ruleId: id, itemId: item!.id },
+    )
+    return reply.code(201).send({ item })
+  })
+
+  app.patch('/api/b/:slug/recurrence/:id/checklist/:itemId', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug, id, itemId } = req.params as { slug: string; id: string; itemId: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    const existing = await loadRule(m.businessId, id)
+    if (!existing) return reply.code(404).send({ error: 'not_found' })
+    const body = TaskChecklistItemSchema.partial().parse(req.body)
+    const [item] = await db
+      .update(taskChecklistItems)
+      .set({
+        ...(body.title !== undefined ? { title: body.title } : {}),
+        ...(body.done !== undefined ? { done: body.done } : {}),
+        ...(body.sortOrder !== undefined ? { sortOrder: body.sortOrder } : {}),
+      })
+      .where(and(eq(taskChecklistItems.id, itemId), eq(taskChecklistItems.ruleId, id)))
+      .returning()
+    if (!item) return reply.code(404).send({ error: 'not_found' })
+    return { item }
+  })
+
+  app.post('/api/b/:slug/recurrence/:id/attachments', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug, id } = req.params as { slug: string; id: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    const existing = await loadRule(m.businessId, id)
+    if (!existing || !isRuleActive(existing)) return reply.code(404).send({ error: 'not_found' })
+
+    const file = await req.file()
+    if (!file) return reply.code(400).send({ error: 'file_required' })
+    if (!ATTACH_ALLOWED.includes(file.mimetype) && !file.mimetype.startsWith('image/')) {
+      return reply.code(415).send({ error: 'mime_not_allowed', mime: file.mimetype })
+    }
+
+    const env = loadEnv()
+    const dir = join(env.UPLOADS_DIR, m.businessId, 'rules', id)
+    await mkdir(dir, { recursive: true })
+    const safeName = file.filename.replace(/[^a-zA-Z0-9._-]/g, '_')
+    const stored = `${randomToken(6)}-${safeName}`
+    const storagePath = join(dir, stored)
+
+    let sizeBytes = 0
+    const { Transform } = await import('node:stream')
+    const counter = new Transform({
+      transform(chunk, _enc, cb) {
+        sizeBytes += chunk.length
+        if (sizeBytes > ATTACH_MAX_BYTES) {
+          cb(new Error('file_too_large'))
+          return
+        }
+        cb(null, chunk)
+      },
+    })
+    try {
+      await pipeline(file.file, counter, createWriteStream(storagePath))
+    } catch (err) {
+      await unlink(storagePath).catch(() => undefined)
+      if (err instanceof Error && err.message === 'file_too_large') {
+        return reply.code(413).send({ error: 'file_too_large', maxBytes: ATTACH_MAX_BYTES })
+      }
+      throw err
+    }
+
+    const [att] = await db
+      .insert(taskAttachments)
+      .values({
+        businessId: m.businessId,
+        ruleId: id,
+        filename: stored,
+        mimeType: file.mimetype,
+        sizeBytes,
+        storagePath,
+        createdByUserId: user.id,
+      })
+      .returning()
+    await writeAudit({
+      businessId: m.businessId,
+      actorUserId: user.id,
+      action: 'task.attachment_uploaded',
+      resourceRef: att!.id,
+    })
+    await addProjectEvent(
+      existing.projectId,
+      'task_attachment',
+      `Anhang (Serie): ${safeName}`,
+      user.id,
+      { ruleId: id, attachmentId: att!.id },
+    )
+    return { attachment: toAttachment(att!, m.businessId) }
+  })
+
+  app.delete('/api/b/:slug/recurrence/:id/attachments/:attId', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug, id, attId } = req.params as { slug: string; id: string; attId: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    const existing = await loadRule(m.businessId, id)
+    if (!existing) return reply.code(404).send({ error: 'not_found' })
+    const [att] = await db
+      .select()
+      .from(taskAttachments)
+      .where(
+        and(
+          eq(taskAttachments.id, attId),
+          eq(taskAttachments.ruleId, id),
+          eq(taskAttachments.businessId, m.businessId),
+        ),
+      )
+      .limit(1)
+    if (!att) return reply.code(404).send({ error: 'not_found' })
+    await db.delete(taskAttachments).where(eq(taskAttachments.id, attId))
+    await unlink(att.storagePath).catch(() => undefined)
+    await addProjectEvent(
+      existing.projectId,
+      'task_attachment_deleted',
+      `Anhang entfernt (Serie): ${att.filename}`,
+      user.id,
+      { ruleId: id, attachmentId: attId },
+    )
+    return { ok: true }
+  })
+
+  /** Mark current period done: close open occurrence (or slot at nextAt) + advance + reset checklist. */
+  app.post('/api/b/:slug/recurrence/:id/complete-period', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug, id } = req.params as { slug: string; id: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    const rule = await loadRule(m.businessId, id)
+    if (!rule || !isRuleActive(rule)) return reply.code(404).send({ error: 'not_found' })
+
+    let taskId: string | null = null
+    let completedFor: Date
+
+    // Prefer the oldest non-done materialization (tick may already have created it).
+    const [openOcc] = await db
+      .select({
+        occId: taskOccurrences.id,
+        scheduledFor: taskOccurrences.scheduledFor,
+        taskId: taskOccurrences.taskId,
+      })
+      .from(taskOccurrences)
+      .innerJoin(tasks, eq(tasks.id, taskOccurrences.taskId))
+      .where(and(eq(taskOccurrences.ruleId, id), ne(tasks.status, 'done')))
+      .orderBy(asc(taskOccurrences.scheduledFor))
+      .limit(1)
+
+    if (openOcc) {
+      completedFor = new Date(openOcc.scheduledFor)
+      taskId = openOcc.taskId
+      await db
+        .update(tasks)
+        .set({ status: 'done', updatedAt: new Date() })
+        .where(eq(tasks.id, openOcc.taskId))
+      await db
+        .update(taskChecklistItems)
+        .set({ done: true })
+        .where(eq(taskChecklistItems.taskId, openOcc.taskId))
+    } else {
+      completedFor = new Date(rule.nextAt)
+      const [existingOcc] = await db
+        .select()
+        .from(taskOccurrences)
+        .where(
+          and(eq(taskOccurrences.ruleId, id), eq(taskOccurrences.scheduledFor, completedFor)),
+        )
+        .limit(1)
+
+      if (existingOcc) {
+        taskId = existingOcc.taskId
+        await db
+          .update(tasks)
+          .set({ status: 'done', updatedAt: new Date() })
+          .where(eq(tasks.id, existingOcc.taskId))
+      } else {
+        try {
+          const [task] = await db
+            .insert(tasks)
+            .values({
+              businessId: m.businessId,
+              projectId: rule.projectId,
+              customerId: rule.customerId,
+              title: rule.title,
+              description: rule.description,
+              priority: rule.priority,
+              assigneeUserId: rule.assigneeUserId,
+              status: 'done',
+              dueAt: completedFor,
+              reminders: Array.isArray(rule.reminders) ? rule.reminders : [],
+            })
+            .returning()
+          taskId = task!.id
+          await db.insert(taskOccurrences).values({
+            ruleId: rule.id,
+            scheduledFor: completedFor,
+            taskId: task!.id,
+          })
+          await copyRuleChecklistToTask(rule.id, task!.id)
+          await db
+            .update(taskChecklistItems)
+            .set({ done: true })
+            .where(eq(taskChecklistItems.taskId, task!.id))
+        } catch (err) {
+          const msg = String((err as Error)?.message || err)
+          if (!/unique|duplicate/i.test(msg)) throw err
+          const [raceOcc] = await db
+            .select()
+            .from(taskOccurrences)
+            .where(
+              and(eq(taskOccurrences.ruleId, id), eq(taskOccurrences.scheduledFor, completedFor)),
+            )
+            .limit(1)
+          if (raceOcc) {
+            taskId = raceOcc.taskId
+            await db
+              .update(tasks)
+              .set({ status: 'done', updatedAt: new Date() })
+              .where(eq(tasks.id, raceOcc.taskId))
+          }
+        }
+      }
+    }
+
+    const advanced = advanceNext(completedFor, rule.freq, rule.weekday, rule.monthDay)
+    const currentNext = new Date(rule.nextAt)
+    const nextAt = advanced.getTime() > currentNext.getTime() ? advanced : currentNext
+    const completedAt = new Date()
+    const [row] = await db
+      .update(recurrenceRules)
+      .set({
+        nextAt,
+        lastCompletedAt: completedAt,
+        updatedAt: completedAt,
+      })
+      .where(eq(recurrenceRules.id, id))
+      .returning()
+
+    await db
+      .update(taskChecklistItems)
+      .set({ done: false })
+      .where(eq(taskChecklistItems.ruleId, id))
+
+    await addProjectEvent(
+      rule.projectId,
+      'recurrence_complete_period',
+      `Zeitraum erledigt: ${rule.title}`,
+      user.id,
+      {
+        ruleId: id,
+        taskId,
+        completedFor: completedFor.toISOString(),
+        nextAt: nextAt.toISOString(),
+      },
+    )
+
+    const side = await loadRuleSideContent(m.businessId, id)
+    return { rule: toRule(row!), task: ruleAsTask(row!), ...side }
+  })
+
+  /** End series permanently — no further rhythm. */
+  app.post('/api/b/:slug/recurrence/:id/finish', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug, id } = req.params as { slug: string; id: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    const rule = await loadRule(m.businessId, id)
+    if (!rule || !isRuleActive(rule)) return reply.code(404).send({ error: 'not_found' })
+
+    const now = new Date()
+    const [row] = await db
+      .update(recurrenceRules)
+      .set({
+        endsAt: now,
+        pausedAt: now,
+        updatedAt: now,
+      })
+      .where(eq(recurrenceRules.id, id))
+      .returning()
+
+    await addProjectEvent(
+      rule.projectId,
+      'recurrence_finished',
+      `Serie beendet: ${rule.title}`,
+      user.id,
+      { ruleId: id },
+    )
+
+    return { rule: toRule(row!), task: ruleAsTask(row!), finished: true }
   })
 
   app.post('/api/b/:slug/recurrence', async (req, reply) => {
@@ -1091,6 +1710,7 @@ export async function projectRoutes(app: FastifyInstance) {
         startsAt,
         endsAt: body.endsAt ? new Date(body.endsAt) : null,
         nextAt: startsAt,
+        reminders: body.reminders ?? [],
       })
       .returning()
     return reply.code(201).send({ rule: toRule(row!) })
@@ -1125,6 +1745,8 @@ export async function projectRoutes(app: FastifyInstance) {
         ...(body.endsAt !== undefined
           ? { endsAt: body.endsAt ? new Date(body.endsAt) : null }
           : {}),
+        ...(body.reminders !== undefined ? { reminders: body.reminders } : {}),
+        ...(body.nextAt !== undefined ? { nextAt: new Date(body.nextAt) } : {}),
         ...(body.paused !== undefined
           ? { pausedAt: body.paused ? new Date() : null }
           : {}),
@@ -1132,7 +1754,7 @@ export async function projectRoutes(app: FastifyInstance) {
       })
       .where(eq(recurrenceRules.id, id))
       .returning()
-    return { rule: toRule(row!) }
+    return { rule: toRule(row!), task: ruleAsTask(row!) }
   })
 
   app.post('/api/b/:slug/recurrence/tick', async (req, reply) => {

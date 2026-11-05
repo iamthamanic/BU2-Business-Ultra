@@ -1,11 +1,11 @@
 /**
  * Resolve funnel data source for a business + surface (Metricool brand vs Direct).
- * Fail-closed when no brand linked — no cross-tenant env leak.
+ * Fail-closed when no brand/connection linked — no cross-tenant env leak.
  * Location: apps/api/src/lib/funnel-source.ts
  */
 import { and, eq } from 'drizzle-orm'
 import { db } from '../db/client.js'
-import { businessIntegrations, funnelBindings } from '../db/schema.js'
+import { businessIntegrations, connections, funnelBindings } from '../db/schema.js'
 import { getBusinessSecret } from './secrets.js'
 
 export type FunnelSourceResult = {
@@ -21,10 +21,20 @@ export type FunnelSourceResult = {
   message?: string
   /** Ready to show live/stub content chrome (key + brand for Metricool). */
   contentReady: boolean
-  needs: 'key' | 'brand' | null
+  needs: 'key' | 'brand' | 'connection' | null
+  /** Native Integration Core connection id when Direct is bound. */
+  connectionId?: string | null
+  connectionsLinked?: number
 }
 
 const ORGANIC_CHANNELS = new Set(['instagram', 'facebook', 'tiktok', 'linkedin', 'youtube'])
+
+/** Funnel Direct provider id → Integration Core provider id. */
+const DIRECT_TO_CONNECTION: Record<string, string> = {
+  youtube: 'youtube',
+  google_ads: 'google_ads',
+  chatgpt_ads: 'chatgpt_ads',
+}
 
 export function organicSurface(channel: string): string {
   return `organic.${channel.toLowerCase()}`
@@ -32,6 +42,14 @@ export function organicSurface(channel: string): string {
 
 export function isOrganicChannel(channel: string): boolean {
   return ORGANIC_CHANNELS.has(channel.toLowerCase())
+}
+
+async function countProviderConnections(businessId: string, provider: string) {
+  const rows = await db
+    .select()
+    .from(connections)
+    .where(and(eq(connections.businessId, businessId), eq(connections.provider, provider)))
+  return rows.filter((r) => r.status === 'active')
 }
 
 export async function resolveFunnelSource(
@@ -63,6 +81,46 @@ export async function resolveFunnelSource(
   let provider = bind?.provider || 'metricool'
   let status = bind?.status || 'active'
   let integrationId = bind?.integrationId || null
+
+  // Direct connectors that use Integration Core OAuth connections.
+  const connProvider = DIRECT_TO_CONNECTION[provider]
+  if (connProvider && provider !== 'metricool') {
+    const active = await countProviderConnections(businessId, connProvider)
+    if (active.length === 0) {
+      return {
+        surface,
+        provider,
+        status: 'needs_connection',
+        implemented: true,
+        keyReady,
+        brandsLinked,
+        blogIds: [],
+        integrationId: null,
+        brandLabel: null,
+        message: 'Native Verbindung in Settings → Verbindungen erforderlich',
+        contentReady: false,
+        needs: 'connection',
+        connectionId: null,
+        connectionsLinked: 0,
+      }
+    }
+    const primary = active[0]!
+    return {
+      surface,
+      provider,
+      status: 'active',
+      implemented: true,
+      keyReady: true,
+      brandsLinked,
+      blogIds: [],
+      integrationId: null,
+      brandLabel: primary.displayName || primary.externalAccountId,
+      contentReady: true,
+      needs: null,
+      connectionId: primary.id,
+      connectionsLinked: active.length,
+    }
+  }
 
   if (provider !== 'metricool') {
     return {

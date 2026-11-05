@@ -47,6 +47,7 @@ export function AdsPage() {
   const [provider, setProvider] = useState<Provider>(() => providerFromChannel(channel))
   const [name, setName] = useState('')
   const [ready, setReady] = useState(false)
+  const [connectNeed, setConnectNeed] = useState<'key' | 'connection' | 'stub'>('key')
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(true)
   const [win, setWin] = useState<'7d' | '30d' | '90d' | 'all'>('30d')
@@ -67,14 +68,57 @@ export function AdsPage() {
       if (isStub(provider)) {
         setCampaigns([])
         setReady(false)
+        setConnectNeed('stub')
         return
       }
+
+      // Native Google Ads OAuth path when Funnel Direct is selected.
+      if (provider === 'google_ads') {
+        const src = await api<{
+          provider: string
+          contentReady: boolean
+          needs: 'key' | 'brand' | 'connection' | null
+          connectionId?: string | null
+        }>(`/api/b/${slug}/marketing/funnel-source/${encodeURIComponent('paid.google')}`)
+        if (src.provider === 'google_ads') {
+          if (!src.contentReady || !src.connectionId) {
+            setCampaigns([])
+            setReady(false)
+            setConnectNeed(src.needs === 'connection' ? 'connection' : 'key')
+            return
+          }
+          try {
+            const live = await api<{ campaigns: Array<{ id: string; name: string; status: string }> }>(
+              `/api/b/${slug}/integrations/google-ads/connections/${src.connectionId}/campaigns`,
+            )
+            setCampaigns(
+              live.campaigns.map((c) => ({
+                id: c.id,
+                name: c.name,
+                status: c.status,
+                provider: 'google_ads',
+                budgetDailyCents: null,
+              })),
+            )
+            setReady(true)
+            setConnectNeed('key')
+            return
+          } catch {
+            setCampaigns([])
+            setReady(false)
+            setConnectNeed('connection')
+            return
+          }
+        }
+      }
+
       const [c, r] = await Promise.all([
         api<{ campaigns: any[] }>(`/api/b/${slug}/ads`),
         api<{ ready: boolean }>(`/api/b/${slug}/integrations/${provider}/ready`),
       ])
       setCampaigns(c.campaigns.filter((x) => x.provider === provider))
       setReady(r.ready)
+      setConnectNeed('key')
     } finally {
       setLoading(false)
     }
@@ -154,9 +198,15 @@ export function AdsPage() {
         emptyContent={
           showConnect ? (
             <FunnelConnectHint
-              need={stub ? 'stub' : 'key'}
+              need={stub ? 'stub' : connectNeed}
               settingsHref={settingsHref}
-              message={stub ? t('adsStubBody') : t('connectBannerAds')}
+              message={
+                stub
+                  ? t('adsStubBody')
+                  : connectNeed === 'connection'
+                    ? t('connectBannerConnection')
+                    : t('connectBannerAds')
+              }
             />
           ) : undefined
         }

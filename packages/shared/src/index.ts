@@ -205,6 +205,26 @@ export const CheckMapBoardSchema = z.object({
   edges: z.array(CheckMapEdgeSchema).default([]),
 })
 
+/** Product-style journey matrix (phases × lanes) — also accepted as legacy cell array. */
+export const PersonaJourneyMapSchema = z.object({
+  phases: z
+    .array(
+      z.object({
+        id: z.string().min(1).max(64),
+        title: z.string().min(1).max(120),
+        lifecycle: z.enum([
+          'awareness',
+          'consideration',
+          'conversion',
+          'delivery',
+          'advocacy',
+        ]),
+      }),
+    )
+    .optional(),
+  items: z.record(z.array(z.string().max(200))).default({}),
+})
+
 export const PersonaSchema = z.object({
   name: z.string().min(1).max(120),
   summary: z.string().max(2000).optional(),
@@ -212,14 +232,17 @@ export const PersonaSchema = z.object({
   pains: z.array(z.string()).default([]),
   channels: z.array(z.string()).default([]),
   journey: z
-    .array(
-      z.object({
-        stage: z.enum(['aware', 'consider', 'decide', 'use', 'advocate']),
-        lane: z.string(),
-        note: z.string().max(1000).optional(),
-      }),
-    )
-    .default([]),
+    .union([
+      PersonaJourneyMapSchema,
+      z.array(
+        z.object({
+          stage: z.enum(['aware', 'consider', 'decide', 'use', 'advocate']),
+          lane: z.string(),
+          note: z.string().max(1000).optional(),
+        }),
+      ),
+    ])
+    .default({ items: {} }),
 })
 
 export const AdsCampaignDraftSchema = z.object({
@@ -284,7 +307,54 @@ export const CustomerSchema = CustomerFieldsSchema.superRefine((v, ctx) => {
     ctx.addIssue({ code: 'custom', message: 'name_required', path: ['firstName'] })
   }
 })
+export type CustomerInput = z.infer<typeof CustomerSchema>
 export const CustomerPatchSchema = CustomerFieldsSchema.partial()
+export type CustomerPatchInput = z.infer<typeof CustomerPatchSchema>
+
+/** CRM customer row as returned by API (persisted + labels). */
+export const CustomerDtoSchema = CustomerFieldsSchema.extend({
+  id: z.string().uuid(),
+  customerNumber: z.number().int().optional(),
+  customerNumberLabel: z.string().optional(),
+  displayName: z.string(),
+  email: z.string().nullable(),
+  phone: z.string().nullable(),
+  address: z.string().nullable(),
+  street: z.string().nullable(),
+  postalCode: z.string().nullable(),
+  city: z.string().nullable(),
+  country: z.string().nullable(),
+  billingStreet: z.string().nullable(),
+  billingPostalCode: z.string().nullable(),
+  billingCity: z.string().nullable(),
+  billingCountry: z.string().nullable(),
+  relationStatus: z.string(),
+  birthDate: z.string().nullable(),
+  photoUrl: z.string().nullable(),
+  buyerPersonaId: z.string().uuid().nullable(),
+  tags: z.array(z.string()),
+  archivedAt: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  kind: z.string(),
+  orgCustomerId: z.string().uuid().nullable().optional(),
+  orgCustomer: z
+    .object({ id: z.string().uuid(), displayName: z.string() })
+    .nullable()
+    .optional(),
+})
+export type CustomerDto = z.infer<typeof CustomerDtoSchema>
+
+export const CustomerNoteDtoSchema = z.object({
+  id: z.string().uuid(),
+  body: z.string(),
+  authorUserId: z.string().uuid().nullable(),
+  authorDisplayName: z.string().nullable().optional(),
+  parentNoteId: z.string().uuid().nullable().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string().optional(),
+})
+export type CustomerNoteDto = z.infer<typeof CustomerNoteDtoSchema>
 
 export const BusinessLabelScopeSchema = z.enum([
   'customer',
@@ -365,7 +435,38 @@ export const ProjectSchema = z.object({
   parentAreaProjectId: z.string().uuid().nullable().optional(),
   boardLaneOrder: BoardLaneOrderSchema.nullable().optional(),
 })
+export type ProjectInput = z.infer<typeof ProjectSchema>
 export const ProjectPatchSchema = ProjectSchema.partial()
+export type ProjectPatchInput = z.infer<typeof ProjectPatchSchema>
+
+export const ProjectStatsDtoSchema = z.object({
+  total: z.number().int(),
+  done: z.number().int(),
+  open: z.number().int(),
+  overdue: z.number().int(),
+})
+export type ProjectStatsDto = z.infer<typeof ProjectStatsDtoSchema>
+
+export const ProjectDtoSchema = z.object({
+  id: z.string().uuid(),
+  type: z.string(),
+  name: z.string(),
+  description: z.string(),
+  area: z.string().nullable(),
+  ownerUserId: z.string().uuid().nullable(),
+  memberUserIds: z.array(z.string().uuid()).optional(),
+  status: z.string(),
+  startAt: z.string().nullable(),
+  dueAt: z.string().nullable(),
+  parentAreaProjectId: z.string().uuid().nullable(),
+  boardLaneOrder: z.array(z.string()).nullable(),
+  archivedAt: z.string().nullable(),
+  completedAt: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  stats: ProjectStatsDtoSchema.optional(),
+})
+export type ProjectDto = z.infer<typeof ProjectDtoSchema>
 
 /** Team-only project access: owner/admin always; else ownerUserId or memberUserIds. */
 export function canAccessProjectTeam(
@@ -379,6 +480,16 @@ export function canAccessProjectTeam(
   return members.includes(userId)
 }
 
+/** Relative reminder before due / next occurrence (Google Calendar style). */
+export const TaskReminderSchema = z.object({
+  offsetValue: z.number().int().min(0).max(9999),
+  offsetUnit: z.enum(['minutes', 'hours', 'days', 'weeks']),
+  channel: z.enum(['notification', 'email']).default('notification'),
+})
+export type TaskReminder = z.infer<typeof TaskReminderSchema>
+
+export const TaskRemindersSchema = z.array(TaskReminderSchema).max(20).default([])
+
 export const TaskSchema = z.object({
   title: z.string().min(1).max(300),
   description: z.string().max(8000).default(''),
@@ -389,10 +500,39 @@ export const TaskSchema = z.object({
   assigneeUserId: z.string().uuid().nullable().optional(),
   dueAt: z.string().datetime().nullable().optional(),
   sortOrder: z.number().int().default(0),
+  reminders: TaskRemindersSchema,
 })
+export type TaskInput = z.infer<typeof TaskSchema>
 export const TaskPatchSchema = TaskSchema.partial().extend({
   version: z.number().int().positive().optional(),
 })
+export type TaskPatchInput = z.infer<typeof TaskPatchSchema>
+
+export const TaskDtoSchema = z.object({
+  id: z.string().uuid(),
+  projectId: z.string().uuid().nullable(),
+  customerId: z.string().uuid().nullable(),
+  title: z.string(),
+  description: z.string(),
+  status: z.string(),
+  priority: z.string(),
+  assigneeUserId: z.string().uuid().nullable(),
+  dueAt: z.string().nullable(),
+  reminders: z.array(TaskReminderSchema).optional(),
+  mode: z.enum(['once', 'recurring']).optional(),
+  source: z.enum(['task', 'rule']).optional(),
+  freq: z.string().nullable().optional(),
+  weekday: z.number().int().nullable().optional(),
+  monthDay: z.number().int().nullable().optional(),
+  reopensAt: z.string().nullable().optional(),
+  lastCompletedAt: z.string().nullable().optional(),
+  sortOrder: z.number().int(),
+  version: z.number().int(),
+  archivedAt: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+export type TaskDto = z.infer<typeof TaskDtoSchema>
 export const TaskStatusSchema = z.object({
   status: z.enum(['open', 'in_progress', 'blocked', 'done']),
   version: z.number().int().positive().optional(),
@@ -409,6 +549,9 @@ export const TaskChecklistItemSchema = z.object({
   sortOrder: z.number().int().default(0),
 })
 
+export const RecurrenceFreqSchema = z.enum(['hourly', 'daily', 'weekly', 'monthly', 'yearly'])
+export type RecurrenceFreq = z.infer<typeof RecurrenceFreqSchema>
+
 export const RecurrenceRuleSchema = z.object({
   title: z.string().min(1).max(300),
   description: z.string().max(4000).default(''),
@@ -416,15 +559,20 @@ export const RecurrenceRuleSchema = z.object({
   projectId: z.string().uuid().nullable().optional(),
   customerId: z.string().uuid().nullable().optional(),
   assigneeUserId: z.string().uuid().nullable().optional(),
-  freq: z.enum(['daily', 'weekly', 'monthly']).default('weekly'),
+  freq: RecurrenceFreqSchema.default('weekly'),
+  /** 0 = Sunday … 6 = Saturday (weekly). */
   weekday: z.number().int().min(0).max(6).nullable().optional(),
+  /** Day of month 1–31 (monthly / yearly). */
   monthDay: z.number().int().min(1).max(31).nullable().optional(),
   timezone: z.string().max(64).default('Europe/Berlin'),
   startsAt: z.string().datetime().optional(),
   endsAt: z.string().datetime().nullable().optional(),
+  reminders: TaskRemindersSchema,
 })
 export const RecurrenceRulePatchSchema = RecurrenceRuleSchema.partial().extend({
   paused: z.boolean().optional(),
+  /** Next materialization / deadline for the series. */
+  nextAt: z.string().datetime().optional(),
 })
 
 export const MODULE_KEYS = [
@@ -561,8 +709,22 @@ export const FUNNEL_SURFACES: FunnelSurfaceDef[] = [
   { key: 'organic.facebook', label: 'Facebook', group: 'Organic', direct: 'Meta Connector' },
   { key: 'organic.tiktok', label: 'TikTok', group: 'Organic', direct: 'TikTok Connector' },
   { key: 'organic.linkedin', label: 'LinkedIn', group: 'Organic', direct: 'LinkedIn Connector' },
-  { key: 'organic.youtube', label: 'YouTube', group: 'Organic', direct: 'YouTube Connector' },
-  { key: 'paid.google', label: 'Google Ads', group: 'Paid', direct: 'Google Ads Connector' },
+  {
+    key: 'organic.youtube',
+    label: 'YouTube',
+    group: 'Organic',
+    direct: 'YouTube Connector',
+    directProvider: 'youtube',
+    directReady: true,
+  },
+  {
+    key: 'paid.google',
+    label: 'Google Ads',
+    group: 'Paid',
+    direct: 'Google Ads Connector',
+    directProvider: 'google_ads',
+    directReady: true,
+  },
   { key: 'paid.meta', label: 'Meta Ads', group: 'Paid', direct: 'Meta Ads Connector' },
   { key: 'paid.tiktok', label: 'TikTok Ads', group: 'Paid', direct: 'TikTok Ads Connector' },
   {
@@ -645,6 +807,8 @@ export const StyleguidePutSchema = StyleguideDocSchema
 export const IntegrationProviderSchema = z.enum([
   'mock',
   'google',
+  'youtube',
+  'google_ads',
   'microsoft',
   'imap',
   'whatsapp',
@@ -772,6 +936,8 @@ export type ConnectImapInput = z.infer<typeof ConnectImapSchema>
 
 export const OAuthProviderParamSchema = z.enum([
   'google',
+  'youtube',
+  'google_ads',
   'microsoft',
   'whatsapp',
   'instagram',

@@ -44,14 +44,27 @@ export function oauthClientConfiguredForProvider(provider: IntegrationProvider |
   return key ? oauthClientConfigured(key) : false
 }
 
-/** Scopes reserved for when token exchange is wired. */
-export const OAUTH_SCOPES: Record<OAuthRedirectProvider, string[]> = {
+/** Google Cloud OAuth scopes by Integration Core provider (same client, different connects). */
+export const GOOGLE_PROVIDER_SCOPES: Record<'google' | 'youtube' | 'google_ads', string[]> = {
   google: [
     'openid',
     'email',
     'https://www.googleapis.com/auth/gmail.modify',
     'https://www.googleapis.com/auth/gmail.send',
   ],
+  youtube: [
+    'openid',
+    'email',
+    'https://www.googleapis.com/auth/youtube.readonly',
+    'https://www.googleapis.com/auth/youtube.upload',
+    'https://www.googleapis.com/auth/youtube.force-ssl',
+  ],
+  google_ads: ['openid', 'email', 'https://www.googleapis.com/auth/adwords'],
+}
+
+/** Scopes for Meta / Microsoft redirect buckets; Google aliases GOOGLE_PROVIDER_SCOPES.google. */
+export const OAUTH_SCOPES: Record<OAuthRedirectProvider, string[]> = {
+  google: GOOGLE_PROVIDER_SCOPES.google,
   microsoft: ['openid', 'email', 'offline_access', 'Mail.ReadWrite', 'Mail.Send'],
   meta: [
     'pages_messaging',
@@ -60,4 +73,12 @@ export const OAUTH_SCOPES: Record<OAuthRedirectProvider, string[]> = {
     'whatsapp_business_management',
     'whatsapp_business_messaging',
   ],
+}
+
+export function scopesForProvider(provider: IntegrationProvider | string): string[] {
+  if (provider === 'google' || provider === 'youtube' || provider === 'google_ads') {
+    return GOOGLE_PROVIDER_SCOPES[provider]
+  }
+  const key = oauthRedirectKey(provider)
+  return key ? OAUTH_SCOPES[key] : []
 }

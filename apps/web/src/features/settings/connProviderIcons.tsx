@@ -8,13 +8,17 @@ import {
   FacebookLogo,
   GoogleLogo,
   InstagramLogo,
+  Megaphone,
   TelegramLogo,
   WhatsappLogo,
   WindowsLogo,
+  YoutubeLogo,
 } from '@phosphor-icons/react'
 
 const ICONS: Record<string, Icon> = {
   google: GoogleLogo,
+  youtube: YoutubeLogo,
+  google_ads: Megaphone,
   microsoft: WindowsLogo,
   imap: EnvelopeSimple,
   whatsapp: WhatsappLogo,

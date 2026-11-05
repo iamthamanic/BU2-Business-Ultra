@@ -7,7 +7,7 @@ import { WarningCircle } from '@phosphor-icons/react'
 import { Link } from 'react-router-dom'
 import { useI18n } from '../../lib/i18n'
 
-export type ConnectNeed = 'key' | 'brand' | 'stub'
+export type ConnectNeed = 'key' | 'brand' | 'connection' | 'stub'
 
 type Props = {
   need: ConnectNeed
@@ -24,7 +24,9 @@ export function FunnelConnectHint({ need, settingsHref, message }: Props) {
       ? t('connectBannerKey')
       : need === 'brand'
         ? t('connectBannerBrand')
-        : t('connectBannerStub'))
+        : need === 'connection'
+          ? t('connectBannerConnection')
+          : t('connectBannerStub'))
 
   return (
     <div className="funnel-connect-hint" role="status">

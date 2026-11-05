@@ -32,6 +32,20 @@ export const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
     connectKind: 'oauth',
   },
   {
+    id: 'youtube',
+    label: 'YouTube',
+    authMethods: ['oauth_pkce'],
+    adapterReady: true,
+    connectKind: 'oauth',
+  },
+  {
+    id: 'google_ads',
+    label: 'Google Ads',
+    authMethods: ['oauth_pkce'],
+    adapterReady: true,
+    connectKind: 'oauth',
+  },
+  {
     id: 'microsoft',
     label: 'Outlook',
     authMethods: ['oauth_pkce'],
@@ -81,7 +95,3 @@ export const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
     connectKind: 'aggregator',
   },
 ]
-
-export function getProviderEntry(id: string): ProviderCatalogEntry | undefined {
-  return PROVIDER_CATALOG.find((p) => p.id === id)
-}

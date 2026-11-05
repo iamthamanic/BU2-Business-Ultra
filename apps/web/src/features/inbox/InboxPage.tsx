@@ -1,7 +1,7 @@
 /**
  * InboxPage — omnichannel messaging inbox (Telegram Bot E2E first).
  * Three-pane Dark-Ops: list · thread · identity context.
- * Connect lives under Settings → Verbindungen; this page consumes sources.
+ * Empty: finished chrome + FunnelConnectHint (no top panel, no fake rows).
  * Location: apps/web/src/features/inbox/InboxPage.tsx
  */
 import { useEffect, useMemo, useState } from 'react'
@@ -13,6 +13,7 @@ import { MktTab, MktTabs } from '../../components/MktTabs'
 import { api } from '../../lib/api'
 import { useI18n } from '../../lib/i18n'
 import { companyRoutes } from '../../lib/companyPaths'
+import { FunnelConnectHint } from '../marketing/FunnelConnectHint'
 
 type InboxConnection = {
   id: string
@@ -177,6 +178,8 @@ export function InboxPage() {
 
   const emptyList = !loading && filtered.length === 0
   const hasConnection = connections.length > 0
+  /** Finished chrome without content — connect CTA lives inside the list pane. */
+  const showPreviewChrome = !loading && !hasConnection
 
   const openCount = conversations.filter((c) => c.status === 'open' || c.status === 'active').length
 
@@ -217,16 +220,11 @@ export function InboxPage() {
         </p>
       ) : null}
 
-      {!hasConnection ? (
-        <div className="inbox-empty-connect panel">
-          <p style={{ margin: 0 }}>{t('inboxConnectInSettings')}</p>
-          <Link className="btn primary" to={routes.settingsConnections}>
-            {t('openConnections')}
-          </Link>
-        </div>
-      ) : null}
-
-      <div className="inbox-panes" data-has-thread={selectedId ? 'true' : 'false'}>
+      <div
+        className="inbox-panes"
+        data-has-thread={selectedId || showPreviewChrome ? 'true' : 'false'}
+        data-preview={showPreviewChrome ? 'true' : 'false'}
+      >
         <aside className="inbox-list" aria-label={t('inboxConversations')}>
           <MktTabs level="l3" label={t('inboxConversations')} className="inbox-filter-tabs">
             <MktTab
@@ -257,6 +255,17 @@ export function InboxPage() {
           </MktTabs>
 
           {loading ? <p className="muted">{t('loading')}</p> : null}
+
+          {showPreviewChrome ? (
+            <div className="inbox-list-empty-slot">
+              <FunnelConnectHint
+                need="key"
+                settingsHref={routes.settingsConnections}
+                message={t('inboxConnectInSettings')}
+              />
+            </div>
+          ) : null}
+
           {emptyList && hasConnection ? (
             <p className="muted inbox-empty">
               {filter === 'assigned' || filter === 'unread'
@@ -264,6 +273,7 @@ export function InboxPage() {
                 : t('inboxEmpty')}
             </p>
           ) : null}
+
           <ul className="inbox-conv-list">
             {filtered.map((c) => (
               <li key={c.id}>
@@ -286,7 +296,37 @@ export function InboxPage() {
         </aside>
 
         <section className="inbox-thread" aria-label={t('inboxThread')}>
-          {!selectedId ? (
+          {showPreviewChrome ? (
+            <>
+              <header className="inbox-thread-head">
+                <div className="inbox-skel-line inbox-skel-line--title" aria-hidden />
+                <div className="inbox-skel-line inbox-skel-line--meta" aria-hidden />
+              </header>
+              <div className="inbox-messages inbox-messages--preview">
+                <div className="inbox-bubble inbox-bubble-inbound inbox-bubble--ghost" aria-hidden>
+                  <div className="inbox-skel-line" />
+                  <div className="inbox-skel-line inbox-skel-line--short" />
+                </div>
+                <div className="inbox-bubble inbox-bubble-outbound inbox-bubble--ghost" aria-hidden>
+                  <div className="inbox-skel-line" />
+                </div>
+                <p className="muted inbox-empty inbox-empty--inline">{t('inboxPickConversation')}</p>
+              </div>
+              <form className="inbox-composer" onSubmit={(e) => e.preventDefault()}>
+                <textarea
+                  className="input inbox-composer-input"
+                  rows={3}
+                  disabled
+                  placeholder={t('inboxReplyPh')}
+                  aria-label={t('inboxReplyPh')}
+                />
+                <button type="button" className="btn primary" disabled>
+                  <PaperPlaneTilt size={14} weight="bold" aria-hidden />
+                  {t('inboxSend')}
+                </button>
+              </form>
+            </>
+          ) : !selectedId ? (
             <p className="muted inbox-empty">{t('inboxPickConversation')}</p>
           ) : threadLoading ? (
             <p className="muted">{t('loading')}</p>
@@ -350,7 +390,16 @@ export function InboxPage() {
 
         <aside className="inbox-context" aria-label={t('inboxContext')}>
           <h3 className="inbox-context-title">{t('inboxContext')}</h3>
-          {!selectedId ? (
+          {showPreviewChrome ? (
+            <div className="inbox-context-card inbox-context-card--preview">
+              <div className="inbox-skel-line inbox-skel-line--title" aria-hidden />
+              <div className="inbox-skel-line inbox-skel-line--meta" aria-hidden />
+              <div className="inbox-skel-line inbox-skel-line--short" aria-hidden />
+              <p className="muted" style={{ marginTop: 10, fontSize: 13 }}>
+                {t('inboxContextEmpty')}
+              </p>
+            </div>
+          ) : !selectedId ? (
             <p className="muted">{t('inboxContextEmpty')}</p>
           ) : identity ? (
             <div className="inbox-context-card">

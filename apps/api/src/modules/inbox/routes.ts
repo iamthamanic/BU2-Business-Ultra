@@ -30,18 +30,12 @@ import {
   syncUnipileConnection,
 } from '../../lib/integrations/unipile/inboxSync.js'
 import { ensureUnipileAdapterRegistered } from '../../lib/integrations/unipile/adapter.js'
+import { syncGmailConnection } from '../../lib/integrations/gmail/inboxSync.js'
+import { httpError } from '../../lib/httpError.js'
 import { loadMembership, requireUser } from '../../plugins/auth.js'
 
 ensureTelegramAdapterRegistered()
 ensureUnipileAdapterRegistered()
-
-function httpError(e: unknown): { status: number; error: string } {
-  const err = e as Error & { statusCode?: number }
-  return {
-    status: err.statusCode && err.statusCode >= 400 ? err.statusCode : 500,
-    error: err.message || 'error',
-  }
-}
 
 export async function inboxRoutes(app: FastifyInstance) {
   app.get('/api/b/:slug/inbox/connections', async (req, reply) => {
@@ -87,6 +81,22 @@ export async function inboxRoutes(app: FastifyInstance) {
     }
     try {
       const result = await syncTelegramConnection(m.businessId, id)
+      return { result }
+    } catch (e) {
+      const { status, error } = httpError(e)
+      return reply.code(status).send({ error })
+    }
+  })
+
+  app.post('/api/b/:slug/inbox/google/connections/:id/sync', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug, id } = req.params as { slug: string; id: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m || (!canMutateContent(m.role) && !user.isSuperadmin)) {
+      return reply.code(403).send({ error: 'forbidden' })
+    }
+    try {
+      const result = await syncGmailConnection(m.businessId, id)
       return { result }
     } catch (e) {
       const { status, error } = httpError(e)

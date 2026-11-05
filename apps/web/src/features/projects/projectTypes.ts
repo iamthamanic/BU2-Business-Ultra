@@ -1,32 +1,16 @@
 /**
- * Projects/tasks client types. Location: apps/web/src/features/projects/projectTypes.ts
+ * Projects/tasks client types — derived from @bu2/shared DTOs.
+ * Location: apps/web/src/features/projects/projectTypes.ts
  */
-export type BuProjectStats = {
-  total: number
-  done: number
-  open: number
-  overdue: number
-}
+import type {
+  ProjectDto,
+  ProjectStatsDto,
+  TaskDto,
+  TaskReminder,
+} from '@bu2/shared'
 
-export type BuProject = {
-  id: string
-  type: 'area' | 'custom' | string
-  name: string
-  description: string
-  area: string | null
-  ownerUserId: string | null
-  memberUserIds?: string[]
-  status: string
-  startAt: string | null
-  dueAt: string | null
-  parentAreaProjectId: string | null
-  boardLaneOrder: string[] | null
-  archivedAt: string | null
-  completedAt: string | null
-  createdAt: string
-  updatedAt: string
-  stats?: BuProjectStats
-}
+export type BuProjectStats = ProjectStatsDto
+export type BuProject = ProjectDto
 
 export type BuProjectEvent = {
   id: string
@@ -41,7 +25,8 @@ export type BuProjectEvent = {
 
 export type BuTaskAttachment = {
   id: string
-  taskId: string
+  taskId?: string | null
+  ruleId?: string | null
   filename: string
   mimeType: string
   sizeBytes: number
@@ -50,22 +35,9 @@ export type BuTaskAttachment = {
   createdAt: string
 }
 
-export type BuTask = {
-  id: string
-  projectId: string | null
-  customerId: string | null
-  title: string
-  description: string
-  status: string
-  priority: string
-  assigneeUserId: string | null
-  dueAt: string | null
-  sortOrder: number
-  version: number
-  archivedAt: string | null
-  createdAt: string
-  updatedAt: string
-}
+export type BuTaskReminder = TaskReminder
+export type BuTaskMode = NonNullable<TaskDto['mode']>
+export type BuTask = TaskDto
 
 export type BuRecurrenceRule = {
   id: string
@@ -82,5 +54,7 @@ export type BuRecurrenceRule = {
   startsAt: string
   endsAt: string | null
   pausedAt: string | null
+  lastCompletedAt?: string | null
   nextAt: string
+  reminders?: BuTaskReminder[]
 }

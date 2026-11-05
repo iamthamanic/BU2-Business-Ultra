@@ -86,12 +86,30 @@ function composeDisplayName(opts: {
   return dn
 }
 
+const CUSTOMER_NUMBER_START = 100100
+
+function formatCustomerNumber(n: number): string {
+  return String(n).padStart(6, '0')
+}
+
+async function allocateCustomerNumber(businessId: string): Promise<number> {
+  const [row] = await db
+    .select({
+      max: sql<number>`coalesce(max(${customers.customerNumber}), ${CUSTOMER_NUMBER_START - 1})`,
+    })
+    .from(customers)
+    .where(eq(customers.businessId, businessId))
+  return Number(row?.max ?? CUSTOMER_NUMBER_START - 1) + 1
+}
+
 function toCustomer(
   row: typeof customers.$inferSelect,
   org?: { id: string; displayName: string } | null,
 ) {
   return {
     id: row.id,
+    customerNumber: row.customerNumber,
+    customerNumberLabel: formatCustomerNumber(row.customerNumber),
     kind: row.kind,
     displayName: row.displayName,
     firstName: row.firstName ?? null,
@@ -404,10 +422,12 @@ export async function customerRoutes(app: FastifyInstance) {
       if (!org) return reply.code(400).send({ error: 'invalid_org' })
       orgCustomerId = org.id
     }
+    const customerNumber = await allocateCustomerNumber(m.businessId)
     const [row] = await db
       .insert(customers)
       .values({
         businessId: m.businessId,
+        customerNumber,
         kind: body.kind,
         displayName,
         firstName: body.kind === 'person' ? firstName : null,
@@ -432,7 +452,13 @@ export async function customerRoutes(app: FastifyInstance) {
         tags: body.tags,
       })
       .returning()
-    await addEvent(row!.id, 'created', `Kunde angelegt: ${row!.displayName}`, user.id)
+    const statusWord =
+      row!.relationStatus === 'customer'
+        ? 'Kunde'
+        : row!.relationStatus === 'prospect'
+          ? 'Interessent'
+          : 'Lead'
+    await addEvent(row!.id, 'created', `${row!.displayName} als ${statusWord} angelegt`, user.id)
     await writeAudit({
       businessId: m.businessId,
       actorUserId: user.id,

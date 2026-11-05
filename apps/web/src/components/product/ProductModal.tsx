@@ -1,6 +1,6 @@
 /**
  * ProductModal — Create/edit product with tabs:
- * Beschreibung | Kalkulation | Buyer Persona | Customer Journey.
+ * Beschreibung | Kalkulation | Buyer Persona | Customer Journey | Auftragsgestaltung.
  * Location: apps/web/src/components/product/ProductModal.tsx
  */
 import { useEffect, useId, useState } from 'react'
@@ -8,6 +8,7 @@ import {
   Calculator,
   ImageSquare,
   Path,
+  PencilRuler,
   UserFocus,
   X,
   type Icon,
@@ -23,10 +24,11 @@ import {
 import { MktTab } from '../MktTabs'
 import { ProductCalcTab } from './ProductCalcTab'
 import { ProductDescTab } from './ProductDescTab'
+import { ProductOrderDesignTab } from './ProductOrderDesignTab'
 import { ProductPersonaTab } from './ProductPersonaTab'
 
 type PersonaRow = { id: string; name: string; summary?: string | null }
-type Tab = 'desc' | 'calc' | 'persona' | 'journey'
+type Tab = 'desc' | 'calc' | 'persona' | 'journey' | 'orderDesign'
 
 type Props = {
   open: boolean
@@ -188,6 +190,7 @@ export function ProductModal({
                 ['calc', 'productTabCalc', Calculator, 'product-calc'],
                 ['persona', 'productTabBuyerPersona', UserFocus, 'product-persona'],
                 ['journey', 'productTabJourney', Path, 'product-journey'],
+                ['orderDesign', 'productTabOrderDesign', PencilRuler, 'product-order'],
               ] as const satisfies ReadonlyArray<readonly [Tab, string, Icon, string]>
             ).map(([id, key, icon, dataIc]) => (
               <MktTab
@@ -226,6 +229,9 @@ export function ProductModal({
               slug={slug}
               onPersonaCreated={onPersonaCreated}
             />
+          ) : null}
+          {tab === 'orderDesign' ? (
+            <ProductOrderDesignTab readOnly={!canWrite} />
           ) : null}
         </div>
 

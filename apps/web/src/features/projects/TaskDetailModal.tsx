@@ -1,22 +1,61 @@
 /**
- * TaskDetailModal — centered task detail (status/prio/assignee/due, checklist, comments).
+ * TaskDetailModal — premium task / recurring-rule detail.
+ * Body modes: Beschreibung (rich text) | Checkliste. Comments via NoteThread.
  * Location: apps/web/src/features/projects/TaskDetailModal.tsx
  */
-import { useEffect, useRef, useState } from 'react'
-import { Paperclip, Trash, X } from '@phosphor-icons/react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  ArrowDown,
+  ArrowUp,
+  CheckCircle,
+  Circle,
+  CircleNotch,
+  ListChecks,
+  Minus,
+  Paperclip,
+  PencilSimple,
+  TextT,
+  Trash,
+  X,
+} from '@phosphor-icons/react'
+import { CrmIconSelect, type CrmIconSelectOption } from '../../components/CrmIconSelect'
+import { ChecklistPanel } from '../../components/checklist/ChecklistPanel'
+import { MktTab, MktTabs } from '../../components/MktTabs'
+import { NoteThread } from '../../components/notes/NoteThread'
+import {
+  NoteEditor,
+  notePlainText,
+  sanitizeNoteHtml,
+} from '../../components/notes/NoteEditor'
 import { api } from '../../lib/api'
 import { useI18n } from '../../lib/i18n'
 import { MemberAvatar, memberDisplayName, type MemberInfo } from './MemberAvatar'
 import type { BuTask, BuTaskAttachment } from './projectTypes'
-import { TASK_PRIORITIES, TASK_STATUSES, taskPriorityLabel, taskStatusLabel } from './taskLabels'
+import { TASK_STATUSES, formatReopenCountdown, taskStatusLabel } from './taskLabels'
+import {
+  remindersFromApi,
+  remindersToPayload,
+  TaskRemindersField,
+  type ReminderDraft,
+} from './TaskRemindersField'
 
-type Comment = { id: string; body: string; createdAt: string }
+type Comment = {
+  id: string
+  body: string
+  createdAt: string
+  authorDisplayName?: string | null
+  authorUserId?: string | null
+}
 type CheckItem = { id: string; title: string; done: boolean }
 type MemberById = Record<string, MemberInfo>
+type DetailSource = 'task' | 'rule'
+type BodyMode = 'description' | 'checklist'
 
 type Props = {
   slug: string
   taskId: string | null
+  /** rule = recurrence series opened with the same modal chrome. */
+  source?: DetailSource
   canWrite: boolean
   memberById?: MemberById
   members?: MemberInfo[]
@@ -39,9 +78,14 @@ function dueAtFromDateInput(v: string): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString()
 }
 
+function descEqual(a: string, b: string): boolean {
+  return sanitizeNoteHtml(a) === sanitizeNoteHtml(b)
+}
+
 export function TaskDetailModal({
   slug,
   taskId,
+  source = 'task',
   canWrite,
   memberById = {},
   members = [],
@@ -54,40 +98,140 @@ export function TaskDetailModal({
   const [comments, setComments] = useState<Comment[]>([])
   const [checklist, setChecklist] = useState<CheckItem[]>([])
   const [attachments, setAttachments] = useState<BuTaskAttachment[]>([])
-  const [commentBody, setCommentBody] = useState('')
-  const [checkTitle, setCheckTitle] = useState('')
+  const [reminders, setReminders] = useState<ReminderDraft[]>([])
+  const [descDraft, setDescDraft] = useState('')
+  const [bodyMode, setBodyMode] = useState<BodyMode>('description')
   const [uploading, setUploading] = useState(false)
+  const [acting, setActing] = useState(false)
   const [err, setErr] = useState('')
+  const [actionOk, setActionOk] = useState('')
+  const isRule = source === 'rule'
+  const sideBase = isRule
+    ? `/api/b/${slug}/recurrence`
+    : `/api/b/${slug}/tasks`
+
+  const statusOptions = useMemo<CrmIconSelectOption[]>(
+    () =>
+      TASK_STATUSES.map((s) => ({
+        value: s,
+        label: taskStatusLabel(s, t),
+        tone: s,
+        icon:
+          s === 'open' ? (
+            <Circle size={14} weight="regular" aria-hidden />
+          ) : s === 'in_progress' ? (
+            <CircleNotch size={14} weight="bold" aria-hidden />
+          ) : s === 'blocked' ? (
+            <PencilSimple size={14} weight="bold" aria-hidden />
+          ) : (
+            <CheckCircle size={14} weight="bold" aria-hidden />
+          ),
+      })),
+    [t],
+  )
+
+  const priorityOptions = useMemo<CrmIconSelectOption[]>(
+    () => [
+      {
+        value: 'low',
+        label: t('taskPriorityLow'),
+        tone: 'low',
+        icon: <ArrowDown size={14} weight="bold" aria-hidden />,
+      },
+      {
+        value: 'medium',
+        label: t('taskPriorityMedium'),
+        tone: 'medium',
+        icon: <Minus size={14} weight="bold" aria-hidden />,
+      },
+      {
+        value: 'high',
+        label: t('taskPriorityHigh'),
+        tone: 'high',
+        icon: <ArrowUp size={14} weight="bold" aria-hidden />,
+      },
+    ],
+    [t],
+  )
 
   useEffect(() => {
     if (!slug || !taskId) {
       setTask(null)
+      setReminders([])
+      setDescDraft('')
+      setComments([])
+      setChecklist([])
+      setAttachments([])
+      setBodyMode('description')
       return
     }
+    setBodyMode('description')
+    setActionOk('')
+    setActing(false)
+    const path = isRule
+      ? `/api/b/${slug}/recurrence/${taskId}`
+      : `/api/b/${slug}/tasks/${taskId}`
     api<{
       task: BuTask
       comments: Comment[]
       checklist: CheckItem[]
       attachments?: BuTaskAttachment[]
-    }>(`/api/b/${slug}/tasks/${taskId}`)
+    }>(path)
       .then((r) => {
-        setTask(r.task)
-        setComments(r.comments)
-        setChecklist(r.checklist)
+        setTask(
+          isRule ? { ...r.task, mode: 'recurring', source: 'rule' } : r.task,
+        )
+        setDescDraft(r.task.description || '')
+        setReminders(remindersFromApi(r.task.reminders))
+        setComments(r.comments || [])
+        setChecklist(r.checklist || [])
         setAttachments(r.attachments || [])
         setErr('')
       })
-      .catch(console.error)
-  }, [slug, taskId])
+      .catch((e) => {
+        console.error(e)
+        setErr(e instanceof Error ? e.message : t('saveFailed'))
+      })
+  }, [slug, taskId, isRule, t])
 
   async function patchTask(body: Record<string, unknown>) {
     if (!task) return
+    if (isRule) {
+      const ruleBody: Record<string, unknown> = {}
+      if (body.priority !== undefined) ruleBody.priority = body.priority
+      if (body.assigneeUserId !== undefined) ruleBody.assigneeUserId = body.assigneeUserId
+      if (body.reminders !== undefined) ruleBody.reminders = body.reminders
+      if (body.title !== undefined) ruleBody.title = body.title
+      if (body.description !== undefined) ruleBody.description = body.description
+      if (body.dueAt !== undefined) {
+        ruleBody.nextAt = body.dueAt || undefined
+      }
+      if (body.status !== undefined) {
+        ruleBody.paused = body.status === 'blocked'
+      }
+      const r = await api<{ task: BuTask }>(`/api/b/${slug}/recurrence/${task.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(ruleBody),
+      })
+      setTask({ ...r.task, mode: 'recurring', source: 'rule' })
+      if (body.description !== undefined) setDescDraft(r.task.description || '')
+      onChanged()
+      return
+    }
     const r = await api<{ task: BuTask }>(`/api/b/${slug}/tasks/${task.id}`, {
       method: 'PATCH',
       body: JSON.stringify({ ...body, version: task.version }),
     })
     setTask(r.task)
+    if (body.description !== undefined) setDescDraft(r.task.description || '')
     onChanged()
+  }
+
+  async function saveDescription() {
+    if (!canWrite || !task) return
+    const next = sanitizeNoteHtml(descDraft)
+    if (descEqual(next, task.description || '')) return
+    await patchTask({ description: next })
   }
 
   async function uploadFiles(files: FileList | File[]) {
@@ -104,7 +248,7 @@ export function TaskDetailModal({
         const fd = new FormData()
         fd.append('file', file)
         const r = await api<{ attachment: BuTaskAttachment }>(
-          `/api/b/${slug}/tasks/${task.id}/attachments`,
+          `${sideBase}/${task.id}/attachments`,
           { method: 'POST', body: fd },
         )
         setAttachments((prev) => [r.attachment, ...prev])
@@ -117,9 +261,83 @@ export function TaskDetailModal({
     }
   }
 
+  async function completePeriod() {
+    if (!task || !canWrite || !isRule || acting) return
+    const ruleId = task.id
+    setActing(true)
+    setErr('')
+    setActionOk('')
+    try {
+      const r = await api<{
+        task: BuTask
+        comments: Comment[]
+        checklist: CheckItem[]
+        attachments?: BuTaskAttachment[]
+      }>(`/api/b/${slug}/recurrence/${ruleId}/complete-period`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const nextDue = r.task.dueAt ? new Date(r.task.dueAt).toISOString() : null
+      const reopensAt =
+        r.task.reopensAt ||
+        (nextDue && !Number.isNaN(Date.parse(nextDue)) ? nextDue : null)
+      const nextTask = {
+        ...r.task,
+        mode: 'recurring' as const,
+        source: 'rule' as const,
+        status: r.task.status || 'done',
+        dueAt: nextDue && !Number.isNaN(Date.parse(nextDue)) ? nextDue : r.task.dueAt,
+        reopensAt,
+      }
+      setTask(nextTask)
+      setComments(r.comments || [])
+      setChecklist(r.checklist || [])
+      setAttachments(r.attachments || [])
+      const nextLabel = reopensAt
+        ? new Date(reopensAt).toLocaleDateString(undefined, {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+          })
+        : '—'
+      setActionOk(t('taskCompletePeriodDone').replace('{date}', nextLabel))
+      onChanged()
+    } catch (e) {
+      setActionOk('')
+      setErr(e instanceof Error ? e.message : t('saveFailed'))
+    } finally {
+      setActing(false)
+    }
+  }
+
+  async function finishSeries() {
+    if (!task || !canWrite || !isRule || acting) return
+    if (!window.confirm(t('taskFinishSeriesConfirm'))) return
+    setActing(true)
+    setErr('')
+    setActionOk('')
+    try {
+      await api(`${sideBase}/${task.id}/finish`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+      })
+      onChanged()
+      onClose()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : t('saveFailed'))
+      setActing(false)
+    }
+  }
+
   if (!taskId || !task) return null
 
   const assignee = task.assigneeUserId ? memberById[task.assigneeUserId] : null
+  const checklistDone = checklist.filter((c) => c.done).length
+  const reopenLabel =
+    isRule && task.status === 'done' && task.reopensAt
+      ? formatReopenCountdown(task.reopensAt, t)
+      : ''
 
   return (
     <div
@@ -135,28 +353,38 @@ export function TaskDetailModal({
         onMouseDown={(e) => e.stopPropagation()}
       >
         <header className="task-detail-modal-head">
-          <h2 className="section-title" style={{ margin: 0, fontSize: '1.15rem' }}>
-            {task.title}
-          </h2>
-          <button type="button" className="btn icon-btn" onClick={onClose} aria-label="Close">
+          <div className="task-detail-modal-head-main">
+            <h2 className="task-detail-modal-title">{task.title}</h2>
+            {isRule ? (
+              <span className="task-mode-chip is-recurring">{t('taskModeRecurring')}</span>
+            ) : null}
+            {reopenLabel ? (
+              <span className="task-reopen-chip" title={reopenLabel}>
+                {reopenLabel}
+              </span>
+            ) : null}
+          </div>
+          <button type="button" className="btn icon-btn" onClick={onClose} aria-label={t('cancel')}>
             <X size={16} weight="bold" aria-hidden />
           </button>
         </header>
 
-        <p className="muted" style={{ margin: 0 }}>
-          {task.description || t('taskNoDesc')}
-        </p>
         {err ? <p className="error">{err}</p> : null}
 
-        <div className="task-detail-modal-fields">
-          <label className="field">
+        <div className="task-detail-meta">
+          <div className="field">
             <span className="label">{t('taskStatus')}</span>
-            <select
-              className="input"
-              disabled={!canWrite}
+            <CrmIconSelect
+              name="status"
               value={task.status}
-              onChange={async (e) => {
-                const status = e.target.value
+              options={statusOptions}
+              disabled={!canWrite}
+              aria-label={t('taskStatus')}
+              onChange={async (status) => {
+                if (isRule) {
+                  await patchTask({ status }).catch(console.error)
+                  return
+                }
                 const r = await api<{ task: BuTask }>(`/api/b/${slug}/tasks/${task.id}/status`, {
                   method: 'POST',
                   body: JSON.stringify({ status, version: task.version }),
@@ -164,30 +392,20 @@ export function TaskDetailModal({
                 setTask(r.task)
                 onChanged()
               }}
-            >
-              {TASK_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {taskStatusLabel(s, t)}
-                </option>
-              ))}
-            </select>
-          </label>
+            />
+          </div>
 
-          <label className="field">
+          <div className="field">
             <span className="label">{t('taskPriority')}</span>
-            <select
-              className="input"
-              disabled={!canWrite}
+            <CrmIconSelect
+              name="priority"
               value={task.priority}
-              onChange={(e) => patchTask({ priority: e.target.value }).catch(console.error)}
-            >
-              {TASK_PRIORITIES.map((p) => (
-                <option key={p} value={p}>
-                  {taskPriorityLabel(p, t)}
-                </option>
-              ))}
-            </select>
-          </label>
+              options={priorityOptions}
+              disabled={!canWrite}
+              aria-label={t('taskPriority')}
+              onChange={(v) => patchTask({ priority: v }).catch(console.error)}
+            />
+          </div>
 
           <label className="field">
             <span className="label">{t('taskAssignee')}</span>
@@ -207,11 +425,9 @@ export function TaskDetailModal({
               ))}
             </select>
             {assignee ? (
-              <span className="row" style={{ gap: 6, marginTop: 6, alignItems: 'center' }}>
-                <MemberAvatar member={assignee} size={22} />
-                <span className="muted" style={{ fontSize: 12 }}>
-                  {memberDisplayName(assignee)}
-                </span>
+              <span className="task-detail-assignee-preview">
+                <MemberAvatar member={assignee} size={20} />
+                <span className="muted">{memberDisplayName(assignee)}</span>
               </span>
             ) : null}
           </label>
@@ -230,8 +446,92 @@ export function TaskDetailModal({
           </label>
         </div>
 
-        <section className="stack">
-          <h3 style={{ margin: 0 }}>{t('taskAttachments')}</h3>
+        <TaskRemindersField
+          value={reminders}
+          disabled={!canWrite}
+          onChange={(next) => {
+            setReminders(next)
+            patchTask({ reminders: remindersToPayload(next) }).catch(console.error)
+          }}
+        />
+
+        <section className="task-detail-body panel">
+          <MktTabs level="surface" label={t('description')} className="task-body-tabs">
+            <MktTab
+              active={bodyMode === 'description'}
+              label={t('description')}
+              icon={TextT}
+              onClick={() => setBodyMode('description')}
+            />
+            <MktTab
+              active={bodyMode === 'checklist'}
+              label={
+                checklist.length > 0
+                  ? `${t('taskChecklist')} (${checklistDone}/${checklist.length})`
+                  : t('taskChecklist')
+              }
+              icon={ListChecks}
+              onClick={() => setBodyMode('checklist')}
+            />
+          </MktTabs>
+
+          {bodyMode === 'description' ? (
+            <div className="task-detail-body-pane" onBlur={() => void saveDescription()}>
+              {canWrite || notePlainText(descDraft) ? (
+                <NoteEditor
+                  value={descDraft}
+                  onChange={setDescDraft}
+                  disabled={!canWrite}
+                  placeholder={t('taskNoDesc')}
+                  rows={5}
+                />
+              ) : (
+                <p className="muted task-detail-body-empty">{t('taskNoDesc')}</p>
+              )}
+            </div>
+          ) : (
+            <div className="task-detail-body-pane">
+              <ChecklistPanel
+                embedded
+                items={checklist}
+                canWrite={canWrite}
+                title={t('taskChecklist')}
+                emptyLabel={t('taskChecklistEmpty')}
+                placeholder={t('taskChecklistPh')}
+                onToggle={async (id, done) => {
+                  const r = await api<{ item: CheckItem }>(
+                    `${sideBase}/${task.id}/checklist/${id}`,
+                    {
+                      method: 'PATCH',
+                      body: JSON.stringify({ done }),
+                    },
+                  )
+                  setChecklist((prev) => prev.map((x) => (x.id === id ? r.item : x)))
+                  onChanged()
+                }}
+                onAdd={async (titleText) => {
+                  const r = await api<{ item: CheckItem }>(
+                    `${sideBase}/${task.id}/checklist`,
+                    {
+                      method: 'POST',
+                      body: JSON.stringify({ title: titleText }),
+                    },
+                  )
+                  setChecklist((prev) => [...prev, r.item])
+                  onChanged()
+                }}
+              />
+            </div>
+          )}
+        </section>
+
+        <section className="task-detail-attach">
+          <header className="task-detail-section-head">
+            <h3 className="task-detail-section-title">{t('taskAttachments')}</h3>
+            {attachments.length > 0 ? (
+              <span className="muted">{attachments.length}</span>
+            ) : null}
+          </header>
           {attachments.length === 0 ? (
             <div
               className={`task-attach-zone${canWrite ? '' : ' is-readonly'}`}
@@ -274,7 +574,7 @@ export function TaskDetailModal({
                       className="btn icon-btn"
                       aria-label={t('taskAttachmentDelete')}
                       onClick={async () => {
-                        await api(`/api/b/${slug}/tasks/${task.id}/attachments/${a.id}`, {
+                        await api(`${sideBase}/${task.id}/attachments/${a.id}`, {
                           method: 'DELETE',
                         })
                         setAttachments((prev) => prev.filter((x) => x.id !== a.id))
@@ -311,112 +611,74 @@ export function TaskDetailModal({
               }
             }}
           />
-          {canWrite && attachments.length === 0 ? (
-            <p className="muted" style={{ margin: 0, fontSize: 12 }}>
-              {t('taskAttachmentsHint')}
-            </p>
-          ) : null}
         </section>
 
-        <section className="stack">
-          <h3 style={{ margin: 0 }}>{t('taskChecklist')}</h3>
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-            {checklist.map((item) => (
-              <li key={item.id} className="row" style={{ gap: 8, alignItems: 'center' }}>
-                <input
-                  type="checkbox"
-                  checked={item.done}
-                  disabled={!canWrite}
-                  onChange={async () => {
-                    const r = await api<{ item: CheckItem }>(
-                      `/api/b/${slug}/tasks/${task.id}/checklist/${item.id}`,
-                      {
-                        method: 'PATCH',
-                        body: JSON.stringify({ done: !item.done }),
-                      },
-                    )
-                    setChecklist((prev) => prev.map((x) => (x.id === item.id ? r.item : x)))
-                    onChanged()
-                  }}
-                />
-                <span style={{ textDecoration: item.done ? 'line-through' : undefined }}>
-                  {item.title}
-                </span>
-              </li>
-            ))}
-          </ul>
-          {canWrite ? (
-            <form
-              className="row"
-              style={{ gap: 8 }}
-              onSubmit={async (e) => {
-                e.preventDefault()
-                if (!checkTitle.trim()) return
-                const r = await api<{ item: CheckItem }>(
-                  `/api/b/${slug}/tasks/${task.id}/checklist`,
-                  {
-                    method: 'POST',
-                    body: JSON.stringify({ title: checkTitle.trim() }),
-                  },
-                )
-                setChecklist((prev) => [...prev, r.item])
-                setCheckTitle('')
-                onChanged()
-              }}
-            >
-              <input
-                className="input"
-                style={{ flex: 1 }}
-                value={checkTitle}
-                onChange={(e) => setCheckTitle(e.target.value)}
-                placeholder={t('taskChecklistPh')}
-              />
-              <button type="submit" className="btn">
-                {t('add')}
-              </button>
-            </form>
-          ) : null}
-        </section>
+        <NoteThread
+          notes={comments}
+          canWrite={canWrite}
+          title={t('taskComments')}
+          emptyLabel={t('taskCommentsEmpty')}
+          placeholder={t('taskCommentPh')}
+          addLabel={t('add')}
+          unknownAuthorLabel={t('customerNoteAuthorUnknown')}
+          onAdd={async (body) => {
+            const r = await api<{ comment: Comment }>(`${sideBase}/${task.id}/comments`, {
+              method: 'POST',
+              body: JSON.stringify({ body }),
+            })
+            setComments((prev) => [...prev, r.comment])
+            onChanged()
+          }}
+        />
 
-        <section className="stack">
-          <h3 style={{ margin: 0 }}>{t('taskComments')}</h3>
-          <ul className="task-comment-list">
-            {comments.map((c) => (
-              <li key={c.id}>{c.body}</li>
-            ))}
-          </ul>
-          {canWrite ? (
-            <form
-              className="row"
-              style={{ gap: 8 }}
-              onSubmit={async (e) => {
-                e.preventDefault()
-                if (!commentBody.trim()) return
-                const r = await api<{ comment: Comment }>(
-                  `/api/b/${slug}/tasks/${task.id}/comments`,
-                  {
-                    method: 'POST',
-                    body: JSON.stringify({ body: commentBody.trim() }),
-                  },
-                )
-                setComments((prev) => [...prev, r.comment])
-                setCommentBody('')
-                onChanged()
-              }}
-            >
-              <input
-                className="input"
-                style={{ flex: 1 }}
-                value={commentBody}
-                onChange={(e) => setCommentBody(e.target.value)}
-                placeholder={t('taskCommentPh')}
-              />
-              <button type="submit" className="btn">
-                {t('add')}
+        {isRule && canWrite ? (
+          <footer className="bu-modal-actions task-detail-rule-actions">
+            {err ? (
+              <p className="error task-detail-action-msg" role="alert">
+                {err}
+              </p>
+            ) : null}
+            {actionOk || reopenLabel ? (
+              <p className="task-detail-action-ok" role="status">
+                {actionOk ||
+                  t('taskCompletePeriodDone').replace(
+                    '{date}',
+                    task.reopensAt
+                      ? new Date(task.reopensAt).toLocaleDateString(undefined, {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })
+                      : '—',
+                  )}
+                {reopenLabel && !actionOk ? ` · ${reopenLabel}` : null}
+              </p>
+            ) : null}
+            <div className="task-detail-rule-actions-row">
+              <button
+                type="button"
+                className="btn"
+                disabled={acting}
+                title={t('taskFinishSeriesHint')}
+                onClick={() => void finishSeries()}
+              >
+                {t('taskFinishSeries')}
               </button>
-            </form>
-          ) : null}
-        </section>
+              <button
+                type="button"
+                className="btn primary"
+                disabled={acting || Boolean(reopenLabel)}
+                title={
+                  reopenLabel ? reopenLabel : t('taskCompletePeriodHint')
+                }
+                onClick={() => void completePeriod()}
+              >
+                <CheckCircle size={14} weight="bold" aria-hidden />
+                {acting ? '…' : t('taskCompletePeriod')}
+              </button>
+            </div>
+          </footer>
+        ) : null}
       </div>
     </div>
   )

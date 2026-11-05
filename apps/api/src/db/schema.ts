@@ -238,7 +238,8 @@ export const personas = pgTable('personas', {
   goals: jsonb('goals').$type<string[]>().default([]),
   pains: jsonb('pains').$type<string[]>().default([]),
   channels: jsonb('channels').$type<string[]>().default([]),
-  journey: jsonb('journey').$type<unknown[]>().default([]),
+  /** JourneyMap { phases?, items } or legacy cell array. */
+  journey: jsonb('journey').$type<unknown>().default({}),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
@@ -352,36 +353,42 @@ export const products = pgTable('products', {
 })
 
 /** CRM customers (person/org) — soft-archive. */
-export const customers = pgTable('customers', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  businessId: uuid('business_id')
-    .notNull()
-    .references(() => businesses.id, { onDelete: 'cascade' }),
-  kind: varchar('kind', { length: 16 }).notNull().default('person'),
-  displayName: varchar('display_name', { length: 200 }).notNull(),
-  firstName: varchar('first_name', { length: 100 }),
-  lastName: varchar('last_name', { length: 100 }),
-  orgCustomerId: uuid('org_customer_id'),
-  email: varchar('email', { length: 320 }),
-  phone: varchar('phone', { length: 64 }),
-  address: text('address'),
-  street: varchar('street', { length: 200 }),
-  postalCode: varchar('postal_code', { length: 32 }),
-  city: varchar('city', { length: 120 }),
-  country: varchar('country', { length: 120 }),
-  billingStreet: varchar('billing_street', { length: 200 }),
-  billingPostalCode: varchar('billing_postal_code', { length: 32 }),
-  billingCity: varchar('billing_city', { length: 120 }),
-  billingCountry: varchar('billing_country', { length: 120 }),
-  relationStatus: varchar('relation_status', { length: 24 }).notNull().default('lead'),
-  birthDate: date('birth_date'),
-  photoUrl: text('photo_url'),
-  buyerPersonaId: uuid('buyer_persona_id').references(() => personas.id, { onDelete: 'set null' }),
-  tags: jsonb('tags').$type<string[]>().notNull().default([]),
-  archivedAt: timestamp('archived_at', { withTimezone: true }),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-})
+export const customers = pgTable(
+  'customers',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    businessId: uuid('business_id')
+      .notNull()
+      .references(() => businesses.id, { onDelete: 'cascade' }),
+    /** Per-business sequential number, starts at 100100 (always 6+ digits). */
+    customerNumber: integer('customer_number').notNull(),
+    kind: varchar('kind', { length: 16 }).notNull().default('person'),
+    displayName: varchar('display_name', { length: 200 }).notNull(),
+    firstName: varchar('first_name', { length: 100 }),
+    lastName: varchar('last_name', { length: 100 }),
+    orgCustomerId: uuid('org_customer_id'),
+    email: varchar('email', { length: 320 }),
+    phone: varchar('phone', { length: 64 }),
+    address: text('address'),
+    street: varchar('street', { length: 200 }),
+    postalCode: varchar('postal_code', { length: 32 }),
+    city: varchar('city', { length: 120 }),
+    country: varchar('country', { length: 120 }),
+    billingStreet: varchar('billing_street', { length: 200 }),
+    billingPostalCode: varchar('billing_postal_code', { length: 32 }),
+    billingCity: varchar('billing_city', { length: 120 }),
+    billingCountry: varchar('billing_country', { length: 120 }),
+    relationStatus: varchar('relation_status', { length: 24 }).notNull().default('lead'),
+    birthDate: date('birth_date'),
+    photoUrl: text('photo_url'),
+    buyerPersonaId: uuid('buyer_persona_id').references(() => personas.id, { onDelete: 'set null' }),
+    tags: jsonb('tags').$type<string[]>().notNull().default([]),
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('customers_biz_number_uidx').on(t.businessId, t.customerNumber)],
+)
 
 /** Company label catalog by scope (customer/project/marketing/product). */
 export const businessTags = pgTable(
@@ -495,6 +502,11 @@ export const tasks = pgTable('tasks', {
   priority: varchar('priority', { length: 16 }).notNull().default('medium'),
   assigneeUserId: uuid('assignee_user_id').references(() => users.id, { onDelete: 'set null' }),
   dueAt: timestamp('due_at', { withTimezone: true }),
+  /** Relative reminders before dueAt (Google Calendar style). */
+  reminders: jsonb('reminders')
+    .$type<Array<{ offsetValue: number; offsetUnit: string; channel: string }>>()
+    .notNull()
+    .default([]),
   sortOrder: integer('sort_order').notNull().default(0),
   version: integer('version').notNull().default(1),
   archivedAt: timestamp('archived_at', { withTimezone: true }),
@@ -504,9 +516,9 @@ export const tasks = pgTable('tasks', {
 
 export const taskComments = pgTable('task_comments', {
   id: uuid('id').defaultRandom().primaryKey(),
-  taskId: uuid('task_id')
-    .notNull()
-    .references(() => tasks.id, { onDelete: 'cascade' }),
+  /** Exactly one of taskId / ruleId is set (series vs materialization). */
+  taskId: uuid('task_id').references(() => tasks.id, { onDelete: 'cascade' }),
+  ruleId: uuid('rule_id'),
   authorUserId: uuid('author_user_id').references(() => users.id, { onDelete: 'set null' }),
   body: text('body').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -514,9 +526,8 @@ export const taskComments = pgTable('task_comments', {
 
 export const taskChecklistItems = pgTable('task_checklist_items', {
   id: uuid('id').defaultRandom().primaryKey(),
-  taskId: uuid('task_id')
-    .notNull()
-    .references(() => tasks.id, { onDelete: 'cascade' }),
+  taskId: uuid('task_id').references(() => tasks.id, { onDelete: 'cascade' }),
+  ruleId: uuid('rule_id'),
   title: varchar('title', { length: 300 }).notNull(),
   done: boolean('done').notNull().default(false),
   sortOrder: integer('sort_order').notNull().default(0),
@@ -540,9 +551,8 @@ export const taskAttachments = pgTable('task_attachments', {
   businessId: uuid('business_id')
     .notNull()
     .references(() => businesses.id, { onDelete: 'cascade' }),
-  taskId: uuid('task_id')
-    .notNull()
-    .references(() => tasks.id, { onDelete: 'cascade' }),
+  taskId: uuid('task_id').references(() => tasks.id, { onDelete: 'cascade' }),
+  ruleId: uuid('rule_id'),
   filename: varchar('filename', { length: 255 }).notNull(),
   mimeType: varchar('mime_type', { length: 120 }).notNull(),
   sizeBytes: integer('size_bytes').notNull().default(0),
@@ -569,7 +579,13 @@ export const recurrenceRules = pgTable('recurrence_rules', {
   startsAt: timestamp('starts_at', { withTimezone: true }).notNull().defaultNow(),
   endsAt: timestamp('ends_at', { withTimezone: true }),
   pausedAt: timestamp('paused_at', { withTimezone: true }),
+  /** Set when a period is completed; with nextAt > now the series shows as done + countdown. */
+  lastCompletedAt: timestamp('last_completed_at', { withTimezone: true }),
   nextAt: timestamp('next_at', { withTimezone: true }).notNull().defaultNow(),
+  reminders: jsonb('reminders')
+    .$type<Array<{ offsetValue: number; offsetUnit: string; channel: string }>>()
+    .notNull()
+    .default([]),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })

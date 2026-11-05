@@ -1,22 +1,42 @@
 /**
- * TaskTable — enriched task list with filters (status/prio/assignee/search).
+ * TaskTable — enriched task list with filters (status toggle/prio/assignee/mode/search).
  * Location: apps/web/src/features/projects/TaskTable.tsx
  */
 import { useMemo, useState } from 'react'
-import { MagnifyingGlass } from '@phosphor-icons/react'
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowsClockwise,
+  CheckCircle,
+  Circle,
+  CircleNotch,
+  MagnifyingGlass,
+  Minus,
+  PencilSimple,
+  SquaresFour,
+} from '@phosphor-icons/react'
+import { CrmIconSelect, type CrmIconSelectOption } from '../../components/CrmIconSelect'
 import type { MessageKey } from '../../i18n/messages'
 import { MemberAvatar, memberDisplayName, type MemberInfo } from './MemberAvatar'
 import { TaskPriorityBadge, TaskStatusBadge } from './TaskBadges'
-import type { BuTask } from './projectTypes'
-import { TASK_PRIORITIES, TASK_STATUSES } from './taskLabels'
+import type { BuTask, BuTaskMode } from './projectTypes'
+import {
+  TASK_PRIORITIES,
+  formatReopenCountdown,
+  taskRhythmLabel,
+  taskStatusLabel,
+} from './taskLabels'
 
 type TFn = (k: MessageKey) => string
 
 export type MemberById = Record<string, MemberInfo>
 
+/** Filter order: Alle → Offen → In Arbeit → Erledigt → Revision */
+const STATUS_FILTER_ORDER = ['open', 'in_progress', 'done', 'blocked'] as const
+
 type Props = {
   tasks: BuTask[]
-  onOpen: (id: string) => void
+  onOpen: (task: BuTask) => void
   t: TFn
   memberById?: MemberById
   showFilters?: boolean
@@ -39,7 +59,18 @@ function formatDue(iso: string | null, t: TFn): string {
   return overdue ? `${label} · ${t('taskOverdue')}` : label
 }
 
-export function EmptyTaskTable({ t, cols = 6 }: { t: TFn; cols?: number }) {
+function taskMode(task: BuTask): BuTaskMode {
+  return task.mode === 'recurring' ? 'recurring' : 'once'
+}
+
+function statusFilterIcon(status: string) {
+  if (status === 'open') return <Circle size={14} weight="regular" aria-hidden />
+  if (status === 'in_progress') return <CircleNotch size={14} weight="bold" aria-hidden />
+  if (status === 'blocked') return <PencilSimple size={14} weight="bold" aria-hidden />
+  return <CheckCircle size={14} weight="bold" aria-hidden />
+}
+
+export function EmptyTaskTable({ t, cols = 8 }: { t: TFn; cols?: number }) {
   return (
     <table className="table funnel-grid-table product-table task-table">
       <thead>
@@ -50,6 +81,8 @@ export function EmptyTaskTable({ t, cols = 6 }: { t: TFn; cols?: number }) {
           <th>{t('taskPriority')}</th>
           <th>{t('taskAssignee')}</th>
           <th>{t('taskDue')}</th>
+          <th>{t('taskRecurrenceFreq')}</th>
+          <th>{t('taskMode')}</th>
         </tr>
       </thead>
       <tbody>
@@ -80,12 +113,14 @@ export function TaskTable({
   const [status, setStatus] = useState('')
   const [priority, setPriority] = useState('')
   const [assignee, setAssignee] = useState('')
+  const [mode, setMode] = useState('')
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase()
     return tasks.filter((task) => {
       if (status && task.status !== status) return false
       if (priority && task.priority !== priority) return false
+      if (mode && taskMode(task) !== mode) return false
       if (assignee === '__none__' && task.assigneeUserId) return false
       if (assignee && assignee !== '__none__' && task.assigneeUserId !== assignee) return false
       if (!term) return true
@@ -94,7 +129,7 @@ export function TaskTable({
         (task.description || '').toLowerCase().includes(term)
       )
     })
-  }, [tasks, q, status, priority, assignee])
+  }, [tasks, q, status, priority, assignee, mode])
 
   const assigneeOptions = useMemo(() => {
     const ids = new Set<string>()
@@ -106,78 +141,148 @@ export function TaskTable({
       .filter(Boolean) as MemberInfo[]
   }, [tasks, memberById])
 
+  const priorityFilterOptions = useMemo<CrmIconSelectOption[]>(
+    () => [
+      {
+        value: '',
+        label: t('taskFilterAllPriority'),
+        tone: 'all',
+        icon: <SquaresFour size={14} weight="regular" aria-hidden />,
+      },
+      {
+        value: 'low',
+        label: t('taskPriorityLow'),
+        tone: 'low',
+        icon: <ArrowDown size={14} weight="bold" aria-hidden />,
+      },
+      {
+        value: 'medium',
+        label: t('taskPriorityMedium'),
+        tone: 'medium',
+        icon: <Minus size={14} weight="bold" aria-hidden />,
+      },
+      {
+        value: 'high',
+        label: t('taskPriorityHigh'),
+        tone: 'high',
+        icon: <ArrowUp size={14} weight="bold" aria-hidden />,
+      },
+    ],
+    [t],
+  )
+
+  const modeFilterOptions = useMemo<CrmIconSelectOption[]>(
+    () => [
+      {
+        value: '',
+        label: t('taskFilterAllMode'),
+        tone: 'all',
+        icon: <SquaresFour size={14} weight="regular" aria-hidden />,
+      },
+      {
+        value: 'once',
+        label: t('taskModeOnce'),
+        icon: <Circle size={14} weight="regular" aria-hidden />,
+      },
+      {
+        value: 'recurring',
+        label: t('taskModeRecurring'),
+        tone: 'in_progress',
+        icon: <ArrowsClockwise size={14} weight="bold" aria-hidden />,
+      },
+    ],
+    [t],
+  )
+
+  const statusToggleItems = useMemo(
+    () => [
+      { id: '', label: t('filterAll'), icon: <SquaresFour size={14} weight="regular" aria-hidden /> },
+      ...STATUS_FILTER_ORDER.map((s) => ({
+        id: s,
+        label: taskStatusLabel(s, t),
+        icon: statusFilterIcon(s),
+      })),
+    ],
+    [t],
+  )
+
+  const colSpan = showProject ? 9 : 8
+
   return (
     <div className={`stack task-table-wrap${compact ? ' is-compact' : ''}`}>
       {showFilters ? (
-        <div className="task-filter-bar" role="search">
-          <label className="task-filter-search">
-            <MagnifyingGlass size={14} weight="regular" aria-hidden />
-            <input
-              className="input task-filter-search-input"
-              type="search"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder={t('taskFilterSearch')}
-              aria-label={t('taskFilterSearch')}
-            />
-          </label>
-          <div className="task-filter-selects">
-            <select
-              className="input crm-filter-select task-filter-select"
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              aria-label={t('taskStatus')}
-            >
-              <option value="">{t('taskFilterAllStatus')}</option>
-              {TASK_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {t(
-                    s === 'open'
-                      ? 'taskStatusOpen'
-                      : s === 'in_progress'
-                        ? 'taskStatusInProgress'
-                        : s === 'blocked'
-                          ? 'taskStatusBlocked'
-                          : 'taskStatusDone',
-                  )}
-                </option>
-              ))}
-            </select>
-            <select
-              className="input crm-filter-select task-filter-select"
-              value={priority}
-              onChange={(e) => setPriority(e.target.value)}
-              aria-label={t('taskPriority')}
-            >
-              <option value="">{t('taskFilterAllPriority')}</option>
-              {TASK_PRIORITIES.map((p) => (
-                <option key={p} value={p}>
-                  {t(
-                    p === 'low'
-                      ? 'taskPriorityLow'
-                      : p === 'medium'
-                        ? 'taskPriorityMedium'
-                        : 'taskPriorityHigh',
-                  )}
-                </option>
-              ))}
-            </select>
-            <select
-              className="input crm-filter-select task-filter-select"
-              value={assignee}
-              onChange={(e) => setAssignee(e.target.value)}
-              aria-label={t('taskAssignee')}
-            >
-              <option value="">{t('taskFilterAllAssignee')}</option>
-              <option value="__none__">{t('taskAssigneeNone')}</option>
-              {assigneeOptions.map((m) => (
-                <option key={m.userId} value={m.userId}>
-                  {memberDisplayName(m)}
-                </option>
-              ))}
-            </select>
+        <>
+          <div
+            className="product-archive-toggle task-status-toggle"
+            role="tablist"
+            aria-label={t('taskStatus')}
+          >
+            {statusToggleItems.map((item) => {
+              const on = status === item.id
+              return (
+                <button
+                  key={item.id || 'all'}
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
+                  data-status={item.id || 'all'}
+                  className={`archive-seg project-scope-seg${on ? ' is-on' : ''}`}
+                  onClick={() => setStatus(item.id)}
+                >
+                  {item.icon}
+                  {item.label}
+                </button>
+              )
+            })}
           </div>
-        </div>
+          <div className="task-filter-bar" role="search">
+            <label className="task-filter-search">
+              <MagnifyingGlass size={14} weight="regular" aria-hidden />
+              <input
+                className="input task-filter-search-input"
+                type="search"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder={t('taskFilterSearch')}
+                aria-label={t('taskFilterSearch')}
+              />
+            </label>
+            <div className="task-filter-selects">
+              <div className="field task-filter-field">
+                <CrmIconSelect
+                  name="priority"
+                  value={priority}
+                  options={priorityFilterOptions}
+                  onChange={setPriority}
+                  aria-label={t('taskPriority')}
+                />
+              </div>
+              <select
+                className="input crm-filter-select task-filter-select"
+                value={assignee}
+                onChange={(e) => setAssignee(e.target.value)}
+                aria-label={t('taskAssignee')}
+              >
+                <option value="">{t('taskFilterAllAssignee')}</option>
+                <option value="__none__">{t('taskAssigneeNone')}</option>
+                {assigneeOptions.map((m) => (
+                  <option key={m.userId} value={m.userId}>
+                    {memberDisplayName(m)}
+                  </option>
+                ))}
+              </select>
+              <div className="field task-filter-field">
+                <CrmIconSelect
+                  name="mode"
+                  value={mode}
+                  options={modeFilterOptions}
+                  onChange={setMode}
+                  aria-label={t('taskMode')}
+                />
+              </div>
+            </div>
+          </div>
+        </>
       ) : null}
 
       <div className={`funnel-table-wrap task-table-panel${compact ? '' : ' panel'}`}>
@@ -192,6 +297,8 @@ export function TaskTable({
               <th>{t('taskPriority')}</th>
               <th>{t('taskAssignee')}</th>
               <th>{t('taskDue')}</th>
+              <th>{t('taskRecurrenceFreq')}</th>
+              <th>{t('taskMode')}</th>
             </tr>
           </thead>
           <tbody>
@@ -203,12 +310,21 @@ export function TaskTable({
                 new Date(task.dueAt!).getTime() < Date.now() &&
                 task.status !== 'done'
               const isDone = task.status === 'done'
-              const toggleDisabled = !canWrite || !onToggleDone || task.status === 'blocked'
+              const isRule = task.source === 'rule'
+              const reopenLabel =
+                isRule && isDone && task.reopensAt
+                  ? formatReopenCountdown(task.reopensAt, t)
+                  : ''
+              const toggleDisabled =
+                !canWrite || !onToggleDone || task.status === 'blocked' || isRule
+              const modeLabel =
+                taskMode(task) === 'recurring' ? t('taskModeRecurring') : t('taskModeOnce')
+              const rhythm = taskRhythmLabel(task, t)
               return (
                 <tr
-                  key={task.id}
-                  className={`product-table-row task-table-row${isOverdue ? ' is-overdue' : ''}${isDone ? ' is-done' : ''}`}
-                  onClick={() => onOpen(task.id)}
+                  key={`${task.source || 'task'}-${task.id}`}
+                  className={`product-table-row task-table-row${isOverdue ? ' is-overdue' : ''}${isDone ? ' is-done' : ''}${reopenLabel ? ' is-period-done' : ''}`}
+                  onClick={() => onOpen(task)}
                 >
                   <td className="task-table-check-col" onClick={(e) => e.stopPropagation()}>
                     <input
@@ -236,7 +352,15 @@ export function TaskTable({
                     </span>
                   </td>
                   <td>
-                    <TaskStatusBadge status={task.status} t={t} />
+                    <span className="task-status-with-reopen">
+                      <TaskStatusBadge status={task.status} t={t} />
+                      {reopenLabel ? (
+                        <span className="task-reopen-chip" title={reopenLabel}>
+                          <ArrowsClockwise size={11} weight="bold" aria-hidden />
+                          {reopenLabel}
+                        </span>
+                      ) : null}
+                    </span>
                   </td>
                   <td>
                     <TaskPriorityBadge priority={task.priority} t={t} />
@@ -252,13 +376,26 @@ export function TaskTable({
                     )}
                   </td>
                   <td className={isOverdue ? 'task-due--overdue' : 'muted'}>{due}</td>
+                  <td className="muted">{rhythm}</td>
+                  <td>
+                    <span
+                      className={`task-mode-chip${taskMode(task) === 'recurring' ? ' is-recurring' : ''}`}
+                    >
+                      {taskMode(task) === 'recurring' ? (
+                        <ArrowsClockwise size={12} weight="bold" aria-hidden />
+                      ) : (
+                        <Circle size={12} weight="regular" aria-hidden />
+                      )}
+                      {modeLabel}
+                    </span>
+                  </td>
                 </tr>
               )
             })}
             {emptyRows > 0 && filtered.length === 0
               ? Array.from({ length: emptyRows }).map((_, i) => (
                   <tr key={`e-${i}`} className="crm-empty-row" aria-hidden>
-                    <td colSpan={6}>&nbsp;</td>
+                    <td colSpan={colSpan}>&nbsp;</td>
                   </tr>
                 ))
               : null}

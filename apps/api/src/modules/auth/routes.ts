@@ -77,9 +77,14 @@ function sessionCookieOpts() {
   }
 }
 
+/** Auth abuse controls (P-05) — tighter on login/OTP than session reads. */
+const authLoginLimit = { max: 20, timeWindow: '1 minute' as const }
+const authChallengeLimit = { max: 10, timeWindow: '1 minute' as const }
+const authSessionLimit = { max: 60, timeWindow: '1 minute' as const }
+
 export async function authRoutes(app: FastifyInstance) {
   /** Primary: email + password → session cookie */
-  app.post('/api/auth/login', async (req, reply) => {
+  app.post('/api/auth/login', { config: { rateLimit: authLoginLimit } }, async (req, reply) => {
     const body = PasswordLoginSchema.parse(req.body)
     const email = body.email.toLowerCase()
     const rows = await db.select().from(users).where(eq(users.email, email)).limit(1)
@@ -98,7 +103,7 @@ export async function authRoutes(app: FastifyInstance) {
   })
 
   /** Set or change password for the logged-in user */
-  app.post('/api/auth/password', async (req, reply) => {
+  app.post('/api/auth/password', { config: { rateLimit: authLoginLimit } }, async (req, reply) => {
     const actor = await requireUser(req).catch(() => null)
     if (!actor) return reply.code(401).send({ error: 'unauthorized' })
     const body = ChangePasswordSchema.parse(req.body)
@@ -122,7 +127,7 @@ export async function authRoutes(app: FastifyInstance) {
     return { ok: true }
   })
 
-  app.post('/api/auth/magic-link', async (req, reply) => {
+  app.post('/api/auth/magic-link', { config: { rateLimit: authChallengeLimit } }, async (req, reply) => {
     const body = MagicLinkRequestSchema.parse(req.body)
     const email = body.email.toLowerCase()
     // Existence check without enumeration: always 200
@@ -151,7 +156,7 @@ export async function authRoutes(app: FastifyInstance) {
     return { ok: true, mode: sent.mode }
   })
 
-  app.post('/api/auth/verify', async (req, reply) => {
+  app.post('/api/auth/verify', { config: { rateLimit: authChallengeLimit } }, async (req, reply) => {
     const body = MagicLinkVerifySchema.parse(req.body)
     const rows = await db
       .select()
@@ -172,7 +177,7 @@ export async function authRoutes(app: FastifyInstance) {
     return { ok: true, user: { id: user.id, email: user.email } }
   })
 
-  app.post('/api/auth/verify-otp', async (req, reply) => {
+  app.post('/api/auth/verify-otp', { config: { rateLimit: authChallengeLimit } }, async (req, reply) => {
     const body = OtpVerifySchema.parse(req.body)
     const email = body.email.toLowerCase()
     const rows = await db.select().from(authChallenges).where(eq(authChallenges.email, email))
@@ -192,7 +197,7 @@ export async function authRoutes(app: FastifyInstance) {
     return { ok: true, user: { id: user.id, email: user.email } }
   })
 
-  app.post('/api/auth/logout', async (req, reply) => {
+  app.post('/api/auth/logout', { config: { rateLimit: authSessionLimit } }, async (req, reply) => {
     const token = req.cookies.bu2_session
     if (token) {
       await db
@@ -205,14 +210,14 @@ export async function authRoutes(app: FastifyInstance) {
     return { ok: true }
   })
 
-  app.get('/api/auth/me', async (req, reply) => {
+  app.get('/api/auth/me', { config: { rateLimit: authSessionLimit } }, async (req, reply) => {
     const user = await requireUser(req).catch(() => null)
     if (!user) return reply.code(401).send({ error: 'unauthorized' })
     return { user }
   })
 
   /** Dev/test only — returns last OTP for an email (never enable in production). */
-  app.post('/api/auth/dev/last-otp', async (req, reply) => {
+  app.post('/api/auth/dev/last-otp', { config: { rateLimit: authChallengeLimit } }, async (req, reply) => {
     const env = loadEnv()
     if (env.NODE_ENV === 'production') {
       return reply.code(404).send({ error: 'not_found' })

@@ -5,27 +5,31 @@
 import type { FastifyInstance } from 'fastify'
 import { OAuthProviderParamSchema, canManageCredentials } from '@bu2/shared'
 import { loadEnv } from '../../lib/env.js'
+import { httpError } from '../../lib/httpError.js'
 import { buildOAuthAuthorizeUrl } from '../../lib/integrations/oauth/authorize.js'
+import { persistOAuthConnection } from '../../lib/integrations/oauth/complete.js'
 import { oauthClientConfiguredForProvider } from '../../lib/integrations/oauth/config.js'
-import { putPkceVerifier } from '../../lib/integrations/oauth/pkceStore.js'
+import { exchangeOAuthCode } from '../../lib/integrations/oauth/exchange.js'
+import { putPkceVerifier, takePkceVerifier } from '../../lib/integrations/oauth/pkceStore.js'
 import {
   allOauthRedirectUris,
+  oauthRedirectKey,
   oauthRedirectUriForProvider,
 } from '../../lib/integrations/oauth/redirects.js'
 import { parseOAuthState } from '../../lib/integrations/oauth/state.js'
 import { loadMembership, requireUser } from '../../plugins/auth.js'
 
-function httpError(e: unknown): { status: number; error: string } {
-  const err = e as Error & { statusCode?: number }
-  return {
-    status: err.statusCode && err.statusCode >= 400 ? err.statusCode : 500,
-    error: err.message || 'error',
-  }
-}
-
 function settingsReturnUrl(slug: string): string {
   const web = loadEnv().PUBLIC_WEB_URL.replace(/\/$/, '')
-  return `${web}/co/${encodeURIComponent(slug)}/settings?tab=connections&oauth=1`
+  // Settings tabs are hash-based (#connections), query carries oauth flash flags.
+  return `${web}/co/${encodeURIComponent(slug)}/settings?oauth=1#connections`
+}
+
+function oauthFailRedirect(returnTo: string, error: string, provider?: string): string {
+  const u = new URL(returnTo)
+  u.searchParams.set('oauth_error', error.slice(0, 120))
+  if (provider) u.searchParams.set('oauth_provider', provider)
+  return u.toString()
 }
 
 export async function oauthIntegrationRoutes(app: FastifyInstance) {
@@ -74,9 +78,13 @@ export async function oauthIntegrationRoutes(app: FastifyInstance) {
 
   for (const provider of ['google', 'microsoft', 'meta'] as const) {
     app.get(`/api/oauth/${provider}/callback`, async (req, reply) => {
-      const q = req.query as { code?: string; state?: string; error?: string; error_description?: string }
+      const q = req.query as {
+        code?: string
+        state?: string
+        error?: string
+        error_description?: string
+      }
       if (q.error) {
-        const slugGuess = ''
         const web = loadEnv().PUBLIC_WEB_URL.replace(/\/$/, '')
         const target = new URL(`${web}/`)
         target.searchParams.set('oauth_error', q.error)
@@ -86,6 +94,7 @@ export async function oauthIntegrationRoutes(app: FastifyInstance) {
       if (!q.state) {
         return reply.code(400).send({ error: 'missing_state' })
       }
+
       let state
       try {
         state = parseOAuthState(q.state)
@@ -96,18 +105,57 @@ export async function oauthIntegrationRoutes(app: FastifyInstance) {
 
       const returnTo = settingsReturnUrl(state.slug)
       if (!q.code) {
-        const u = new URL(returnTo)
-        u.searchParams.set('oauth_error', 'missing_code')
-        return reply.redirect(u.toString())
+        return reply.redirect(oauthFailRedirect(returnTo, 'missing_code', state.provider))
       }
 
-      // Token exchange + connection persist: next slice when client secrets are live.
-      // PKCE verifier is available via takePkceVerifier(q.state) once exchange is wired.
-      const u = new URL(returnTo)
-      u.searchParams.set('oauth', provider)
-      u.searchParams.set('oauth_status', 'pending_token_exchange')
-      u.searchParams.set('oauth_provider', state.provider)
-      return reply.redirect(u.toString())
+      const redirectKey = oauthRedirectKey(state.provider)
+      if (!redirectKey || redirectKey !== provider) {
+        return reply.redirect(oauthFailRedirect(returnTo, 'provider_mismatch', state.provider))
+      }
+
+      // Live session must match signed state (B-09) — cookie session + membership, not state alone.
+      let user
+      try {
+        user = await requireUser(req)
+      } catch {
+        return reply.redirect(oauthFailRedirect(returnTo, 'session_required', state.provider))
+      }
+      if (user.id !== state.userId && !user.isSuperadmin) {
+        return reply.redirect(oauthFailRedirect(returnTo, 'state_user_mismatch', state.provider))
+      }
+      const m = await loadMembership(user.id, state.slug)
+      if (
+        !m ||
+        m.businessId !== state.businessId ||
+        (!canManageCredentials(m.role) && !user.isSuperadmin)
+      ) {
+        return reply.redirect(oauthFailRedirect(returnTo, 'forbidden', state.provider))
+      }
+
+      const codeVerifier = takePkceVerifier(q.state)
+      try {
+        const tokens = await exchangeOAuthCode({
+          redirectKey,
+          provider: state.provider,
+          code: q.code,
+          codeVerifier,
+        })
+        const conn = await persistOAuthConnection({
+          businessId: m.businessId,
+          userId: user.id,
+          provider: state.provider,
+          tokens,
+        })
+        const u = new URL(returnTo)
+        u.searchParams.set('oauth', provider)
+        u.searchParams.set('oauth_status', 'connected')
+        u.searchParams.set('oauth_provider', state.provider)
+        u.searchParams.set('connection_id', conn.id)
+        return reply.redirect(u.toString())
+      } catch (e) {
+        const { error } = httpError(e)
+        return reply.redirect(oauthFailRedirect(returnTo, error, state.provider))
+      }
     })
   }
 }
