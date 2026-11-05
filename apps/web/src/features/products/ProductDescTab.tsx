@@ -2,12 +2,12 @@
  * ProductDescTab — Modal tab: cover, name, description, market.
  * Cover uses a real <label htmlFor> (more reliable than button→hidden input)
  * and compresses large images so the 2MB API limit is not a silent fail.
- * Location: apps/web/src/components/product/ProductDescTab.tsx
+ * Location: apps/web/src/features/products/ProductDescTab.tsx
  */
 import { ImageSquare } from '@phosphor-icons/react'
 import { useId, useRef, useState, type MouseEvent } from 'react'
 import { useI18n } from '../../lib/i18n'
-import { initials, type ProductDraft } from '../../features/product/productTypes'
+import { initials, type ProductDraft } from './productTypes'
 
 type Props = {
   draft: ProductDraft

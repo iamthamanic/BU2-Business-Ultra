@@ -1,6 +1,6 @@
 /**
  * CustomerJourneyGrid — Legacy-style phases × lanes matrix with group pills
- * and cell preset picker. Location: apps/web/src/components/product/CustomerJourneyGrid.tsx
+ * and cell preset picker. Location: apps/web/src/features/products/CustomerJourneyGrid.tsx
  */
 import {
   ChartBar,
@@ -33,8 +33,8 @@ import {
   type JourneyLaneKey,
   type JourneyMap,
   type JourneyPhase,
-} from '../../features/product/customerJourney'
-import { initials } from '../../features/product/productTypes'
+} from './customerJourney'
+import { initials } from './productTypes'
 
 type Props = {
   value: JourneyMap | undefined

@@ -1,7 +1,7 @@
 /**
  * ProductCalcTab — Legacy CMB workbench layout: centered product root,
  * stem/fan connectors, 5 department columns, result spine.
- * Location: apps/web/src/components/product/ProductCalcTab.tsx
+ * Location: apps/web/src/features/products/ProductCalcTab.tsx
  */
 import { Plus, X } from '@phosphor-icons/react'
 import { useMemo } from 'react'
@@ -14,7 +14,7 @@ import {
   type CostDept,
   type CostPosition,
   type ProductDraft,
-} from '../../features/product/productTypes'
+} from './productTypes'
 import { ProductCalcFan, ProductCalcStem } from './ProductCalcConnectors'
 
 type Props = {

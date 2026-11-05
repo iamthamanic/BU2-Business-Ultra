@@ -1,6 +1,6 @@
 /**
  * ProductCalcConnectors — Decorative stem + fan SVG lines (legacy CMB workbench).
- * Pure presentation — not domain edges. Location: apps/web/src/components/product/ProductCalcConnectors.tsx
+ * Pure presentation — not domain edges. Location: apps/web/src/features/products/ProductCalcConnectors.tsx
  */
 
 type FanProps = {

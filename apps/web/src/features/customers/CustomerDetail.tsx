@@ -1,6 +1,6 @@
 /**
  * CustomerDetail — Dark-Ops CRM detail: identity header, icon tabs, panel workstations.
- * Location: apps/web/src/features/customer/CustomerDetail.tsx
+ * Location: apps/web/src/features/customers/CustomerDetail.tsx
  */
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'

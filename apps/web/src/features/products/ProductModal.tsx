@@ -1,7 +1,7 @@
 /**
  * ProductModal — Create/edit product with tabs:
  * Beschreibung | Kalkulation | Buyer Persona | Customer Journey.
- * Location: apps/web/src/components/product/ProductModal.tsx
+ * Location: apps/web/src/features/products/ProductModal.tsx
  */
 import { useEffect, useId, useState } from 'react'
 import {
@@ -19,8 +19,8 @@ import {
   emptyDraft,
   type BuProduct,
   type ProductDraft,
-} from '../../features/product/productTypes'
-import { MktTab } from '../MktTabs'
+} from './productTypes'
+import { MktTab } from '../../components/MktTabs'
 import { ProductCalcTab } from './ProductCalcTab'
 import { ProductDescTab } from './ProductDescTab'
 import { ProductPersonaTab } from './ProductPersonaTab'

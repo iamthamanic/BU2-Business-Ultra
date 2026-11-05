@@ -1,6 +1,6 @@
 /**
  * customerJourney — Legacy-style phase × lane matrix model + presets.
- * Location: apps/web/src/features/product/customerJourney.ts
+ * Location: apps/web/src/features/products/customerJourney.ts
  */
 
 export type LifecycleStage =

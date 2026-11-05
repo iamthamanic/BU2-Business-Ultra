@@ -1,5 +1,5 @@
 /**
  * ProductPage — alias for ProductShell (table/cards + modal).
- * Location: apps/web/src/features/product/ProductPage.tsx
+ * Location: apps/web/src/features/products/ProductPage.tsx
  */
 export { ProductShell as ProductPage } from './ProductShell'

@@ -1,6 +1,6 @@
 /**
  * CustomerShell — CRM list aligned to Product Dark-Ops chrome (toolbar, empty, table).
- * Location: apps/web/src/features/customer/CustomerShell.tsx
+ * Location: apps/web/src/features/customers/CustomerShell.tsx
  */
 import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useNavigate, useOutletContext, useParams } from 'react-router-dom'
