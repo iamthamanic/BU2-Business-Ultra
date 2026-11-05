@@ -1,6 +1,6 @@
 /**
  * productTypes — client shapes for Product screen / modal.
- * Location: apps/web/src/features/product/productTypes.ts
+ * Location: apps/web/src/features/products/productTypes.ts
  */
 
 import { defaultJourneyMap, type JourneyMap } from './customerJourney'

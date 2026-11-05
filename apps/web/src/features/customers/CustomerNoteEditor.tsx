@@ -1,6 +1,6 @@
 /**
  * CustomerNoteEditor — rich note toolbar (bold/italic/underline/list/color) + sanitized HTML body.
- * Location: apps/web/src/features/customer/CustomerNoteEditor.tsx
+ * Location: apps/web/src/features/customers/CustomerNoteEditor.tsx
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {

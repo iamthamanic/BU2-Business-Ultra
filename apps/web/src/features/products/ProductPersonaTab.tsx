@@ -1,7 +1,7 @@
 /**
  * ProductPersonaTab — Buyer Persona profile/link OR Customer Journey matrix
  * (section chosen by parent modal tabs).
- * Location: apps/web/src/components/product/ProductPersonaTab.tsx
+ * Location: apps/web/src/features/products/ProductPersonaTab.tsx
  */
 import { ArrowRight, Plus, UserFocus } from '@phosphor-icons/react'
 import { useEffect, useMemo, useState } from 'react'
@@ -10,11 +10,11 @@ import { useI18n } from '../../lib/i18n'
 import {
   normalizeJourneyMap,
   type JourneyMap,
-} from '../../features/product/customerJourney'
+} from './customerJourney'
 import {
   initials,
   type ProductDraft,
-} from '../../features/product/productTypes'
+} from './productTypes'
 import { CustomerJourneyGrid } from './CustomerJourneyGrid'
 
 type PersonaRow = { id: string; name: string; summary?: string | null }

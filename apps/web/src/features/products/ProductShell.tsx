@@ -1,6 +1,6 @@
 /**
  * ProductShell — Product department: table/card list + create/edit modal.
- * Location: apps/web/src/features/product/ProductShell.tsx
+ * Location: apps/web/src/features/products/ProductShell.tsx
  */
 import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext, useParams, useSearchParams } from 'react-router-dom'
@@ -10,7 +10,7 @@ import {
   SquaresFour,
   Table,
 } from '@phosphor-icons/react'
-import { ProductModal } from '../../components/product/ProductModal'
+import { ProductModal } from './ProductModal'
 import type { CompanyOutletContext } from '../../components/BusinessShell'
 import { api } from '../../lib/api'
 import { useI18n } from '../../lib/i18n'

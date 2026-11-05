@@ -1,6 +1,6 @@
 /**
  * CustomerCreateModal — create CRM customer (Dark-Ops fields).
- * Location: apps/web/src/features/customer/CustomerCreateModal.tsx
+ * Location: apps/web/src/features/customers/CustomerCreateModal.tsx
  */
 import { useState } from 'react'
 import { X } from '@phosphor-icons/react'

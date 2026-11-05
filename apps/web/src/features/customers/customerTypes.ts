@@ -1,5 +1,5 @@
 /**
- * Customer CRM client types. Location: apps/web/src/features/customer/customerTypes.ts
+ * Customer CRM client types. Location: apps/web/src/features/customers/customerTypes.ts
  */
 export type BuCustomer = {
   id: string
