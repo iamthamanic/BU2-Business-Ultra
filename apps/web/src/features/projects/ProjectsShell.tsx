@@ -12,13 +12,11 @@ import {
   useParams,
 } from 'react-router-dom'
 import {
-  ArrowsClockwise,
   CalendarBlank,
   CheckCircle,
   CirclesThree,
   DotsThree,
   FolderSimpleDashed,
-  ListChecks,
   MagnifyingGlass,
   PlayCircle,
   Plus,
@@ -35,6 +33,7 @@ import { useI18n } from '../../lib/i18n'
 import type { MessageKey } from '../../i18n/messages'
 import { companyRoutes } from '../../lib/companyPaths'
 import { ProjectCreateModal } from './ProjectCreateModal'
+import { ProjectsScopeToggle } from './ProjectsScopeToggle'
 import { MemberAvatar, type MemberInfo } from './MemberAvatar'
 import { ProjectStatusBadge } from './TaskBadges'
 import type { BuProject } from './projectTypes'
@@ -325,14 +324,7 @@ export function ProjectsShell() {
 
       <div className="crm-subnav project-index-toolbar" role="navigation" aria-label={t('projects')}>
         <div className="project-index-nav">
-          <Link className="btn project-mine-cta" to={routes.projectsMine}>
-            <ListChecks size={14} weight="bold" aria-hidden />
-            {t('projectsMine')}
-          </Link>
-          <Link className="btn" to={`${routes.projects}/recurring`}>
-            <ArrowsClockwise size={14} weight="bold" aria-hidden />
-            {t('projectsRecurring')}
-          </Link>
+          <ProjectsScopeToggle slug={slug} active="all" />
         </div>
         {!emptyAll ? (
           <div className="project-index-filters" role="search">

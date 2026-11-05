@@ -44,12 +44,12 @@ import { useI18n } from '../../lib/i18n'
 import type { MessageKey } from '../../i18n/messages'
 import { companyRoutes } from '../../lib/companyPaths'
 import type { CustomerOutletContext } from './CustomerShell'
+import { NoteComposerModal } from '../../components/notes/NoteComposerModal'
+import { ThreadedNotesList } from '../../components/notes/ThreadedNotesList'
 import {
-  CustomerNoteEditor,
-  NoteBodyHtml,
   notePlainText,
   sanitizeNoteHtml,
-} from './CustomerNoteEditor'
+} from '../../components/notes/NoteEditor'
 import type {
   BuCustomer,
   BuCustomerConsent,
@@ -292,7 +292,7 @@ export function CustomerDetail() {
   const [noteMenuId, setNoteMenuId] = useState<string | null>(null)
   const [noteMenuPos, setNoteMenuPos] = useState<{ top: number; left: number } | null>(null)
   const noteMenuRef = useRef<HTMLDivElement | null>(null)
-  const noteMenuBtnRef = useRef<HTMLButtonElement | null>(null)
+  const noteMenuBtnRef = useRef<HTMLElement | null>(null)
   const [catalogTags, setCatalogTags] = useState<
     { id: string; name: string; color: string | null; description?: string }[]
   >([])
@@ -453,7 +453,7 @@ export function CustomerDetail() {
     setNoteMenuPos(null)
   }
 
-  function openNoteMenu(noteId: string, btn: HTMLButtonElement) {
+  function openNoteMenu(noteId: string, btn: HTMLElement) {
     if (noteMenuId === noteId) {
       closeNoteMenu()
       return
@@ -471,7 +471,7 @@ export function CustomerDetail() {
     setNoteMenuId(noteId)
   }
 
-  function noteRootId(note: BuCustomerNote): string {
+  function noteRootId(note: { id: string; parentNoteId?: string | null }): string {
     return note.parentNoteId || note.id
   }
 
@@ -488,7 +488,7 @@ export function CustomerDetail() {
     setEditingNoteBody('')
   }
 
-  function startReplyNote(note: BuCustomerNote) {
+  function startReplyNote(note: { id: string; parentNoteId?: string | null }) {
     closeNoteMenu()
     cancelEditNote()
     setReplyParentId(noteRootId(note))
@@ -1151,146 +1151,25 @@ export function CustomerDetail() {
                   {t('customerNotesFilterEmpty')}
                 </p>
               ) : (
-                <ul className="customer-note-list">
-                  {noteThreads.map(({ root, replies }) => {
-                    const renderCard = (n: BuCustomerNote, opts?: { reply?: boolean }) => {
-                      const author =
-                        n.authorDisplayName?.trim() || t('customerNoteAuthorUnknown')
-                      const isEditing = editingNoteId === n.id
-                      const busy = noteBusyId === n.id
-                      const edited =
-                        n.updatedAt &&
-                        n.createdAt &&
-                        new Date(n.updatedAt).getTime() - new Date(n.createdAt).getTime() > 1000
-                      return (
-                        <li
-                          key={n.id}
-                          className={`customer-note-card${opts?.reply ? ' is-reply' : ''}`}
-                        >
-                          {isEditing ? (
-                            <div className="customer-note-edit">
-                              <CustomerNoteEditor
-                                key={n.id}
-                                value={editingNoteBody}
-                                onChange={setEditingNoteBody}
-                                disabled={busy}
-                                placeholder={t('customerNotePh')}
-                                autoFocus
-                                rows={4}
-                              />
-                              <div className="customer-note-edit-actions">
-                                <button
-                                  type="button"
-                                  className="btn"
-                                  disabled={busy}
-                                  onClick={cancelEditNote}
-                                >
-                                  {t('customerNoteCancel')}
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn primary"
-                                  disabled={busy || !notePlainText(editingNoteBody)}
-                                  onClick={() => void saveEditNote(n.id)}
-                                >
-                                  {t('customerNoteSave')}
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="customer-note-main">
-                              <NoteBodyHtml body={n.body} />
-                              {canWrite ? (
-                                <div className="customer-note-actions">
-                                  <button
-                                    type="button"
-                                    className="btn icon-btn customer-note-menu-btn"
-                                    disabled={busy}
-                                    aria-label={t('customerNoteMenu')}
-                                    title={t('customerNoteMenu')}
-                                    aria-haspopup="menu"
-                                    aria-expanded={noteMenuId === n.id}
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      openNoteMenu(n.id, e.currentTarget)
-                                    }}
-                                  >
-                                    <DotsThree size={14} weight="bold" aria-hidden />
-                                  </button>
-                                </div>
-                              ) : null}
-                            </div>
-                          )}
-                          <footer className="customer-note-meta">
-                            <div className="customer-note-author">
-                              <span className="customer-note-av" aria-hidden>
-                                {initials(author)}
-                              </span>
-                              <div className="customer-note-author-text">
-                                <span className="customer-note-author-name">{author}</span>
-                                <span className="muted customer-note-when">
-                                  {formatWhen(n.createdAt)}
-                                  {edited ? ` · ${t('customerNoteEdited')}` : ''}
-                                </span>
-                              </div>
-                            </div>
-                            {canWrite && !isEditing ? (
-                              <button
-                                type="button"
-                                className="btn customer-note-reply-btn"
-                                disabled={busy || replyBusy}
-                                onClick={() => startReplyNote(n)}
-                              >
-                                <ArrowBendUpLeft size={12} weight="bold" aria-hidden />
-                                {t('customerNoteReply')}
-                              </button>
-                            ) : null}
-                          </footer>
-                        </li>
-                      )
-                    }
-
-                    return (
-                      <li key={root.id} className="customer-note-thread">
-                        <ul className="customer-note-thread-list">
-                          {renderCard(root)}
-                          {replies.map((r) => renderCard(r, { reply: true }))}
-                          {replyParentId === root.id ? (
-                            <li className="customer-note-card customer-note-reply-composer is-reply">
-                              <CustomerNoteEditor
-                                key={`reply-${root.id}`}
-                                value={replyBody}
-                                onChange={setReplyBody}
-                                disabled={replyBusy}
-                                placeholder={t('customerNoteReplyPh')}
-                                autoFocus
-                                rows={3}
-                              />
-                              <div className="customer-note-edit-actions">
-                                <button
-                                  type="button"
-                                  className="btn"
-                                  disabled={replyBusy}
-                                  onClick={cancelReplyNote}
-                                >
-                                  {t('customerNoteCancel')}
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn primary"
-                                  disabled={replyBusy || !notePlainText(replyBody)}
-                                  onClick={() => void submitReplyNote()}
-                                >
-                                  {t('customerNoteReplySave')}
-                                </button>
-                              </div>
-                            </li>
-                          ) : null}
-                        </ul>
-                      </li>
-                    )
-                  })}
-                </ul>
+                <ThreadedNotesList
+                  threads={noteThreads}
+                  canWrite={canWrite}
+                  editingNoteId={editingNoteId}
+                  editingNoteBody={editingNoteBody}
+                  noteBusyId={noteBusyId}
+                  noteMenuId={noteMenuId}
+                  replyParentId={replyParentId}
+                  replyBody={replyBody}
+                  replyBusy={replyBusy}
+                  onEditBodyChange={setEditingNoteBody}
+                  onCancelEdit={cancelEditNote}
+                  onSaveEdit={(id) => void saveEditNote(id)}
+                  onOpenMenu={openNoteMenu}
+                  onStartReply={startReplyNote}
+                  onReplyBodyChange={setReplyBody}
+                  onCancelReply={cancelReplyNote}
+                  onSubmitReply={() => void submitReplyNote()}
+                />
               )}
             </section>
 
@@ -2381,62 +2260,19 @@ export function CustomerDetail() {
           )
         : null}
 
-      {noteCreateOpen
-        ? createPortal(
-            <div
-              className="bu-modal-overlay"
-              role="presentation"
-              onMouseDown={(e) => {
-                if (e.target === e.currentTarget && !noteCreating) setNoteCreateOpen(false)
-              }}
-            >
-              <form
-                className="bu-modal panel crm-modal customer-note-modal"
-                role="dialog"
-                aria-modal="true"
-                aria-label={t('customerNoteAdd')}
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  void createNote()
-                }}
-              >
-                <header className="bu-modal-head">
-                  <h2 className="section-title" style={{ margin: 0, fontSize: '1.1rem' }}>
-                    {t('customerNoteAdd')}
-                  </h2>
-                </header>
-                <div className="crm-modal-body stack">
-                  <CustomerNoteEditor
-                    value={noteBody}
-                    onChange={setNoteBody}
-                    disabled={noteCreating}
-                    placeholder={t('customerNotePh')}
-                    autoFocus
-                    rows={6}
-                  />
-                </div>
-                <footer className="bu-modal-actions">
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={noteCreating}
-                    onClick={() => setNoteCreateOpen(false)}
-                  >
-                    {t('cancel')}
-                  </button>
-                  <button
-                    type="submit"
-                    className="btn primary"
-                    disabled={noteCreating || !notePlainText(noteBody)}
-                  >
-                    {noteCreating ? '…' : t('customerNoteAdd')}
-                  </button>
-                </footer>
-              </form>
-            </div>,
-            document.body,
-          )
-        : null}
+      <NoteComposerModal
+        open={noteCreateOpen}
+        title={t('customerNoteAdd')}
+        placeholder={t('customerNotePh')}
+        submitLabel={t('customerNoteAdd')}
+        body={noteBody}
+        onBodyChange={setNoteBody}
+        canSubmit={!noteCreating && Boolean(notePlainText(noteBody))}
+        busy={noteCreating}
+        onClose={() => setNoteCreateOpen(false)}
+        onSubmit={() => void createNote()}
+        rows={6}
+      />
 
       {statsOpen && data
         ? createPortal(

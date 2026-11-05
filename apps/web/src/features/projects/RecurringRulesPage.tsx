@@ -3,13 +3,13 @@
  * Location: apps/web/src/features/projects/RecurringRulesPage.tsx
  */
 import { useEffect, useState } from 'react'
-import { Link, useOutletContext } from 'react-router-dom'
+import { useOutletContext } from 'react-router-dom'
 import { Plus } from '@phosphor-icons/react'
 import { CrmEmptyPreview } from '../../components/CrmEmptyPreview'
 import { api } from '../../lib/api'
 import { useI18n } from '../../lib/i18n'
-import { companyRoutes } from '../../lib/companyPaths'
 import type { ProjectsOutletContext } from './ProjectsShell'
+import { ProjectsScopeToggle } from './ProjectsScopeToggle'
 import type { BuRecurrenceRule } from './projectTypes'
 
 export function RecurringRulesPage() {
@@ -17,7 +17,6 @@ export function RecurringRulesPage() {
   const slug = ctx?.slug || ''
   const canWrite = ctx?.canWrite ?? false
   const { t } = useI18n()
-  const routes = companyRoutes(slug)
   const [rules, setRules] = useState<BuRecurrenceRule[]>([])
   const [loading, setLoading] = useState(true)
   const [title, setTitle] = useState('')
@@ -53,15 +52,15 @@ export function RecurringRulesPage() {
     <div className="stack mkt-shell product-shell crm-shell">
       <header className="product-page-head">
         <div>
-          <Link to={routes.projects} className="muted" style={{ fontSize: 13 }}>
-            ← {t('projects')}
-          </Link>
-          <h1 className="section-title product-page-title" style={{ marginTop: 4 }}>
+          <h1 className="section-title product-page-title" style={{ marginTop: 0 }}>
             {t('projectsRecurring')}
           </h1>
           <p className="muted" style={{ margin: '4px 0 0' }}>
             {t('projectsRecurringLede')}
           </p>
+          <div style={{ marginTop: 10 }}>
+            <ProjectsScopeToggle slug={slug} active="recurring" />
+          </div>
         </div>
         <div className="product-page-actions">
           {canWrite ? (

@@ -3,14 +3,14 @@
  * Location: apps/web/src/features/projects/MyTasksPage.tsx
  */
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useOutletContext } from 'react-router-dom'
+import { useOutletContext } from 'react-router-dom'
 import { Plus } from '@phosphor-icons/react'
 import { CrmEmptyPreview } from '../../components/CrmEmptyPreview'
 import { api } from '../../lib/api'
 import { useI18n } from '../../lib/i18n'
-import { companyRoutes } from '../../lib/companyPaths'
 import type { MemberInfo } from './MemberAvatar'
 import type { ProjectsOutletContext } from './ProjectsShell'
+import { ProjectsScopeToggle } from './ProjectsScopeToggle'
 import { EmptyTaskTable, TaskTable } from './TaskTable'
 import { TaskCreateModal } from './TaskCreateModal'
 import { TaskDetailModal } from './TaskDetailModal'
@@ -21,7 +21,6 @@ export function MyTasksPage() {
   const slug = ctx?.slug || ''
   const canWrite = ctx?.canWrite ?? false
   const { t } = useI18n()
-  const routes = companyRoutes(slug)
   const [tasks, setTasks] = useState<BuTask[]>([])
   const [members, setMembers] = useState<MemberInfo[]>([])
   const [loading, setLoading] = useState(true)
@@ -92,15 +91,15 @@ export function MyTasksPage() {
     <div className="stack mkt-shell product-shell crm-shell">
       <header className="product-page-head">
         <div>
-          <Link to={routes.projects} className="muted" style={{ fontSize: 13 }}>
-            ← {t('projects')}
-          </Link>
-          <h1 className="section-title product-page-title" style={{ marginTop: 4 }}>
+          <h1 className="section-title product-page-title" style={{ marginTop: 0 }}>
             {t('projectsMine')}
           </h1>
           <p className="muted" style={{ margin: '4px 0 0' }}>
             {t('projectsMineLede')}
           </p>
+          <div style={{ marginTop: 10 }}>
+            <ProjectsScopeToggle slug={slug} active="mine" />
+          </div>
         </div>
         {canWrite ? (
           <div className="product-page-actions">

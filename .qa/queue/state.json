@@ -1,0 +1,53 @@
+{
+  "version": 2,
+  "repo": "iamthamanic/BU2-Business-Ultra",
+  "activeIssue": null,
+  "featureSlug": "arch-customers-service-split",
+  "phase": "idle",
+  "branch": null,
+  "prUrl": null,
+  "milestoneFilter": null,
+  "paused": false,
+  "runMode": "loop",
+  "queue": [
+    4,
+    5,
+    6,
+    7
+  ],
+  "completedIssues": [
+    1,
+    2,
+    3
+  ],
+  "mergedIssues": [
+    1,
+    2,
+    3
+  ],
+  "prUrls": {
+    "1": "https://github.com/iamthamanic/BU2-Business-Ultra/pull/8",
+    "2": "https://github.com/iamthamanic/BU2-Business-Ultra/pull/9",
+    "3": "https://github.com/iamthamanic/BU2-Business-Ultra/pull/10"
+  },
+  "retries": {
+    "implement": 0,
+    "verifyTicket": 0,
+    "compositionGate": 0,
+    "verifyUi": 0,
+    "review": 0
+  },
+  "maxRetries": {
+    "implement": 3,
+    "verifyTicket": 2,
+    "compositionGate": 2,
+    "verifyUi": 2,
+    "review": 2,
+    "sameRootCause": 2
+  },
+  "lastError": null,
+  "lastErrorCount": 0,
+  "issuesProcessedInSession": 3,
+  "updatedAt": "2026-11-05T11:55:33.000Z",
+  "lastMergeSha": "9451bac63cf821627e48cddd3e50934002e90457"
+}

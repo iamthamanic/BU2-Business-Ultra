@@ -445,6 +445,7 @@ const de = {
 
   projects: 'Projekte',
   projectsLede: 'Areas und Custom-Projekte, Aufgaben und Wiederholungen.',
+  projectsAll: 'Alle Projekte',
   projectsMine: 'Meine Aufgaben',
   projectsMineLede: 'Zugewiesen an dich oder Inbox (ohne Projekt).',
   projectsRecurring: 'Wiederkehrend',
@@ -1471,6 +1472,7 @@ const en: { [K in keyof typeof de]: string } = {
     'More profile context appears once modules like projects or communication are connected.',
   projects: 'Projects',
   projectsLede: 'Areas and custom projects, tasks and recurrence.',
+  projectsAll: 'All projects',
   projectsMine: 'My tasks',
   projectsMineLede: 'Assigned to you or inbox (no project).',
   projectsRecurring: 'Recurring',
