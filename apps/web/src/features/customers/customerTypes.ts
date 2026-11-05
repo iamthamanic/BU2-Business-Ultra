@@ -1,34 +1,11 @@
 /**
- * Customer CRM client types. Location: apps/web/src/features/customers/customerTypes.ts
+ * Customer CRM client types — derived from @bu2/shared DTOs where available.
+ * Location: apps/web/src/features/customers/customerTypes.ts
  */
-export type BuCustomer = {
-  id: string
-  kind: string
-  displayName: string
-  firstName?: string | null
-  lastName?: string | null
-  orgCustomerId?: string | null
-  orgCustomer?: { id: string; displayName: string } | null
-  email: string | null
-  phone: string | null
-  address: string | null
-  street: string | null
-  postalCode: string | null
-  city: string | null
-  country: string | null
-  billingStreet: string | null
-  billingPostalCode: string | null
-  billingCity: string | null
-  billingCountry: string | null
-  relationStatus: string
-  birthDate: string | null
-  photoUrl: string | null
-  buyerPersonaId: string | null
-  tags: string[]
-  archivedAt: string | null
-  createdAt: string
-  updatedAt: string
-}
+import type { CustomerDto, CustomerNoteDto } from '@bu2/shared'
+
+export type BuCustomer = CustomerDto
+export type BuCustomerNote = CustomerNoteDto
 
 export type BuCustomerPurchase = {
   id: string
@@ -48,16 +25,6 @@ export type BuCustomerStats = {
   persona: { id: string; name: string; summary: string | null } | null
   products: { productId: string | null; name: string; amountCents: number }[]
   purchases: BuCustomerPurchase[]
-}
-
-export type BuCustomerNote = {
-  id: string
-  body: string
-  authorUserId: string | null
-  authorDisplayName?: string | null
-  parentNoteId?: string | null
-  createdAt: string
-  updatedAt?: string
 }
 
 export type BuCustomerConsent = {

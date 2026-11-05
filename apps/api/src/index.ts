@@ -2,6 +2,7 @@ import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import cookie from '@fastify/cookie'
 import multipart from '@fastify/multipart'
+import rateLimit from '@fastify/rate-limit'
 import fastifyStatic from '@fastify/static'
 import { mkdirSync, existsSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -26,7 +27,7 @@ import { adminRoutes } from './modules/admin/routes.js'
 import { integrationRoutes } from './modules/integrations/routes.js'
 import { oauthIntegrationRoutes } from './modules/integrations/oauthRoutes.js'
 import { inboxRoutes } from './modules/inbox/routes.js'
-import { ensureMockAdapterRegistered } from './lib/integrations/core/mockAdapter.js'
+import './lib/integrations/core/mockAdapter.js'
 import { ensureTelegramAdapterRegistered } from './lib/integrations/telegram/adapter.js'
 import { ensureUnipileAdapterRegistered } from './lib/integrations/unipile/adapter.js'
 
@@ -45,7 +46,14 @@ async function main() {
     credentials: true,
   })
   await app.register(cookie, { secret: env.SESSION_SECRET })
-  await app.register(multipart, { limits: { fileSize: 25 * 1024 * 1024 } })
+  // Opt-in only — auth routes set config.rateLimit (P-05). Other routes stay unlimited.
+  await app.register(rateLimit, {
+    global: false,
+    max: 60,
+    timeWindow: '1 minute',
+  })
+  // Logos + YouTube Planen uploads (Shorts/videos); keep fail-closed on size in route too.
+  await app.register(multipart, { limits: { fileSize: 256 * 1024 * 1024 } })
   await app.register(fastifyStatic, {
     root: uploadsDir,
     prefix: '/uploads/',
@@ -53,7 +61,7 @@ async function main() {
   })
 
   await registerAuth(app)
-  ensureMockAdapterRegistered()
+  // Mock adapter self-registers on import (connections.ts / mockAdapter.ts side effect).
   ensureTelegramAdapterRegistered()
   ensureUnipileAdapterRegistered()
 

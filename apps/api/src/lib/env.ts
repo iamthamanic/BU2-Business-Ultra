@@ -1,6 +1,9 @@
 /**
- * Env loader for the API — reads monorepo root `.env` into process.env (without
- * overriding already-set vars), then validates with Zod.
+ * Env loader for the API — loads monorepo root env files into process.env
+ * (without overriding already-set vars), then validates with Zod.
+ *
+ * Priority: process env → `.env.local` (dev/test only) → `.env` → non-secret defaults.
+ * Production never auto-loads local files; critical secrets fail closed (no hardcoded prod fallbacks).
  * Location: apps/api/src/lib/env.ts
  */
 import { existsSync, readFileSync } from 'node:fs'
@@ -18,8 +21,7 @@ const EnvSchema = z.object({
   SECRETS_MASTER_KEY: z.string().min(16),
   SESSION_SECRET: z.string().min(16),
   BOOTSTRAP_OWNER_EMAIL: z.string().email().default('raccoova@gmail.com'),
-  /** Local/dev bootstrap password only — never use the default in production */
-  // Local/dev: short passwords allowed (e.g. 1234). Tighten for real deploys.
+  /** Local/dev bootstrap password only — never use a weak value in production */
   BOOTSTRAP_OWNER_PASSWORD: z.string().min(4).default('change-me-local'),
   BREVO_SENDER_EMAIL: z.string().email().default('social@halteverbot123.de'),
   BREVO_SENDER_NAME: z.string().default('Business Ultra'),
@@ -35,15 +37,14 @@ export type Env = z.infer<typeof EnvSchema>
 let cached: Env | null = null
 let dotenvLoaded = false
 
-/** Load KEY=VALUE pairs from monorepo `.env` into process.env (no override). */
-function loadDotenvFromRoot(): void {
-  if (dotenvLoaded) return
-  dotenvLoaded = true
+function repoRoot(): string {
   const here = dirname(fileURLToPath(import.meta.url))
   // apps/api/src/lib → repo root
-  const rootEnv = resolve(here, '../../../../.env')
-  if (!existsSync(rootEnv)) return
-  const text = readFileSync(rootEnv, 'utf8')
+  return resolve(here, '../../../..')
+}
+
+/** Parse KEY=VALUE lines; never override keys already present in process.env. */
+export function applyDotenvText(text: string, into: NodeJS.ProcessEnv = process.env): void {
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim()
     if (!line || line.startsWith('#')) continue
@@ -57,22 +58,61 @@ function loadDotenvFromRoot(): void {
     ) {
       val = val.slice(1, -1)
     }
-    if (process.env[key] === undefined) process.env[key] = val
+    if (into[key] === undefined) into[key] = val
   }
+}
+
+function loadFileIfPresent(path: string): void {
+  if (!existsSync(path)) return
+  applyDotenvText(readFileSync(path, 'utf8'))
+}
+
+/**
+ * Load root env files once.
+ * Dev/test: `.env.local` then `.env` (first file wins per key via no-override).
+ * Production: no file auto-load (platform/CI injects process.env).
+ */
+export function loadDotenvFromRoot(opts?: { forceReload?: boolean; nodeEnv?: string }): void {
+  if (dotenvLoaded && !opts?.forceReload) return
+  dotenvLoaded = true
+  const nodeEnv = opts?.nodeEnv ?? process.env.NODE_ENV ?? 'development'
+  if (nodeEnv === 'production') return
+  const root = repoRoot()
+  // Higher-priority file first so it claims keys before `.env`.
+  loadFileIfPresent(resolve(root, '.env.local'))
+  loadFileIfPresent(resolve(root, '.env'))
+}
+
+/** Test helper — clears cache so the next loadEnv() re-reads. */
+export function resetEnvCacheForTests(): void {
+  cached = null
+  dotenvLoaded = false
 }
 
 export function loadEnv(): Env {
   if (cached) return cached
   loadDotenvFromRoot()
-  const parsed = EnvSchema.safeParse({
-    ...process.env,
-    DATABASE_URL:
-      process.env.DATABASE_URL ??
-      'postgresql://bu2:bu2_local_dev_change_me@127.0.0.1:5432/bu2',
-    SECRETS_MASTER_KEY:
-      process.env.SECRETS_MASTER_KEY ?? 'dev-only-secrets-master-key-32b!!',
-    SESSION_SECRET: process.env.SESSION_SECRET ?? 'dev-only-session-secret-32bytes!!',
-  })
+
+  const nodeEnv = process.env.NODE_ENV ?? 'development'
+  const isProd = nodeEnv === 'production'
+
+  const input: Record<string, unknown> = { ...process.env }
+
+  // Non-secret local defaults only outside production.
+  if (!isProd) {
+    if (input.DATABASE_URL == null || input.DATABASE_URL === '') {
+      input.DATABASE_URL =
+        'postgresql://bu2:bu2_local_dev_change_me@127.0.0.1:5432/bu2'
+    }
+    if (input.SECRETS_MASTER_KEY == null || input.SECRETS_MASTER_KEY === '') {
+      input.SECRETS_MASTER_KEY = 'dev-only-secrets-master-key-32b!!'
+    }
+    if (input.SESSION_SECRET == null || input.SESSION_SECRET === '') {
+      input.SESSION_SECRET = 'dev-only-session-secret-32bytes!!'
+    }
+  }
+
+  const parsed = EnvSchema.safeParse(input)
   if (!parsed.success) {
     console.error('Invalid environment', parsed.error.flatten())
     throw new Error('Invalid environment configuration')

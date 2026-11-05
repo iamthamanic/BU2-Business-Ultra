@@ -1,6 +1,9 @@
 # Required GitHub Secrets
 
 Documented names only — configure in GitHub → Settings → Secrets and variables → Actions.
+Do not put these values in the repo. Local development uses `.env.local` (preferred) or `.env` — both are gitignored.
+
+## CI / deploy (Required unless noted)
 
 - `DATABASE_URL`
 - `SECRETS_MASTER_KEY`
@@ -11,18 +14,44 @@ Documented names only — configure in GitHub → Settings → Secrets and varia
 - `BOOTSTRAP_OWNER_EMAIL`
 - `OPENSEO_SSO_SHARED_SECRET`
 - `OPENSEO_BASE_URL`
-- `OPENSEO_IMAGE_DIGEST`
+- `OPENSEO_IMAGE_DIGEST` (CI-only — image pin for OpenSEO sidecar)
 - `PUBLIC_WEB_URL`
 - `PUBLIC_API_URL`
 - `CORS_ORIGIN`
 - `SORTANIZE_URL` (optional override)
 
-## Optional — messaging OAuth (Inbox connect)
+## Optional — messaging OAuth (Inbox / Verbindungen)
 
-Redirect URIs are derived from `PUBLIC_API_URL` at runtime (see Settings → Verbindungen). Register those URIs in Google / Azure / Meta; do not hardcode localhost in production.
+Redirect URIs are **derived from `PUBLIC_API_URL`** at runtime (`GET /api/oauth/redirect-uris`).
+Register the exact URIs in Google / Azure / Meta; do not invent a separate `GOOGLE_OAUTH_REDIRECT_URI` env var.
+
+| Provider | Local callback | Production example |
+|----------|----------------|--------------------|
+| Google | `http://127.0.0.1:8742/api/oauth/google/callback` | `https://business-ultra.raccoova.com/api/oauth/google/callback` |
+| Microsoft | `http://127.0.0.1:8742/api/oauth/microsoft/callback` | `https://business-ultra.raccoova.com/api/oauth/microsoft/callback` |
+| Meta | `http://127.0.0.1:8742/api/oauth/meta/callback` | `https://business-ultra.raccoova.com/api/oauth/meta/callback` |
+
+Env names:
 
 - `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`
 - `MICROSOFT_OAUTH_CLIENT_ID` / `MICROSOFT_OAUTH_CLIENT_SECRET`
 - `MICROSOFT_OAUTH_TENANT` (optional, default `common`)
 - `META_OAUTH_APP_ID` / `META_OAUTH_APP_SECRET`
 - `UNIPILE_DSN` / `UNIPILE_ACCESS_TOKEN` (personal Telegram via Unipile)
+
+Leave blank until the client exists. Empty = fail-closed (503). Do not use `CHANGE_ME` placeholders.
+
+**Status:** authorize + PKCE + token exchange + encrypted credential persist for Google family (**Gmail**, **YouTube**, **Google Ads**), Microsoft, Meta messaging. Same Google Cloud client; separate connects (different scopes). Callback: `oauth_status=connected`.
+
+**Google Ads:** enable **Google Ads API** on the same Cloud project as the OAuth client; manage access (Test / Explorer) in Cloud Console. No developer token in BU2. Do **not** use the “App Conversion Tracking and Remarketing API” form.
+
+Production must terminate TLS and route `/api/oauth/*/callback` to the API.
+
+## Boundary: global vs business secrets
+
+| Layer | Examples | Where |
+|-------|----------|--------|
+| Global app | OAuth client id/secret, `SESSION_SECRET`, `SECRETS_MASTER_KEY`, Brevo platform key | Env / GitHub Secrets |
+| Per-business | Access/refresh tokens, Metricool keys, Ads developer tokens tied to a tenant | Integration Core (encrypted at rest with `SECRETS_MASTER_KEY`) |
+
+Never put tenant tokens in global env. Rotating `SECRETS_MASTER_KEY` invalidates sealed credentials — re-connect integrations after a rotation.

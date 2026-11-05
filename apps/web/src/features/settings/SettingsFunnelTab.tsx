@@ -82,9 +82,7 @@ export function SettingsFunnelTab({ slug, onSaved }: Props) {
   }
 
   function allMetricool() {
-    setRows((prev) =>
-      prev.map((r) => (r.directReady ? r : { ...r, provider: 'metricool' })),
-    )
+    setRows((prev) => prev.map((r) => ({ ...r, provider: 'metricool' })))
   }
 
   async function save() {
@@ -131,17 +129,15 @@ export function SettingsFunnelTab({ slug, onSaved }: Props) {
               <div className="co-funnel-row">
                 <div className="co-funnel-label">{meta.label}</div>
                 <div className="co-funnel-source">
-                  {!row.directReady ? (
-                    <label className="co-check">
-                      <input
-                        type="radio"
-                        name={`p-${row.surface}`}
-                        checked={row.provider === 'metricool'}
-                        onChange={() => setProvider(row.surface, 'metricool')}
-                      />{' '}
-                      Metricool
-                    </label>
-                  ) : null}
+                  <label className="co-check">
+                    <input
+                      type="radio"
+                      name={`p-${row.surface}`}
+                      checked={row.provider === 'metricool'}
+                      onChange={() => setProvider(row.surface, 'metricool')}
+                    />{' '}
+                    Metricool
+                  </label>
                   <label
                     className="co-check"
                     style={row.directReady ? undefined : { opacity: 0.45 }}
@@ -159,7 +155,7 @@ export function SettingsFunnelTab({ slug, onSaved }: Props) {
                 </div>
                 <select
                   className="input"
-                  disabled={row.directReady || row.provider !== 'metricool'}
+                  disabled={row.provider !== 'metricool'}
                   value={row.integrationId}
                   onChange={(e) => setInteg(row.surface, e.target.value)}
                   aria-label={`Brand ${meta.label}`}

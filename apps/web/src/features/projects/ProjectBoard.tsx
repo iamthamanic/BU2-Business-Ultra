@@ -1,16 +1,21 @@
 /**
- * ProjectBoard — Dark-Ops kanban with status DnD, lane reorder, mobile scroll-snap.
+ * ProjectBoard — Dark-Ops kanban with status DnD, lane reorder, mode filter.
  * Location: apps/web/src/features/projects/ProjectBoard.tsx
  */
 import { useMemo, useState } from 'react'
-import { DotsSixVertical, Plus } from '@phosphor-icons/react'
+import { ArrowsClockwise, Circle, DotsSixVertical, Plus } from '@phosphor-icons/react'
 import { CrmEmptyPreview } from '../../components/CrmEmptyPreview'
 import { api } from '../../lib/api'
 import type { MessageKey } from '../../i18n/messages'
 import { MemberAvatar, type MemberInfo } from './MemberAvatar'
 import { TaskPriorityBadge } from './TaskBadges'
-import type { BuTask } from './projectTypes'
-import { normalizeLaneOrder, taskStatusLabel, type TaskStatus } from './taskLabels'
+import type { BuTask, BuTaskMode } from './projectTypes'
+import {
+  formatReopenCountdown,
+  normalizeLaneOrder,
+  taskStatusLabel,
+  type TaskStatus,
+} from './taskLabels'
 
 type TFn = (k: MessageKey) => string
 type MemberById = Record<string, MemberInfo>
@@ -22,10 +27,14 @@ type Props = {
   laneOrder: string[] | null | undefined
   memberById: MemberById
   t: TFn
-  onOpenTask: (id: string) => void
+  onOpenTask: (task: BuTask) => void
   onCreate: (status?: TaskStatus) => void
   onChanged: () => Promise<void>
   onLaneOrderChange: (order: TaskStatus[]) => Promise<void>
+}
+
+function taskMode(task: BuTask): BuTaskMode {
+  return task.mode === 'recurring' ? 'recurring' : 'once'
 }
 
 function formatDue(iso: string | null): string | null {
@@ -52,11 +61,17 @@ export function ProjectBoard({
   const [draggingLane, setDraggingLane] = useState<string | null>(null)
   const [dropLane, setDropLane] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [modeFilter, setModeFilter] = useState('')
+
+  const visibleTasks = useMemo(() => {
+    if (!modeFilter) return tasks
+    return tasks.filter((task) => taskMode(task) === modeFilter)
+  }, [tasks, modeFilter])
 
   const byStatus = useMemo(() => {
     const m: Record<string, BuTask[]> = {}
     for (const col of columns) m[col] = []
-    for (const task of tasks) {
+    for (const task of visibleTasks) {
       const key = m[task.status] ? task.status : columns[0]!
       if (!m[key]) m[key] = []
       m[key]!.push(task)
@@ -65,12 +80,12 @@ export function ProjectBoard({
       m[col] = [...(m[col] || [])].sort((a, b) => a.sortOrder - b.sortOrder)
     }
     return m
-  }, [tasks, columns])
+  }, [visibleTasks, columns])
 
   async function moveTask(taskId: string, status: TaskStatus, insertIndex: number) {
     if (!canWrite || busy) return
-    const task = tasks.find((x) => x.id === taskId)
-    if (!task) return
+    const task = visibleTasks.find((x) => x.id === taskId)
+    if (!task || task.source === 'rule') return
     const laneTasks = (byStatus[status] || []).filter((x) => x.id !== taskId)
     const nextSort = insertIndex <= 0 ? 0 : insertIndex >= laneTasks.length ? laneTasks.length : insertIndex
     // Reindex lane: place task at nextSort
@@ -121,9 +136,37 @@ export function ProjectBoard({
     }
   }
 
-  const empty = tasks.length === 0
+  const empty = visibleTasks.length === 0
 
   const board = (
+    <div className="stack">
+      <div
+        className="product-archive-toggle project-board-mode-bar"
+        role="tablist"
+        aria-label={t('taskMode')}
+      >
+        {(
+          [
+            { id: '', label: t('taskFilterAllMode') },
+            { id: 'once', label: t('taskModeOnce') },
+            { id: 'recurring', label: t('taskModeRecurring') },
+          ] as const
+        ).map((opt) => {
+          const on = modeFilter === opt.id
+          return (
+            <button
+              key={opt.id || 'all'}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              className={`archive-seg project-scope-seg${on ? ' is-on' : ''}`}
+              onClick={() => setModeFilter(opt.id)}
+            >
+              {opt.label}
+            </button>
+          )
+        })}
+      </div>
     <div className={`project-board${empty ? ' project-board-empty' : ''}`}>
       {columns.map((col) => {
         const laneTasks = byStatus[col] || []
@@ -179,14 +222,23 @@ export function ProjectBoard({
                   Boolean(task.dueAt) &&
                   new Date(task.dueAt!).getTime() < Date.now() &&
                   task.status !== 'done'
+                const isRule = task.source === 'rule'
+                const reopenLabel =
+                  isRule && task.status === 'done' && task.reopensAt
+                    ? formatReopenCountdown(task.reopensAt, t)
+                    : ''
+                const modeLabel =
+                  taskMode(task) === 'recurring' ? t('taskModeRecurring') : t('taskModeOnce')
                 return (
                   <button
-                    key={task.id}
+                    key={`${task.source || 'task'}-${task.id}`}
                     type="button"
-                    className={`project-board-card${draggingTaskId === task.id ? ' is-dragging' : ''}${overdue ? ' is-overdue' : ''}`}
+                    className={`project-board-card${draggingTaskId === task.id ? ' is-dragging' : ''}${overdue ? ' is-overdue' : ''}${reopenLabel ? ' is-period-done' : ''}`}
                     data-prio={task.priority}
-                    draggable={canWrite}
+                    data-mode={taskMode(task)}
+                    draggable={canWrite && !isRule}
                     onDragStart={(e) => {
+                      if (isRule) return
                       setDraggingTaskId(task.id)
                       e.dataTransfer.setData('text/task', task.id)
                       e.dataTransfer.effectAllowed = 'move'
@@ -206,12 +258,27 @@ export function ProjectBoard({
                       const tid = e.dataTransfer.getData('text/task')
                       if (tid) await moveTask(tid, col, idx)
                     }}
-                    onClick={() => onOpenTask(task.id)}
+                    onClick={() => onOpenTask(task)}
                   >
                     <span className="project-board-card-title">{task.title}</span>
                     <span className="project-board-card-meta">
                       <TaskPriorityBadge priority={task.priority} t={t} />
-                      {due ? (
+                      <span
+                        className={`task-mode-chip${taskMode(task) === 'recurring' ? ' is-recurring' : ''}`}
+                      >
+                        {taskMode(task) === 'recurring' ? (
+                          <ArrowsClockwise size={12} weight="bold" aria-hidden />
+                        ) : (
+                          <Circle size={12} weight="regular" aria-hidden />
+                        )}
+                        {modeLabel}
+                      </span>
+                      {reopenLabel ? (
+                        <span className="task-reopen-chip" title={reopenLabel}>
+                          <ArrowsClockwise size={11} weight="bold" aria-hidden />
+                          {reopenLabel}
+                        </span>
+                      ) : due ? (
                         <span className={`project-board-due${overdue ? ' is-overdue' : ''}`}>
                           {due}
                         </span>
@@ -255,9 +322,10 @@ export function ProjectBoard({
         )
       })}
     </div>
+    </div>
   )
 
-  if (empty) {
+  if (tasks.length === 0) {
     return (
       <CrmEmptyPreview
         canWrite={canWrite}

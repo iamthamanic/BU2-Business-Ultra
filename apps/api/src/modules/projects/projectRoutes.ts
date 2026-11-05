@@ -1,58 +1,22 @@
 /**
  * registerProjectCrudRoutes Fastify registration — uses ./service.ts for domain helpers.
  */
-import { createWriteStream } from 'node:fs'
-import { mkdir, unlink } from 'node:fs/promises'
-import { join } from 'node:path'
-import { pipeline } from 'node:stream/promises'
 import type { FastifyInstance } from 'fastify'
-import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, lte, or } from 'drizzle-orm'
-import {
-  ProjectPatchSchema,
-  ProjectSchema,
-  RecurrenceRulePatchSchema,
-  RecurrenceRuleSchema,
-  TaskChecklistItemSchema,
-  TaskCommentSchema,
-  TaskPatchSchema,
-  TaskSchema,
-  TaskStatusSchema,
-  canMutateContent,
-  type Role,
-} from '@bu2/shared'
+import { and, asc, desc, eq, ilike, isNotNull, isNull } from 'drizzle-orm'
+import { ProjectPatchSchema, ProjectSchema, canMutateContent, type Role } from '@bu2/shared'
 import { db } from '../../db/client.js'
-import {
-  memberships,
-  projectEvents,
-  projects,
-  recurrenceRules,
-  taskAttachments,
-  taskChecklistItems,
-  taskComments,
-  taskOccurrences,
-  tasks,
-  users,
-} from '../../db/schema.js'
+import { projectEvents, projects, recurrenceRules, tasks, users } from '../../db/schema.js'
 import { writeAudit } from '../../lib/audit.js'
-import { randomToken } from '../../lib/crypto.js'
-import { loadEnv } from '../../lib/env.js'
 import { loadMembership, requireUser } from '../../plugins/auth.js'
 import { ensureDefaultAreaProjectsIfEmpty } from './defaultAreas.js'
 import {
-  ATTACH_ALLOWED,
-  ATTACH_MAX_BYTES,
-  TICK_CAP,
   addProjectEvent,
   assertProjectAccess,
-  assertTaskProjectAccess,
   loadProject,
-  loadTask,
-  materializeDueRules,
+  mergeTasksWithRules,
+  statsFromMerged,
   taskStatsForProjects,
-  toAttachment,
   toProject,
-  toRule,
-  toTask,
 } from './service.js'
 
 
@@ -112,8 +76,14 @@ export async function registerProjectCrudRoutes(app: FastifyInstance) {
           ),
         )
         .orderBy(asc(tasks.sortOrder), desc(tasks.updatedAt))
-      const stats = (await taskStatsForProjects(m.businessId, [id])).get(id)!
-      return { project: { ...toProject(row), stats }, tasks: taskRows.map(toTask) }
+      const ruleRows = await db
+        .select()
+        .from(recurrenceRules)
+        .where(and(eq(recurrenceRules.businessId, m.businessId), eq(recurrenceRules.projectId, id)))
+        .orderBy(asc(recurrenceRules.nextAt))
+      const merged = await mergeTasksWithRules(taskRows, ruleRows)
+      const stats = statsFromMerged(merged)
+      return { project: { ...toProject(row), stats }, tasks: merged }
     })
 
   app.post('/api/b/:slug/projects', async (req, reply) => {

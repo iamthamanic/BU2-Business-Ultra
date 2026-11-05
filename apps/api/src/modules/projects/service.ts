@@ -2,7 +2,7 @@
  * Projects domain service — mappers, access checks, loaders, recurrence materialization, stats.
  * Location: apps/api/src/modules/projects/service.ts
  */
-import { and, asc, eq, inArray, isNull, lte } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, lte } from 'drizzle-orm'
 import { canAccessProjectTeam, type Role } from '@bu2/shared'
 import { db } from '../../db/client.js'
 import {
@@ -10,8 +10,11 @@ import {
   projects,
   recurrenceRules,
   taskAttachments,
+  taskChecklistItems,
+  taskComments,
   taskOccurrences,
   tasks,
+  users,
 } from '../../db/schema.js'
 
 export const ATTACH_MAX_BYTES = 10 * 1024 * 1024
@@ -75,13 +78,19 @@ export async function assertTaskProjectAccess(
 }
 
 export function toAttachment(row: typeof taskAttachments.$inferSelect, businessId: string) {
+  const folder = row.taskId
+    ? `tasks/${row.taskId}`
+    : row.ruleId
+      ? `rules/${row.ruleId}`
+      : 'orphan'
   return {
     id: row.id,
     taskId: row.taskId,
+    ruleId: row.ruleId ?? null,
     filename: row.filename,
     mimeType: row.mimeType,
     sizeBytes: row.sizeBytes,
-    url: `/uploads/${businessId}/tasks/${row.taskId}/${row.filename}`,
+    url: `/uploads/${businessId}/${folder}/${row.filename}`,
     createdByUserId: row.createdByUserId,
     createdAt: row.createdAt,
   }
@@ -104,7 +113,10 @@ export async function addProjectEvent(
   })
 }
 
-export function toTask(row: typeof tasks.$inferSelect) {
+export function toTask(
+  row: typeof tasks.$inferSelect,
+  opts?: { mode?: 'once' | 'recurring' },
+) {
   return {
     id: row.id,
     projectId: row.projectId,
@@ -115,12 +127,92 @@ export function toTask(row: typeof tasks.$inferSelect) {
     priority: row.priority,
     assigneeUserId: row.assigneeUserId,
     dueAt: row.dueAt,
+    reminders: Array.isArray(row.reminders) ? row.reminders : [],
+    mode: opts?.mode ?? 'once',
+    source: 'task' as const,
     sortOrder: row.sortOrder,
     version: row.version,
     archivedAt: row.archivedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   }
+}
+
+/** Period is closed until nextAt — show as done with reopen countdown. */
+export function isPeriodDoneWaiting(row: typeof recurrenceRules.$inferSelect, now = new Date()) {
+  return Boolean(
+    row.lastCompletedAt && row.nextAt.getTime() > now.getTime() && !row.pausedAt,
+  )
+}
+
+/** Present a recurrence rule as a task-like row for list/board UI. */
+export function ruleAsTask(row: typeof recurrenceRules.$inferSelect, now = new Date()) {
+  const waiting = isPeriodDoneWaiting(row, now)
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    customerId: row.customerId,
+    title: row.title,
+    description: row.description,
+    status: row.pausedAt ? 'blocked' : waiting ? 'done' : 'open',
+    priority: row.priority,
+    assigneeUserId: row.assigneeUserId,
+    dueAt: row.nextAt,
+    reminders: Array.isArray(row.reminders) ? row.reminders : [],
+    mode: 'recurring' as const,
+    source: 'rule' as const,
+    freq: row.freq,
+    weekday: row.weekday,
+    monthDay: row.monthDay,
+    /** ISO — when a completed period reopens (countdown target). */
+    reopensAt: waiting ? row.nextAt.toISOString() : null,
+    lastCompletedAt: row.lastCompletedAt ? row.lastCompletedAt.toISOString() : null,
+    sortOrder: 0,
+    version: 1,
+    archivedAt: null as string | null,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  }
+}
+
+export function statsFromMerged(
+  merged: Array<{ status: string; dueAt: Date | string | null }>,
+) {
+  const now = Date.now()
+  const s = { total: 0, done: 0, open: 0, overdue: 0 }
+  for (const t of merged) {
+    s.total++
+    if (t.status === 'done') {
+      s.done++
+      continue
+    }
+    s.open++
+    const due = t.dueAt ? new Date(t.dueAt).getTime() : NaN
+    if (!Number.isNaN(due) && due < now) s.overdue++
+  }
+  return s
+}
+
+export async function occurrenceTaskIdSet(taskIds: string[]): Promise<Set<string>> {
+  if (!taskIds.length) return new Set()
+  const rows = await db
+    .select({ taskId: taskOccurrences.taskId })
+    .from(taskOccurrences)
+    .where(inArray(taskOccurrences.taskId, taskIds))
+  return new Set(rows.map((r) => r.taskId))
+}
+
+/** One-shot tasks (excluding materializations) + recurrence rules as recurring rows. */
+export async function mergeTasksWithRules(
+  taskRows: (typeof tasks.$inferSelect)[],
+  ruleRows: (typeof recurrenceRules.$inferSelect)[],
+) {
+  const occIds = await occurrenceTaskIdSet(taskRows.map((r) => r.id))
+  const once = taskRows
+    .filter((r) => !occIds.has(r.id))
+    .map((r) => toTask(r, { mode: 'once' }))
+  const recurring = filterActiveRules(ruleRows).map((r) => ruleAsTask(r))
+  return [...once, ...recurring]
 }
 
 export function toRule(row: typeof recurrenceRules.$inferSelect) {
@@ -139,7 +231,9 @@ export function toRule(row: typeof recurrenceRules.$inferSelect) {
     startsAt: row.startsAt,
     endsAt: row.endsAt,
     pausedAt: row.pausedAt,
+    lastCompletedAt: row.lastCompletedAt,
     nextAt: row.nextAt,
+    reminders: Array.isArray(row.reminders) ? row.reminders : [],
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   }
@@ -163,8 +257,95 @@ export async function loadTask(businessId: string, id: string) {
   return rows[0] ?? null
 }
 
-export function advanceNext(from: Date, freq: string, weekday: number | null, monthDay: number | null): Date {
+export async function loadRule(businessId: string, id: string) {
+  const rows = await db
+    .select()
+    .from(recurrenceRules)
+    .where(and(eq(recurrenceRules.id, id), eq(recurrenceRules.businessId, businessId)))
+    .limit(1)
+  return rows[0] ?? null
+}
+
+export function isRuleActive(row: typeof recurrenceRules.$inferSelect, now = new Date()) {
+  return !(row.endsAt && row.endsAt.getTime() <= now.getTime())
+}
+
+export function filterActiveRules(rows: (typeof recurrenceRules.$inferSelect)[]) {
+  const now = new Date()
+  return rows.filter((r) => isRuleActive(r, now))
+}
+
+export async function loadRuleSideContent(businessId: string, ruleId: string) {
+  const [commentRows, checklist, attachments] = await Promise.all([
+    db
+      .select({
+        id: taskComments.id,
+        ruleId: taskComments.ruleId,
+        authorUserId: taskComments.authorUserId,
+        body: taskComments.body,
+        createdAt: taskComments.createdAt,
+        authorDisplayName: users.displayName,
+        authorEmail: users.email,
+      })
+      .from(taskComments)
+      .leftJoin(users, eq(users.id, taskComments.authorUserId))
+      .where(eq(taskComments.ruleId, ruleId))
+      .orderBy(asc(taskComments.createdAt)),
+    db
+      .select()
+      .from(taskChecklistItems)
+      .where(eq(taskChecklistItems.ruleId, ruleId))
+      .orderBy(asc(taskChecklistItems.sortOrder)),
+    db
+      .select()
+      .from(taskAttachments)
+      .where(
+        and(eq(taskAttachments.ruleId, ruleId), eq(taskAttachments.businessId, businessId)),
+      )
+      .orderBy(desc(taskAttachments.createdAt)),
+  ])
+  return {
+    comments: commentRows.map((c) => ({
+      id: c.id,
+      ruleId: c.ruleId,
+      authorUserId: c.authorUserId,
+      body: c.body,
+      createdAt: c.createdAt,
+      authorDisplayName: c.authorDisplayName?.trim() || c.authorEmail || null,
+    })),
+    checklist,
+    attachments: attachments.map((a) => toAttachment(a, businessId)),
+  }
+}
+
+export async function copyRuleChecklistToTask(ruleId: string, taskId: string) {
+  const items = await db
+    .select()
+    .from(taskChecklistItems)
+    .where(eq(taskChecklistItems.ruleId, ruleId))
+    .orderBy(asc(taskChecklistItems.sortOrder))
+  if (!items.length) return
+  await db.insert(taskChecklistItems).values(
+    items.map((item) => ({
+      taskId,
+      title: item.title,
+      done: false,
+      sortOrder: item.sortOrder,
+    })),
+  )
+}
+
+export function advanceNext(
+  from: Date,
+  freq: string,
+  weekday: number | null,
+  monthDay: number | null,
+): Date {
   const d = new Date(from)
+  if (freq === 'hourly') {
+    d.setUTCHours(d.getUTCHours() + 1)
+    return d
+  }
   if (freq === 'daily') {
     d.setUTCDate(d.getUTCDate() + 1)
     return d
@@ -179,6 +360,14 @@ export function advanceNext(from: Date, freq: string, weekday: number | null, mo
       }
     } else {
       d.setUTCDate(d.getUTCDate() + 6)
+    }
+    return d
+  }
+  if (freq === 'yearly') {
+    d.setUTCFullYear(d.getUTCFullYear() + 1)
+    if (monthDay != null) {
+      const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate()
+      d.setUTCDate(Math.min(monthDay, last))
     }
     return d
   }
@@ -209,6 +398,8 @@ export async function materializeDueRules(businessId: string, now = new Date()) 
   let created = 0
   for (const rule of rules) {
     if (rule.endsAt && rule.endsAt < now) continue
+    // Period closed until nextAt — keep done+countdown; don't pre-create the next slot.
+    if (isPeriodDoneWaiting(rule, now)) continue
     if (rule.projectId) {
       const proj = await loadProject(businessId, rule.projectId)
       if (!proj || proj.archivedAt) continue
@@ -231,6 +422,7 @@ export async function materializeDueRules(businessId: string, now = new Date()) 
             assigneeUserId: rule.assigneeUserId,
             status: 'open',
             dueAt: scheduledFor,
+            reminders: Array.isArray(rule.reminders) ? rule.reminders : [],
           })
           .returning()
         await db.insert(taskOccurrences).values({
@@ -238,6 +430,7 @@ export async function materializeDueRules(businessId: string, now = new Date()) 
           scheduledFor,
           taskId: task!.id,
         })
+        await copyRuleChecklistToTask(rule.id, task!.id)
         created++
       } catch (err) {
         // Unique (rule_id, scheduled_for) → already materialized; continue
@@ -249,14 +442,20 @@ export async function materializeDueRules(businessId: string, now = new Date()) 
     }
     await db
       .update(recurrenceRules)
-      .set({ nextAt: next, updatedAt: new Date() })
+      .set({
+        nextAt: next,
+        lastCompletedAt: null,
+        updatedAt: new Date(),
+      })
       .where(eq(recurrenceRules.id, rule.id))
   }
   return { created, scanned: rules.length }
 }
 
 export async function taskStatsForProjects(businessId: string, projectIds: string[]) {
-  if (!projectIds.length) return new Map<string, { total: number; done: number; open: number; overdue: number }>()
+  if (!projectIds.length) {
+    return new Map<string, { total: number; done: number; open: number; overdue: number }>()
+  }
   const rows = await db
     .select({
       projectId: tasks.projectId,
@@ -286,4 +485,3 @@ export async function taskStatsForProjects(businessId: string, projectIds: strin
   }
   return map
 }
-

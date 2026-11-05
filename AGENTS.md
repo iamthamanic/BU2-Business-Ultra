@@ -9,6 +9,8 @@ Business Ultra 2 (BU2) ist ein modularer Monolith für Marketing-, Produkt-, Kun
 
 **Produktkontext:** [README.md](README.md), Entscheidungen: [DECISIONS.md](DECISIONS.md). PRD-Draft: [docs/PRD.md](docs/PRD.md) (aus bestehenden Docs abgeleitet — bei Bedarf schärfen).
 
+**Verträge:** Architektur [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Security [docs/SECURITY.md](docs/SECURITY.md) · Integrationen [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) · Operations [docs/OPERATIONS.md](docs/OPERATIONS.md) · UI [docs/UI_STYLEGUIDE.md](docs/UI_STYLEGUIDE.md). Vor Commit: `@audit-runner preflight` (Contract **plus** Quality-Chain: SOLID/KISS/DRY via `@audit-changes`, Spaghetti via ponytail, Boundaries via `@codebase-realignment`, UI-Reuse). Nur Docs: `contract-only`.
+
 ### Was dieses Repo **ist**
 
 - Produktiv-App mit Web (`apps/web`), API (`apps/api`), Shared-Packages und Playwright-E2E
@@ -36,7 +38,7 @@ Business Ultra 2 (BU2) ist ein modularer Monolith für Marketing-, Produkt-, Kun
 
 ## Architektur
 
-Kanonischer Vertrag: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** (modular monolith + sharpening target). Kurzüberblick:
+Kanonischer Vertrag: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** (modular monolith + sharpening target; `binding`). Kurzüberblick:
 
 ```
 apps/web/          Dark-Ops shell, features (match API module names), shared components/
@@ -49,10 +51,12 @@ packages/finance-calc/
 ### Schichtenregeln
 
 1. UI spricht nur Shared-Contracts / API-Client — keine SQL im Frontend
-2. AuthZ serverseitig; Tenant-Slug aus Route, nicht aus Client-Trust
+2. AuthZ serverseitig; Tenant-Slug aus Route, nicht aus Client-Trust — Details: [docs/SECURITY.md](docs/SECURITY.md)
 3. Neue UI: bestehende Shell-/Product-/CRM-Klassen vor neuen One-offs
 4. API-Module: HTTP in `routes.ts`, Logik in `service.ts` (siehe ARCHITECTURE module template)
 5. Kein SagaTree-`domains/`-Frontend; Structure-Refactors ohne Contract-Breaks
+6. Provider/OAuth/Connections: [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md)
+7. Betrieb/Backup/Deploy-Pointer: [docs/OPERATIONS.md](docs/OPERATIONS.md)
 
 ---
 

@@ -3,6 +3,7 @@
  * Location: apps/web/src/features/projects/ProjectsShell.tsx
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Link,
   Outlet,
@@ -12,13 +13,13 @@ import {
   useParams,
 } from 'react-router-dom'
 import {
-  ArrowsClockwise,
+  Archive,
+  ArrowSquareOut,
   CalendarBlank,
   CheckCircle,
   CirclesThree,
   DotsThree,
   FolderSimpleDashed,
-  ListChecks,
   MagnifyingGlass,
   PlayCircle,
   Plus,
@@ -36,6 +37,7 @@ import type { MessageKey } from '../../i18n/messages'
 import { companyRoutes } from '../../lib/companyPaths'
 import { ProjectCreateModal } from './ProjectCreateModal'
 import { MemberAvatar, type MemberInfo } from './MemberAvatar'
+import { ProjectsScopeToggle } from './ProjectsScopeToggle'
 import { ProjectStatusBadge } from './TaskBadges'
 import type { BuProject } from './projectTypes'
 import { ProjectGlyphAvatar } from './projectVisual'
@@ -324,16 +326,7 @@ export function ProjectsShell() {
       </header>
 
       <div className="crm-subnav project-index-toolbar" role="navigation" aria-label={t('projects')}>
-        <div className="project-index-nav">
-          <Link className="btn project-mine-cta" to={routes.projectsMine}>
-            <ListChecks size={14} weight="bold" aria-hidden />
-            {t('projectsMine')}
-          </Link>
-          <Link className="btn" to={`${routes.projects}/recurring`}>
-            <ArrowsClockwise size={14} weight="bold" aria-hidden />
-            {t('projectsRecurring')}
-          </Link>
-        </div>
+        <ProjectsScopeToggle slug={slug} active="all" />
         {!emptyAll ? (
           <div className="project-index-filters" role="search">
             <CrmIconSelect
@@ -455,23 +448,53 @@ function ProjectActionsMenu({
 }) {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  function closeMenu() {
+    setOpen(false)
+    setMenuPos(null)
+  }
+
+  function placeMenu(btn: HTMLButtonElement) {
+    const r = btn.getBoundingClientRect()
+    const menuW = 176
+    const menuH = canWrite ? 88 : 48
+    let top = r.bottom + 6
+    let left = r.right - menuW
+    if (left < 8) left = 8
+    if (left + menuW > window.innerWidth - 8) left = window.innerWidth - menuW - 8
+    if (top + menuH > window.innerHeight - 8) top = Math.max(8, r.top - menuH - 6)
+    setMenuPos({ top, left })
+  }
 
   useEffect(() => {
     if (!open) return
     function onDoc(e: MouseEvent) {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
+      const t = e.target as Node
+      if (rootRef.current?.contains(t) || menuRef.current?.contains(t)) return
+      closeMenu()
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false)
+      if (e.key === 'Escape') closeMenu()
+    }
+    function onReposition() {
+      if (btnRef.current) placeMenu(btnRef.current)
     }
     document.addEventListener('mousedown', onDoc)
     document.addEventListener('keydown', onKey)
+    window.addEventListener('resize', onReposition)
+    window.addEventListener('scroll', onReposition, true)
     return () => {
       document.removeEventListener('mousedown', onDoc)
       document.removeEventListener('keydown', onKey)
+      window.removeEventListener('resize', onReposition)
+      window.removeEventListener('scroll', onReposition, true)
     }
-  }, [open])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, canWrite])
 
   return (
     <div
@@ -483,44 +506,62 @@ function ProjectActionsMenu({
       }}
     >
       <button
+        ref={btnRef}
         type="button"
         className="btn icon-btn project-actions-btn"
         aria-label={t('openMenu')}
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (open) {
+            closeMenu()
+            return
+          }
+          if (btnRef.current) placeMenu(btnRef.current)
+          setOpen(true)
+        }}
       >
         <DotsThree size={18} weight="bold" aria-hidden />
       </button>
-      {open ? (
-        <div className="project-actions-menu" role="menu">
-          <button
-            type="button"
-            role="menuitem"
-            className="project-actions-item"
-            onClick={() => {
-              setOpen(false)
-              navigate(href)
-            }}
-          >
-            {t('open')}
-          </button>
-          {canWrite ? (
-            <button
-              type="button"
-              role="menuitem"
-              className="project-actions-item"
-              onClick={async () => {
-                setOpen(false)
-                await api(`/api/b/${slug}/projects/${projectId}/archive`, { method: 'POST' })
-                await onArchived()
-              }}
+      {open && menuPos
+        ? createPortal(
+            <div
+              ref={menuRef}
+              className="project-actions-menu project-actions-menu--fixed"
+              role="menu"
+              style={{ top: menuPos.top, left: menuPos.left }}
             >
-              {t('archive')}
-            </button>
-          ) : null}
-        </div>
-      ) : null}
+              <button
+                type="button"
+                role="menuitem"
+                className="project-actions-item project-actions-item--open"
+                onClick={() => {
+                  closeMenu()
+                  navigate(href)
+                }}
+              >
+                <ArrowSquareOut size={16} weight="duotone" aria-hidden />
+                <span>{t('open')}</span>
+              </button>
+              {canWrite ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="project-actions-item project-actions-item--archive"
+                  onClick={async () => {
+                    closeMenu()
+                    await api(`/api/b/${slug}/projects/${projectId}/archive`, { method: 'POST' })
+                    await onArchived()
+                  }}
+                >
+                  <Archive size={16} weight="duotone" aria-hidden />
+                  <span>{t('archive')}</span>
+                </button>
+              ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   )
 }

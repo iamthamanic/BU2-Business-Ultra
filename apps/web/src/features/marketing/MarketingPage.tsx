@@ -24,8 +24,9 @@ type Connector = {
   integrationId: string | null
   brandLabel: string | null
   contentReady: boolean
-  needs: 'key' | 'brand' | null
+  needs: 'key' | 'brand' | 'connection' | null
   message?: string
+  connectionId?: string | null
 }
 
 type OrganicPayload = {
@@ -317,11 +318,13 @@ export function MarketingPage() {
 
   // Organic Analyse — connect hint lives in the empty table row
   const need = organic?.connector.needs
-  const needsConnect = need === 'key' || need === 'brand'
+  const needsConnect = need === 'key' || need === 'brand' || need === 'connection'
   const emptyHint =
-    needsConnect || (organic?.connector.brandsLinked ?? 0) === 0
-      ? t('postsEmptyNeedBrand')
-      : t('postsEmptyWindow')
+    need === 'connection'
+      ? t('connectBannerConnection')
+      : needsConnect || (organic?.connector.brandsLinked ?? 0) === 0
+        ? t('postsEmptyNeedBrand')
+        : t('postsEmptyWindow')
 
   return (
     <div className="stack funnel-page">
@@ -330,7 +333,9 @@ export function MarketingPage() {
         posts={organic?.posts ?? []}
         emptyHint={loading && !organic ? t('loading') : emptyHint}
         emptyContent={
-          needsConnect ? <FunnelConnectHint need={need} settingsHref={settingsHref} /> : undefined
+          needsConnect && need ? (
+            <FunnelConnectHint need={need} settingsHref={settingsHref} />
+          ) : undefined
         }
         initialWindow={win}
         onWindowChange={(w) => setWin(w)}

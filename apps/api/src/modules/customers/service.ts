@@ -2,7 +2,7 @@
  * Customers domain service — mappers, loaders, events, stats.
  * Location: apps/api/src/modules/customers/service.ts
  */
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import {
   customerEvents,
@@ -12,6 +12,22 @@ import {
   personas,
   users,
 } from '../../db/schema.js'
+
+export const CUSTOMER_NUMBER_START = 100100
+
+export function formatCustomerNumber(n: number): string {
+  return String(n).padStart(6, '0')
+}
+
+export async function allocateCustomerNumber(businessId: string): Promise<number> {
+  const [row] = await db
+    .select({
+      max: sql<number>`coalesce(max(${customers.customerNumber}), ${CUSTOMER_NUMBER_START - 1})`,
+    })
+    .from(customers)
+    .where(eq(customers.businessId, businessId))
+  return Number(row?.max ?? CUSTOMER_NUMBER_START - 1) + 1
+}
 
 export function formatAddressLine(parts: {
   street?: string | null
@@ -74,6 +90,8 @@ export function toCustomer(
 ) {
   return {
     id: row.id,
+    customerNumber: row.customerNumber,
+    customerNumberLabel: formatCustomerNumber(row.customerNumber),
     kind: row.kind,
     displayName: row.displayName,
     firstName: row.firstName ?? null,

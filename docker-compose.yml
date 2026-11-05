@@ -19,8 +19,14 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+    # Prefer `.env.local` when present; fall back to `.env` (Compose ≥2.24 optional files).
+    # Host variable substitution (${POSTGRES_*}, etc.) still uses Compose's project `.env`
+    # unless you pass: docker compose --env-file .env.local up
     env_file:
-      - .env
+      - path: .env.local
+        required: false
+      - path: .env
+        required: false
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-bu2}:${POSTGRES_PASSWORD:-bu2_local_dev_change_me}@postgres:5432/${POSTGRES_DB:-bu2}
       API_PORT: "8742"

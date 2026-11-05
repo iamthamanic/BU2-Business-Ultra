@@ -38,18 +38,19 @@ import { CrmIconSelect, type CrmIconSelectOption } from '../../components/CrmIco
 import { FunnelDateRangePicker } from '../../components/FunnelDateRangePicker'
 import { FunnelTip } from '../../components/FunnelTip'
 import { MktTab, MktTabs } from '../../components/MktTabs'
+import { NoteCard } from '../../components/notes/NoteCard'
+import { NoteComposerModal } from '../../components/notes/NoteComposerModal'
+import {
+  NoteEditor,
+  notePlainText,
+  sanitizeNoteHtml,
+} from '../../components/notes/NoteEditor'
 import { api } from '../../lib/api'
 import { dateInRange, defaultDateRange, ORGANIC_PRESETS } from '../../lib/dateRange'
 import { useI18n } from '../../lib/i18n'
 import type { MessageKey } from '../../i18n/messages'
 import { companyRoutes } from '../../lib/companyPaths'
 import type { CustomerOutletContext } from './CustomerShell'
-import {
-  CustomerNoteEditor,
-  NoteBodyHtml,
-  notePlainText,
-  sanitizeNoteHtml,
-} from './CustomerNoteEditor'
 import type {
   BuCustomer,
   BuCustomerConsent,
@@ -228,6 +229,38 @@ function historyTypeLabel(type: string, t: TFn): string {
   const key = `customerHistoryType_${type}` as MessageKey
   const labeled = t(key)
   return labeled === key ? type : labeled
+}
+
+function titleCaseWords(value: string): string {
+  return value
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
+}
+
+/** Prefer live customer name + status over legacy "Kunde angelegt: …" summaries. */
+function historyCreatedSummary(
+  customer: {
+    kind: string
+    displayName: string
+    firstName?: string | null
+    lastName?: string | null
+    relationStatus: string
+  },
+  t: TFn,
+): string {
+  const name =
+    customer.kind === 'person'
+      ? titleCaseWords(
+          [customer.firstName, customer.lastName].filter(Boolean).join(' ') ||
+            customer.displayName,
+        )
+      : titleCaseWords(customer.displayName)
+  return t('customerHistoryCreatedSummary')
+    .replace('{name}', name || customer.displayName)
+    .replace('{status}', statusLabel(customer.relationStatus, t))
 }
 
 function historyTypeTone(type: string): string {
@@ -925,6 +958,46 @@ export function CustomerDetail() {
       body: JSON.stringify(body),
     })
     await refresh()
+    await ctx.refreshList?.()
+  }
+
+  async function saveProfile() {
+    if (!canWrite || !data) return
+    const cust = data.customer
+    const billing = billingSame
+      ? {
+          billingStreet: cust.street,
+          billingPostalCode: cust.postalCode,
+          billingCity: cust.city,
+          billingCountry: cust.country,
+        }
+      : {
+          billingStreet: cust.billingStreet,
+          billingPostalCode: cust.billingPostalCode,
+          billingCity: cust.billingCity,
+          billingCountry: cust.billingCountry,
+        }
+    await patch({
+      displayName: cust.displayName,
+      firstName: cust.kind === 'person' ? cust.firstName || null : null,
+      lastName: cust.kind === 'person' ? cust.lastName || null : null,
+      orgCustomerId:
+        cust.kind === 'person'
+          ? orgPick && orgPick !== '__create__'
+            ? orgPick
+            : cust.orgCustomerId || null
+          : null,
+      email: cust.email,
+      phone: cust.phone,
+      birthDate: cust.birthDate,
+      street: cust.street,
+      postalCode: cust.postalCode,
+      city: cust.city,
+      country: cust.country,
+      ...billing,
+      relationStatus: cust.relationStatus,
+      kind: cust.kind,
+    })
   }
 
   async function saveCustomerTags(next: string[]) {
@@ -937,6 +1010,7 @@ export function CustomerDetail() {
         body: JSON.stringify({ tags }),
       })
       setData({ ...data, customer: { ...data.customer, tags } })
+      await ctx.refreshList?.()
     } catch (e) {
       setErr((e as Error).message)
     } finally {
@@ -1027,6 +1101,12 @@ export function CustomerDetail() {
                 </span>
               </div>
               <div className="customer-meta-row">
+                {c.customerNumber != null ? (
+                  <span className="customer-meta-item customer-number-chip" title={t('customerNumber')}>
+                    <IdentificationCard size={14} weight="regular" aria-hidden />
+                    {c.customerNumberLabel || String(c.customerNumber).padStart(6, '0')}
+                  </span>
+                ) : null}
                 {c.email ? (
                   <span className="customer-meta-item">
                     <EnvelopeSimple size={14} weight="regular" aria-hidden />
@@ -1073,6 +1153,13 @@ export function CustomerDetail() {
                 {t('archive')}
               </button>
             )}
+            <button
+              type="button"
+              className="btn primary"
+              onClick={() => void saveProfile()}
+            >
+              {t('save')}
+            </button>
           </div>
         ) : null}
       </header>
@@ -1154,87 +1241,69 @@ export function CustomerDetail() {
                 <ul className="customer-note-list">
                   {noteThreads.map(({ root, replies }) => {
                     const renderCard = (n: BuCustomerNote, opts?: { reply?: boolean }) => {
-                      const author =
-                        n.authorDisplayName?.trim() || t('customerNoteAuthorUnknown')
                       const isEditing = editingNoteId === n.id
                       const busy = noteBusyId === n.id
-                      const edited =
-                        n.updatedAt &&
-                        n.createdAt &&
-                        new Date(n.updatedAt).getTime() - new Date(n.createdAt).getTime() > 1000
                       return (
-                        <li
+                        <NoteCard
                           key={n.id}
-                          className={`customer-note-card${opts?.reply ? ' is-reply' : ''}`}
-                        >
-                          {isEditing ? (
-                            <div className="customer-note-edit">
-                              <CustomerNoteEditor
-                                key={n.id}
-                                value={editingNoteBody}
-                                onChange={setEditingNoteBody}
-                                disabled={busy}
-                                placeholder={t('customerNotePh')}
-                                autoFocus
-                                rows={4}
-                              />
-                              <div className="customer-note-edit-actions">
-                                <button
-                                  type="button"
-                                  className="btn"
+                          note={n}
+                          authorFallback={t('customerNoteAuthorUnknown')}
+                          editedLabel={t('customerNoteEdited')}
+                          reply={opts?.reply}
+                          bodySlot={
+                            isEditing ? (
+                              <div className="customer-note-edit">
+                                <NoteEditor
+                                  key={n.id}
+                                  value={editingNoteBody}
+                                  onChange={setEditingNoteBody}
                                   disabled={busy}
-                                  onClick={cancelEditNote}
-                                >
-                                  {t('customerNoteCancel')}
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn primary"
-                                  disabled={busy || !notePlainText(editingNoteBody)}
-                                  onClick={() => void saveEditNote(n.id)}
-                                >
-                                  {t('customerNoteSave')}
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="customer-note-main">
-                              <NoteBodyHtml body={n.body} />
-                              {canWrite ? (
-                                <div className="customer-note-actions">
+                                  placeholder={t('customerNotePh')}
+                                  autoFocus
+                                  rows={4}
+                                />
+                                <div className="customer-note-edit-actions">
                                   <button
                                     type="button"
-                                    className="btn icon-btn customer-note-menu-btn"
+                                    className="btn"
                                     disabled={busy}
-                                    aria-label={t('customerNoteMenu')}
-                                    title={t('customerNoteMenu')}
-                                    aria-haspopup="menu"
-                                    aria-expanded={noteMenuId === n.id}
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      openNoteMenu(n.id, e.currentTarget)
-                                    }}
+                                    onClick={cancelEditNote}
                                   >
-                                    <DotsThree size={14} weight="bold" aria-hidden />
+                                    {t('customerNoteCancel')}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn primary"
+                                    disabled={busy || !notePlainText(editingNoteBody)}
+                                    onClick={() => void saveEditNote(n.id)}
+                                  >
+                                    {t('customerNoteSave')}
                                   </button>
                                 </div>
-                              ) : null}
-                            </div>
-                          )}
-                          <footer className="customer-note-meta">
-                            <div className="customer-note-author">
-                              <span className="customer-note-av" aria-hidden>
-                                {initials(author)}
-                              </span>
-                              <div className="customer-note-author-text">
-                                <span className="customer-note-author-name">{author}</span>
-                                <span className="muted customer-note-when">
-                                  {formatWhen(n.createdAt)}
-                                  {edited ? ` · ${t('customerNoteEdited')}` : ''}
-                                </span>
                               </div>
-                            </div>
-                            {canWrite && !isEditing ? (
+                            ) : undefined
+                          }
+                          actions={
+                            canWrite && !isEditing ? (
+                              <button
+                                type="button"
+                                className="btn icon-btn customer-note-menu-btn"
+                                disabled={busy}
+                                aria-label={t('customerNoteMenu')}
+                                title={t('customerNoteMenu')}
+                                aria-haspopup="menu"
+                                aria-expanded={noteMenuId === n.id}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  openNoteMenu(n.id, e.currentTarget)
+                                }}
+                              >
+                                <DotsThree size={14} weight="bold" aria-hidden />
+                              </button>
+                            ) : null
+                          }
+                          footerExtra={
+                            canWrite && !isEditing ? (
                               <button
                                 type="button"
                                 className="btn customer-note-reply-btn"
@@ -1244,9 +1313,9 @@ export function CustomerDetail() {
                                 <ArrowBendUpLeft size={12} weight="bold" aria-hidden />
                                 {t('customerNoteReply')}
                               </button>
-                            ) : null}
-                          </footer>
-                        </li>
+                            ) : null
+                          }
+                        />
                       )
                     }
 
@@ -1257,7 +1326,7 @@ export function CustomerDetail() {
                           {replies.map((r) => renderCard(r, { reply: true }))}
                           {replyParentId === root.id ? (
                             <li className="customer-note-card customer-note-reply-composer is-reply">
-                              <CustomerNoteEditor
+                              <NoteEditor
                                 key={`reply-${root.id}`}
                                 value={replyBody}
                                 onChange={setReplyBody}
@@ -1454,43 +1523,11 @@ export function CustomerDetail() {
         <div className="crm-tab-panel">
           <div className="customer-profile-grid">
             <form
+              id="customer-profile-form"
               className="panel customer-card customer-profile-form"
-              onSubmit={async (e) => {
+              onSubmit={(e) => {
                 e.preventDefault()
-                const billing = billingSame
-                  ? {
-                      billingStreet: c.street,
-                      billingPostalCode: c.postalCode,
-                      billingCity: c.city,
-                      billingCountry: c.country,
-                    }
-                  : {
-                      billingStreet: c.billingStreet,
-                      billingPostalCode: c.billingPostalCode,
-                      billingCity: c.billingCity,
-                      billingCountry: c.billingCountry,
-                    }
-                await patch({
-                  displayName: c.displayName,
-                  firstName: c.kind === 'person' ? c.firstName || null : null,
-                  lastName: c.kind === 'person' ? c.lastName || null : null,
-                  orgCustomerId:
-                    c.kind === 'person'
-                      ? orgPick && orgPick !== '__create__'
-                        ? orgPick
-                        : c.orgCustomerId || null
-                      : null,
-                  email: c.email,
-                  phone: c.phone,
-                  birthDate: c.birthDate,
-                  street: c.street,
-                  postalCode: c.postalCode,
-                  city: c.city,
-                  country: c.country,
-                  ...billing,
-                  relationStatus: c.relationStatus,
-                  kind: c.kind,
-                })
+                void saveProfile()
               }}
             >
               <header className="customer-card-head">
@@ -1498,41 +1535,61 @@ export function CustomerDetail() {
                   {t('customerMasterData')}
                 </h2>
               </header>
-              {c.kind === 'person' ? (
-                <div className="customer-settings-row">
-                  <label className="field">
-                    <span className="label">{t('customerFirstName')}</span>
-                    <input
-                      className="input"
-                      disabled={!canWrite}
-                      value={c.firstName || ''}
-                      onChange={(e) => syncPersonDisplayName({ firstName: e.target.value || null })}
-                    />
-                  </label>
-                  <label className="field">
-                    <span className="label">{t('customerLastName')}</span>
-                    <input
-                      className="input"
-                      disabled={!canWrite}
-                      value={c.lastName || ''}
-                      onChange={(e) => syncPersonDisplayName({ lastName: e.target.value || null })}
-                    />
-                  </label>
-                </div>
-              ) : (
+              <div className="customer-settings-row customer-settings-row--3">
                 <label className="field">
-                  <span className="label">{t('customerCompany')}</span>
+                  <span className="label">{t('customerNumber')}</span>
                   <input
                     className="input"
-                    disabled={!canWrite}
-                    value={c.displayName}
-                    onChange={(e) =>
-                      setData({ ...data, customer: { ...c, displayName: e.target.value } })
+                    readOnly
+                    disabled
+                    value={
+                      c.customerNumber != null
+                        ? c.customerNumberLabel || String(c.customerNumber).padStart(6, '0')
+                        : '—'
                     }
+                    aria-label={t('customerNumber')}
                   />
                 </label>
-              )}
-              <div className="customer-settings-row">
+                {c.kind === 'person' ? (
+                  <>
+                    <label className="field">
+                      <span className="label">{t('customerFirstName')}</span>
+                      <input
+                        className="input"
+                        disabled={!canWrite}
+                        value={c.firstName || ''}
+                        onChange={(e) =>
+                          syncPersonDisplayName({ firstName: e.target.value || null })
+                        }
+                      />
+                    </label>
+                    <label className="field">
+                      <span className="label">{t('customerLastName')}</span>
+                      <input
+                        className="input"
+                        disabled={!canWrite}
+                        value={c.lastName || ''}
+                        onChange={(e) =>
+                          syncPersonDisplayName({ lastName: e.target.value || null })
+                        }
+                      />
+                    </label>
+                  </>
+                ) : (
+                  <label className="field customer-settings-span-2">
+                    <span className="label">{t('customerCompany')}</span>
+                    <input
+                      className="input"
+                      disabled={!canWrite}
+                      value={c.displayName}
+                      onChange={(e) =>
+                        setData({ ...data, customer: { ...c, displayName: e.target.value } })
+                      }
+                    />
+                  </label>
+                )}
+              </div>
+              <div className="customer-settings-row customer-settings-row--3">
                 <div className="field">
                   <span className="label">{t('customerStatus')}</span>
                   <CrmIconSelect
@@ -1557,39 +1614,41 @@ export function CustomerDetail() {
                     onChange={(v) => syncPersonDisplayName({ kind: v })}
                   />
                 </div>
+                {c.kind === 'person' ? (
+                  <div className="field">
+                    <span className="label">{t('customerCompany')}</span>
+                    <CrmIconSelect
+                      name="orgCustomerId"
+                      value={orgPick}
+                      options={companySelectOptions}
+                      disabled={!canWrite || orgBusy}
+                      aria-label={t('customerCompany')}
+                      onChange={(v) => void applyCompanyLink(v)}
+                    />
+                    {orgPick === '__create__' ? (
+                      <div className="customer-company-create">
+                        <input
+                          className="input"
+                          disabled={!canWrite || orgBusy}
+                          value={newOrgName}
+                          placeholder={t('customerCompanyNamePh')}
+                          onChange={(e) => setNewOrgName(e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          className="btn primary"
+                          disabled={!canWrite || orgBusy || !newOrgName.trim()}
+                          onClick={() => void createAndLinkCompany()}
+                        >
+                          {orgBusy ? '…' : t('customerCompanyCreate')}
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="field" aria-hidden />
+                )}
               </div>
-              {c.kind === 'person' ? (
-                <div className="field">
-                  <span className="label">{t('customerCompany')}</span>
-                  <CrmIconSelect
-                    name="orgCustomerId"
-                    value={orgPick}
-                    options={companySelectOptions}
-                    disabled={!canWrite || orgBusy}
-                    aria-label={t('customerCompany')}
-                    onChange={(v) => void applyCompanyLink(v)}
-                  />
-                  {orgPick === '__create__' ? (
-                    <div className="customer-company-create">
-                      <input
-                        className="input"
-                        disabled={!canWrite || orgBusy}
-                        value={newOrgName}
-                        placeholder={t('customerCompanyNamePh')}
-                        onChange={(e) => setNewOrgName(e.target.value)}
-                      />
-                      <button
-                        type="button"
-                        className="btn primary"
-                        disabled={!canWrite || orgBusy || !newOrgName.trim()}
-                        onClick={() => void createAndLinkCompany()}
-                      >
-                        {orgBusy ? '…' : t('customerCompanyCreate')}
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
               <div className="customer-profile-contact-row">
                 <label className="field">
                   <span className="label">{t('email')}</span>
@@ -1802,13 +1861,6 @@ export function CustomerDetail() {
                 ) : null}
               </fieldset>
 
-              {canWrite ? (
-                <div className="customer-form-foot">
-                  <button type="submit" className="btn primary">
-                    {t('save')}
-                  </button>
-                </div>
-              ) : null}
             </form>
 
             <aside className="customer-profile-rail">
@@ -2196,7 +2248,11 @@ export function CustomerDetail() {
                         </div>
                         <div className="customer-history-body">
                           <div className="customer-history-top">
-                            <strong className="customer-history-summary">{ev.summary}</strong>
+                            <strong className="customer-history-summary">
+                              {ev.type === 'created'
+                                ? historyCreatedSummary(c, t)
+                                : ev.summary}
+                            </strong>
                             <time className="customer-history-when" dateTime={ev.createdAt}>
                               {formatWhen(ev.createdAt)}
                             </time>
@@ -2381,62 +2437,19 @@ export function CustomerDetail() {
           )
         : null}
 
-      {noteCreateOpen
-        ? createPortal(
-            <div
-              className="bu-modal-overlay"
-              role="presentation"
-              onMouseDown={(e) => {
-                if (e.target === e.currentTarget && !noteCreating) setNoteCreateOpen(false)
-              }}
-            >
-              <form
-                className="bu-modal panel crm-modal customer-note-modal"
-                role="dialog"
-                aria-modal="true"
-                aria-label={t('customerNoteAdd')}
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  void createNote()
-                }}
-              >
-                <header className="bu-modal-head">
-                  <h2 className="section-title" style={{ margin: 0, fontSize: '1.1rem' }}>
-                    {t('customerNoteAdd')}
-                  </h2>
-                </header>
-                <div className="crm-modal-body stack">
-                  <CustomerNoteEditor
-                    value={noteBody}
-                    onChange={setNoteBody}
-                    disabled={noteCreating}
-                    placeholder={t('customerNotePh')}
-                    autoFocus
-                    rows={6}
-                  />
-                </div>
-                <footer className="bu-modal-actions">
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={noteCreating}
-                    onClick={() => setNoteCreateOpen(false)}
-                  >
-                    {t('cancel')}
-                  </button>
-                  <button
-                    type="submit"
-                    className="btn primary"
-                    disabled={noteCreating || !notePlainText(noteBody)}
-                  >
-                    {noteCreating ? '…' : t('customerNoteAdd')}
-                  </button>
-                </footer>
-              </form>
-            </div>,
-            document.body,
-          )
-        : null}
+      <NoteComposerModal
+        open={noteCreateOpen}
+        title={t('customerNoteAdd')}
+        placeholder={t('customerNotePh')}
+        submitLabel={t('customerNoteAdd')}
+        body={noteBody}
+        onBodyChange={setNoteBody}
+        canSubmit={!noteCreating && Boolean(notePlainText(noteBody))}
+        busy={noteCreating}
+        onClose={() => setNoteCreateOpen(false)}
+        onSubmit={() => void createNote()}
+        rows={6}
+      />
 
       {statsOpen && data
         ? createPortal(

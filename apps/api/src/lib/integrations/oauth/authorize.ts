@@ -1,5 +1,5 @@
 /**
- * Build provider authorize URLs (PKCE) — token exchange lands when client env is set.
+ * Build provider authorize URLs (PKCE). Token exchange: oauth/exchange.ts + callback routes.
  * Location: apps/api/src/lib/integrations/oauth/authorize.ts
  */
 import { createHash, randomBytes } from 'node:crypto'
@@ -9,6 +9,7 @@ import {
   getMetaOAuthConfig,
   getMicrosoftOAuthConfig,
   OAUTH_SCOPES,
+  scopesForProvider,
 } from './config.js'
 import { oauthRedirectKey, oauthRedirectUri } from './redirects.js'
 import { createOAuthState } from './state.js'
@@ -56,9 +57,10 @@ export function buildOAuthAuthorizeUrl(opts: {
     u.searchParams.set('client_id', cfg.clientId)
     u.searchParams.set('redirect_uri', redirectUri)
     u.searchParams.set('response_type', 'code')
-    u.searchParams.set('scope', OAUTH_SCOPES.google.join(' '))
+    u.searchParams.set('scope', scopesForProvider(opts.provider).join(' '))
     u.searchParams.set('access_type', 'offline')
     u.searchParams.set('prompt', 'consent')
+    u.searchParams.set('include_granted_scopes', 'true')
     u.searchParams.set('state', state)
     u.searchParams.set('code_challenge', challenge)
     u.searchParams.set('code_challenge_method', 'S256')

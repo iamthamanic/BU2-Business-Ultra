@@ -19,6 +19,7 @@ import { writeAudit } from '../../lib/audit.js'
 import { loadMembership, requireUser } from '../../plugins/auth.js'
 import {
   addEvent,
+  allocateCustomerNumber,
   composeDisplayName,
   formatAddressLine,
   loadCustomer,
@@ -196,10 +197,12 @@ export async function registerCustomerCrudRoutes(app: FastifyInstance) {
       if (!org) return reply.code(400).send({ error: 'invalid_org' })
       orgCustomerId = org.id
     }
+    const customerNumber = await allocateCustomerNumber(m.businessId)
     const [row] = await db
       .insert(customers)
       .values({
         businessId: m.businessId,
+        customerNumber,
         kind: body.kind,
         displayName,
         firstName: body.kind === 'person' ? firstName : null,

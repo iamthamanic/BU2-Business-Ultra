@@ -16,6 +16,30 @@ designDir: .qa/design
 acceptanceDir: .qa/acceptance
 evidenceDir: .qa/evidence
 
+# Additive project-contract paths for @audit-runner (compatible extension)
+projectContract:
+  architecturePath: docs/ARCHITECTURE.md
+  prdPath: docs/PRD.md
+  styleguidePath: docs/UI_STYLEGUIDE.md
+  decisionsPath: DECISIONS.md
+  securityPath: docs/SECURITY.md
+  integrationsPath: docs/INTEGRATIONS.md
+  operationsPath: docs/OPERATIONS.md
+  migrationPath: null
+  migrationActive: false
+  requiredDocs:
+    - AGENTS.md
+    - README.md
+    - docs/ARCHITECTURE.md
+    - docs/PRD.md
+    - docs/UI_STYLEGUIDE.md
+    - .qa/project.yaml
+  optionalDocs:
+    - docs/SECURITY.md
+    - docs/INTEGRATIONS.md
+    - docs/OPERATIONS.md
+    - DECISIONS.md
+
 locale: de
 
 adaptiveUi:

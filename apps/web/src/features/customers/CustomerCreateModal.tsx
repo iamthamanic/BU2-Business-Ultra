@@ -2,8 +2,9 @@
  * CustomerCreateModal — create CRM customer (Dark-Ops fields).
  * Location: apps/web/src/features/customers/CustomerCreateModal.tsx
  */
-import { useState } from 'react'
-import { X } from '@phosphor-icons/react'
+import { useMemo, useState } from 'react'
+import { Buildings, SealCheck, User, UserPlus, X } from '@phosphor-icons/react'
+import { CrmIconSelect, type CrmIconSelectOption } from '../../components/CrmIconSelect'
 import { useI18n } from '../../lib/i18n'
 
 type Props = {
@@ -31,6 +32,40 @@ export function CustomerCreateModal({ open, onClose, onSave }: Props) {
   const [relationStatus, setRelationStatus] = useState<'lead' | 'customer'>('lead')
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
+
+  const kindOptions = useMemo<CrmIconSelectOption[]>(
+    () => [
+      {
+        value: 'person',
+        label: t('customerKindPerson'),
+        icon: <User size={14} weight="regular" aria-hidden />,
+      },
+      {
+        value: 'org',
+        label: t('customerKindOrg'),
+        icon: <Buildings size={14} weight="regular" aria-hidden />,
+      },
+    ],
+    [t],
+  )
+
+  const statusOptions = useMemo<CrmIconSelectOption[]>(
+    () => [
+      {
+        value: 'lead',
+        label: t('customerStatusLead'),
+        icon: <UserPlus size={14} weight="regular" aria-hidden />,
+        tone: 'lead',
+      },
+      {
+        value: 'customer',
+        label: t('customerStatusCustomer'),
+        icon: <SealCheck size={14} weight="regular" aria-hidden />,
+        tone: 'customer',
+      },
+    ],
+    [t],
+  )
 
   if (!open) return null
 
@@ -91,14 +126,14 @@ export function CustomerCreateModal({ open, onClose, onSave }: Props) {
         <div className="crm-modal-body stack">
           <label className="field">
             <span className="label">{t('customerKind')}</span>
-            <select
-              className="input"
+            <CrmIconSelect
+              name="kind"
               value={kind}
-              onChange={(e) => setKind(e.target.value as 'person' | 'org')}
-            >
-              <option value="person">{t('customerKindPerson')}</option>
-              <option value="org">{t('customerKindOrg')}</option>
-            </select>
+              options={kindOptions}
+              onChange={(v) => setKind(v as 'person' | 'org')}
+              disabled={saving}
+              aria-label={t('customerKind')}
+            />
           </label>
           {kind === 'person' ? (
             <div className="bu-modal-row-2">
@@ -150,14 +185,14 @@ export function CustomerCreateModal({ open, onClose, onSave }: Props) {
           </label>
           <label className="field">
             <span className="label">{t('customerStatus')}</span>
-            <select
-              className="input"
+            <CrmIconSelect
+              name="relationStatus"
               value={relationStatus}
-              onChange={(e) => setRelationStatus(e.target.value as 'lead' | 'customer')}
-            >
-              <option value="lead">{t('customerStatusLead')}</option>
-              <option value="customer">{t('customerStatusCustomer')}</option>
-            </select>
+              options={statusOptions}
+              onChange={(v) => setRelationStatus(v as 'lead' | 'customer')}
+              disabled={saving}
+              aria-label={t('customerStatus')}
+            />
           </label>
           {err ? <p className="error">{err}</p> : null}
         </div>

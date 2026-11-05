@@ -45,36 +45,42 @@ export const products = pgTable('products', {
 })
 
 /** CRM customers (person/org) — soft-archive. */
-export const customers = pgTable('customers', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  businessId: uuid('business_id')
-    .notNull()
-    .references(() => businesses.id, { onDelete: 'cascade' }),
-  kind: varchar('kind', { length: 16 }).notNull().default('person'),
-  displayName: varchar('display_name', { length: 200 }).notNull(),
-  firstName: varchar('first_name', { length: 100 }),
-  lastName: varchar('last_name', { length: 100 }),
-  orgCustomerId: uuid('org_customer_id'),
-  email: varchar('email', { length: 320 }),
-  phone: varchar('phone', { length: 64 }),
-  address: text('address'),
-  street: varchar('street', { length: 200 }),
-  postalCode: varchar('postal_code', { length: 32 }),
-  city: varchar('city', { length: 120 }),
-  country: varchar('country', { length: 120 }),
-  billingStreet: varchar('billing_street', { length: 200 }),
-  billingPostalCode: varchar('billing_postal_code', { length: 32 }),
-  billingCity: varchar('billing_city', { length: 120 }),
-  billingCountry: varchar('billing_country', { length: 120 }),
-  relationStatus: varchar('relation_status', { length: 24 }).notNull().default('lead'),
-  birthDate: date('birth_date'),
-  photoUrl: text('photo_url'),
-  buyerPersonaId: uuid('buyer_persona_id').references(() => personas.id, { onDelete: 'set null' }),
-  tags: jsonb('tags').$type<string[]>().notNull().default([]),
-  archivedAt: timestamp('archived_at', { withTimezone: true }),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-})
+export const customers = pgTable(
+  'customers',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    businessId: uuid('business_id')
+      .notNull()
+      .references(() => businesses.id, { onDelete: 'cascade' }),
+    /** Per-business sequential number, starts at 100100 (always 6+ digits). */
+    customerNumber: integer('customer_number').notNull(),
+    kind: varchar('kind', { length: 16 }).notNull().default('person'),
+    displayName: varchar('display_name', { length: 200 }).notNull(),
+    firstName: varchar('first_name', { length: 100 }),
+    lastName: varchar('last_name', { length: 100 }),
+    orgCustomerId: uuid('org_customer_id'),
+    email: varchar('email', { length: 320 }),
+    phone: varchar('phone', { length: 64 }),
+    address: text('address'),
+    street: varchar('street', { length: 200 }),
+    postalCode: varchar('postal_code', { length: 32 }),
+    city: varchar('city', { length: 120 }),
+    country: varchar('country', { length: 120 }),
+    billingStreet: varchar('billing_street', { length: 200 }),
+    billingPostalCode: varchar('billing_postal_code', { length: 32 }),
+    billingCity: varchar('billing_city', { length: 120 }),
+    billingCountry: varchar('billing_country', { length: 120 }),
+    relationStatus: varchar('relation_status', { length: 24 }).notNull().default('lead'),
+    birthDate: date('birth_date'),
+    photoUrl: text('photo_url'),
+    buyerPersonaId: uuid('buyer_persona_id').references(() => personas.id, { onDelete: 'set null' }),
+    tags: jsonb('tags').$type<string[]>().notNull().default([]),
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('customers_biz_number_uidx').on(t.businessId, t.customerNumber)],
+)
 
 /** Company label catalog by scope (customer/project/marketing/product). */
 export const businessTags = pgTable(

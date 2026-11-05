@@ -281,6 +281,7 @@ CREATE INDEX IF NOT EXISTS products_business_idx ON products (business_id);
 CREATE TABLE IF NOT EXISTS customers (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   business_id uuid NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+  customer_number integer NOT NULL,
   kind varchar(16) NOT NULL DEFAULT 'person',
   display_name varchar(200) NOT NULL,
   first_name varchar(100),
@@ -307,6 +308,8 @@ CREATE TABLE IF NOT EXISTS customers (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS customers_business_idx ON customers (business_id);
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS customer_number integer;
+CREATE UNIQUE INDEX IF NOT EXISTS customers_biz_number_uidx ON customers (business_id, customer_number);
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS first_name varchar(100);
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS last_name varchar(100);
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS org_customer_id uuid REFERENCES customers(id) ON DELETE SET NULL;
@@ -410,6 +413,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   priority varchar(16) NOT NULL DEFAULT 'medium',
   assignee_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
   due_at timestamptz,
+  reminders jsonb NOT NULL DEFAULT '[]'::jsonb,
   sort_order integer NOT NULL DEFAULT 0,
   version integer NOT NULL DEFAULT 1,
   archived_at timestamptz,
@@ -417,10 +421,12 @@ CREATE TABLE IF NOT EXISTS tasks (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS tasks_business_idx ON tasks (business_id);
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS reminders jsonb NOT NULL DEFAULT '[]'::jsonb;
 
 CREATE TABLE IF NOT EXISTS task_comments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  task_id uuid NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  task_id uuid REFERENCES tasks(id) ON DELETE CASCADE,
+  rule_id uuid,
   author_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
   body text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
@@ -428,7 +434,8 @@ CREATE TABLE IF NOT EXISTS task_comments (
 
 CREATE TABLE IF NOT EXISTS task_checklist_items (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  task_id uuid NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  task_id uuid REFERENCES tasks(id) ON DELETE CASCADE,
+  rule_id uuid,
   title varchar(300) NOT NULL,
   done boolean NOT NULL DEFAULT false,
   sort_order integer NOT NULL DEFAULT 0,
@@ -449,7 +456,8 @@ CREATE INDEX IF NOT EXISTS project_events_project_idx ON project_events (project
 CREATE TABLE IF NOT EXISTS task_attachments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   business_id uuid NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
-  task_id uuid NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  task_id uuid REFERENCES tasks(id) ON DELETE CASCADE,
+  rule_id uuid,
   filename varchar(255) NOT NULL,
   mime_type varchar(120) NOT NULL,
   size_bytes integer NOT NULL DEFAULT 0,
@@ -475,10 +483,24 @@ CREATE TABLE IF NOT EXISTS recurrence_rules (
   starts_at timestamptz NOT NULL DEFAULT now(),
   ends_at timestamptz,
   paused_at timestamptz,
+  last_completed_at timestamptz,
   next_at timestamptz NOT NULL DEFAULT now(),
+  reminders jsonb NOT NULL DEFAULT '[]'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE recurrence_rules ADD COLUMN IF NOT EXISTS reminders jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE recurrence_rules ADD COLUMN IF NOT EXISTS last_completed_at timestamptz;
+
+ALTER TABLE task_comments
+  ADD COLUMN IF NOT EXISTS rule_id uuid REFERENCES recurrence_rules(id) ON DELETE CASCADE;
+ALTER TABLE task_checklist_items
+  ADD COLUMN IF NOT EXISTS rule_id uuid REFERENCES recurrence_rules(id) ON DELETE CASCADE;
+ALTER TABLE task_attachments
+  ADD COLUMN IF NOT EXISTS rule_id uuid REFERENCES recurrence_rules(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS task_comments_rule_idx ON task_comments (rule_id);
+CREATE INDEX IF NOT EXISTS task_checklist_rule_idx ON task_checklist_items (rule_id);
+CREATE INDEX IF NOT EXISTS task_attachments_rule_idx ON task_attachments (rule_id);
 
 CREATE TABLE IF NOT EXISTS task_occurrences (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -1,42 +1,62 @@
 /**
- * RecurringRulesPage — recurrence rules + tick.
+ * RecurringRulesPage — company-wide recurring tasks (board-aligned table).
  * Location: apps/web/src/features/projects/RecurringRulesPage.tsx
  */
-import { useEffect, useState } from 'react'
-import { Link, useOutletContext } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import { Plus } from '@phosphor-icons/react'
-import { CrmEmptyPreview } from '../../components/CrmEmptyPreview'
 import { api } from '../../lib/api'
 import { useI18n } from '../../lib/i18n'
-import { companyRoutes } from '../../lib/companyPaths'
+import { MemberAvatar, memberDisplayName, type MemberInfo } from './MemberAvatar'
+import { ProjectsScopeToggle } from './ProjectsScopeToggle'
 import type { ProjectsOutletContext } from './ProjectsShell'
 import type { BuRecurrenceRule } from './projectTypes'
+import { TaskCreateModal } from './TaskCreateModal'
+import { TaskDetailModal } from './TaskDetailModal'
+import { TaskPriorityBadge, TaskStatusBadge } from './TaskBadges'
+import { taskRhythmLabel } from './taskLabels'
+
+function formatDue(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })
+}
 
 export function RecurringRulesPage() {
   const ctx = useOutletContext<ProjectsOutletContext>()
   const slug = ctx?.slug || ''
   const canWrite = ctx?.canWrite ?? false
   const { t } = useI18n()
-  const routes = companyRoutes(slug)
   const [rules, setRules] = useState<BuRecurrenceRule[]>([])
+  const [members, setMembers] = useState<MemberInfo[]>([])
   const [loading, setLoading] = useState(true)
-  const [title, setTitle] = useState('')
-  const [freq, setFreq] = useState<'daily' | 'weekly' | 'monthly'>('weekly')
-  const [projectId, setProjectId] = useState('')
-  const [tickMsg, setTickMsg] = useState('')
-  const [formOpen, setFormOpen] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null)
+
+  const projectNameById = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const p of ctx?.projects || []) map[p.id] = p.name
+    return map
+  }, [ctx?.projects])
+
+  const memberById = useMemo(() => {
+    const map: Record<string, MemberInfo> = {}
+    for (const m of members) map[m.userId] = m
+    return map
+  }, [members])
 
   async function refresh() {
     if (!slug) return
     setLoading(true)
     try {
-      const r = await api<{ rules: BuRecurrenceRule[]; tick?: { created: number } }>(
-        `/api/b/${slug}/recurrence`,
-      )
-      setRules(r.rules)
-      if (r.tick && r.tick.created > 0) {
-        setTickMsg(t('recurrenceTickCreated').replace('{n}', String(r.tick.created)))
-      }
+      const [rulesRes, membersRes] = await Promise.all([
+        api<{ rules: BuRecurrenceRule[] }>(`/api/b/${slug}/recurrence`),
+        api<{ members: MemberInfo[] }>(`/api/b/${slug}/members`).catch(() => ({
+          members: [] as MemberInfo[],
+        })),
+      ])
+      setRules(rulesRes.rules)
+      setMembers(membersRes.members || [])
     } finally {
       setLoading(false)
     }
@@ -47,183 +67,133 @@ export function RecurringRulesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug])
 
-  const empty = rules.length === 0
-
   return (
     <div className="stack mkt-shell product-shell crm-shell">
       <header className="product-page-head">
         <div>
-          <Link to={routes.projects} className="muted" style={{ fontSize: 13 }}>
-            ← {t('projects')}
-          </Link>
-          <h1 className="section-title product-page-title" style={{ marginTop: 4 }}>
-            {t('projectsRecurring')}
-          </h1>
+          <h1 className="section-title product-page-title">{t('projectsRecurring')}</h1>
           <p className="muted" style={{ margin: '4px 0 0' }}>
             {t('projectsRecurringLede')}
           </p>
         </div>
         <div className="product-page-actions">
           {canWrite ? (
-            <>
-              <button
-                type="button"
-                className="btn"
-                onClick={async () => {
-                  const r = await api<{ created: number }>(`/api/b/${slug}/recurrence/tick`, {
-                    method: 'POST',
-                  })
-                  setTickMsg(t('recurrenceTickCreated').replace('{n}', String(r.created ?? 0)))
-                  await refresh()
-                }}
-              >
-                {t('recurrenceTick')}
-              </button>
-              <button type="button" className="btn primary" onClick={() => setFormOpen(true)}>
-                <Plus size={14} weight="bold" aria-hidden />
-                {t('recurrenceCreate')}
-              </button>
-            </>
+            <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
+              <Plus size={14} weight="bold" aria-hidden />
+              {t('taskCreate')}
+            </button>
           ) : null}
         </div>
       </header>
 
-      <p className="muted" style={{ fontSize: 13, margin: 0 }}>
-        {t('recurrenceDevHint')}
-      </p>
-      {tickMsg ? <p className="chip">{tickMsg}</p> : null}
+      <div className="crm-subnav project-index-toolbar" role="navigation" aria-label={t('projects')}>
+        <ProjectsScopeToggle slug={slug} active="recurring" />
+      </div>
 
-      {empty ? (
-        <CrmEmptyPreview
-          canWrite={canWrite && !loading}
-          ctaLabel={t('recurrenceCreate')}
-          hint={t('recurrenceEmpty')}
-          onCta={() => setFormOpen(true)}
-        />
-      ) : (
-        <div className="panel funnel-table-wrap">
-          <table className="table funnel-grid-table product-table">
-            <thead>
-              <tr>
-                <th>{t('name')}</th>
-                <th>{t('recurrenceFreq')}</th>
-                <th>{t('recurrenceNext')}</th>
-                <th></th>
+      <div className="funnel-table-wrap task-table-panel panel" aria-busy={loading}>
+        <table className="table funnel-grid-table product-table task-table">
+          <thead>
+            <tr>
+              <th>{t('projectCol')}</th>
+              <th>{t('taskTitle')}</th>
+              <th>{t('taskStatus')}</th>
+              <th>{t('taskPriority')}</th>
+              <th>{t('taskAssignee')}</th>
+              <th>{t('taskDue')}</th>
+              <th>{t('taskRecurrenceFreq')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && rules.length === 0 ? (
+              <tr className="product-table-row">
+                <td colSpan={7} className="muted">
+                  {t('loading')}
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {rules.map((rule) => (
-                <tr key={rule.id} className="product-table-row">
+            ) : null}
+            {!loading && rules.length === 0 ? (
+              <tr className="product-table-row">
+                <td colSpan={7} className="muted">
+                  {t('recurrenceEmpty')}
+                </td>
+              </tr>
+            ) : null}
+            {rules.map((rule) => {
+              const projectName = rule.projectId
+                ? projectNameById[rule.projectId] || '—'
+                : t('taskInbox')
+              const status = rule.pausedAt ? 'blocked' : 'open'
+              const member = rule.assigneeUserId ? memberById[rule.assigneeUserId] : null
+              const isOverdue =
+                !rule.pausedAt && new Date(rule.nextAt).getTime() < Date.now()
+              return (
+                <tr
+                  key={rule.id}
+                  className={`product-table-row task-table-row${isOverdue ? ' is-overdue' : ''}`}
+                  onClick={() => setSelectedRuleId(rule.id)}
+                >
+                  <td className="muted">{projectName}</td>
                   <td>
-                    <strong>{rule.title}</strong>
-                    {rule.pausedAt ? (
-                      <span className="muted"> · {t('recurrencePaused')}</span>
-                    ) : null}
+                    <span className={`task-table-title-cell task-prio-rail--${rule.priority}`}>
+                      <strong className="task-table-title">{rule.title}</strong>
+                    </span>
                   </td>
-                  <td className="muted">{rule.freq}</td>
-                  <td className="muted">{new Date(rule.nextAt).toLocaleString()}</td>
                   <td>
-                    {canWrite ? (
-                      <button
-                        type="button"
-                        className="btn"
-                        onClick={async () => {
-                          await api(`/api/b/${slug}/recurrence/${rule.id}`, {
-                            method: 'PATCH',
-                            body: JSON.stringify({ paused: !rule.pausedAt }),
-                          })
-                          await refresh()
-                        }}
-                      >
-                        {rule.pausedAt ? t('recurrenceResume') : t('recurrencePause')}
-                      </button>
-                    ) : null}
+                    <TaskStatusBadge status={status} t={t} />
                   </td>
+                  <td>
+                    <TaskPriorityBadge priority={rule.priority} t={t} />
+                  </td>
+                  <td>
+                    {member ? (
+                      <span className="task-table-assignee">
+                        <MemberAvatar member={member} size={22} />
+                        <span className="task-table-assignee-name">{memberDisplayName(member)}</span>
+                      </span>
+                    ) : (
+                      <span className="muted">{t('taskAssigneeNone')}</span>
+                    )}
+                  </td>
+                  <td className={isOverdue ? 'task-due--overdue' : 'muted'}>
+                    {formatDue(rule.nextAt)}
+                    {isOverdue ? ` · ${t('taskOverdue')}` : ''}
+                  </td>
+                  <td className="muted">{taskRhythmLabel(rule, t)}</td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
 
-      {formOpen ? (
-        <div className="bu-modal-overlay" role="dialog" aria-modal="true">
-          <form
-            className="bu-modal panel crm-modal"
-            onSubmit={async (e) => {
-              e.preventDefault()
-              if (!title.trim()) return
-              await api(`/api/b/${slug}/recurrence`, {
-                method: 'POST',
-                body: JSON.stringify({
-                  title: title.trim(),
-                  freq,
-                  projectId: projectId || null,
-                  startsAt: new Date().toISOString(),
-                }),
-              })
-              setTitle('')
-              setFormOpen(false)
-              await refresh()
-            }}
-          >
-            <header className="bu-modal-head">
-              <h2 className="section-title" style={{ margin: 0, fontSize: '1.1rem' }}>
-                {t('recurrenceCreate')}
-              </h2>
-              <button type="button" className="btn" onClick={() => setFormOpen(false)}>
-                {t('cancel')}
-              </button>
-            </header>
-            <div className="crm-modal-body stack">
-              <label className="field">
-                <span className="label">{t('taskTitle')}</span>
-                <input
-                  className="input"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  autoFocus
-                />
-              </label>
-              <label className="field">
-                <span className="label">{t('recurrenceFreq')}</span>
-                <select
-                  className="input"
-                  value={freq}
-                  onChange={(e) => setFreq(e.target.value as typeof freq)}
-                >
-                  <option value="daily">daily</option>
-                  <option value="weekly">weekly</option>
-                  <option value="monthly">monthly</option>
-                </select>
-              </label>
-              <label className="field">
-                <span className="label">{t('projects')}</span>
-                <select
-                  className="input"
-                  value={projectId}
-                  onChange={(e) => setProjectId(e.target.value)}
-                >
-                  <option value="">—</option>
-                  {(ctx.projects || []).map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <footer className="bu-modal-actions">
-              <button type="button" className="btn" onClick={() => setFormOpen(false)}>
-                {t('cancel')}
-              </button>
-              <button type="submit" className="btn primary">
-                {t('save')}
-              </button>
-            </footer>
-          </form>
-        </div>
-      ) : null}
+      <TaskCreateModal
+        open={createOpen}
+        slug={slug}
+        projects={ctx?.projects || []}
+        defaultMode="recurring"
+        onClose={() => setCreateOpen(false)}
+        onSave={async (body) => {
+          await api(`/api/b/${slug}/tasks`, {
+            method: 'POST',
+            body: JSON.stringify(body),
+          })
+        }}
+        onCreated={() => {
+          refresh().catch(console.error)
+        }}
+      />
+      <TaskDetailModal
+        slug={slug}
+        taskId={selectedRuleId}
+        source="rule"
+        canWrite={canWrite}
+        memberById={memberById}
+        members={members}
+        onClose={() => setSelectedRuleId(null)}
+        onChanged={() => {
+          refresh().catch(console.error)
+        }}
+      />
     </div>
   )
 }

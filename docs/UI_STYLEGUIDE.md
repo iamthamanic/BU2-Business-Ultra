@@ -65,6 +65,10 @@ Defined on `:root` in `dark-ops.css` — no one-off magic numbers in feature CSS
 | Activity | `.project-activity-*` | Timeline dots; structural empty ghosts |
 | Attachments | `.task-attach-*` | Dashed empty zone; list + delete |
 | Empty | `.crm-empty-*` / blur preview | Structure + CTA, no fake data rows |
+| Connect empty | `.funnel-connect-hint` (`FunnelConnectHint`) | Amber warn banner **inside** the empty table/list (Marketing funnel + Inbox); CTA → Settings → Verbindungen. Do **not** use a separate top panel above the chrome. |
+| Inbox empty | full `.inbox-panes` + hint + ghost bubbles | Show finished three-pane layout (filters, thread shell, composer disabled, context); skeleton lines only — no fake names/messages |
+| Notes / comments | `NoteThread` + `useNoteComposer` + `.customer-note-*` | Same card chrome as Kunden-Notizen; reuse everywhere (Tasks, later CRM refactor) |
+| Checklist | `ChecklistPanel` | Progress bar + item rows + add form; Tasks modal (extend to other modules as needed) |
 | Page head | `.product-page-head`, `.product-page-meta` | Title + status only (no “Area” label) |
 
 ## Layout
@@ -78,7 +82,7 @@ Defined on `:root` in `dark-ops.css` — no one-off magic numbers in feature CSS
 | State | Pattern |
 |-------|---------|
 | Loading | skeleton (`.crm-skel*`) matching final shape |
-| Empty | table headers or board columns + hint + primary CTA |
+| Empty | Keep final chrome (table headers / board columns / inbox panes) + `.funnel-connect-hint` or muted hint + primary CTA; no fake content rows |
 | Error | `.error` / inline message + retry when applicable |
 | Disabled | reduced opacity + no pointer events |
 

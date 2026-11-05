@@ -1,6 +1,7 @@
 /**
  * Paid ads mutate clients — Google / Meta / TikTok / ChatGPT.
- * Key-gated: attempt live mutate; fall back to structured stub with same response shape.
+ * Callers resolve credentials via adsCredentials (Integration Core OAuth for google_ads first).
+ * Attempt live mutate; fall back to structured stub with same response shape.
  */
 
 export type AdsProvider = 'google_ads' | 'meta_ads' | 'tiktok_ads' | 'chatgpt_ads'
@@ -19,19 +20,18 @@ export async function mutateGoogleAds(opts: {
   objective?: string | null
   payload: Record<string, unknown>
 }): Promise<AdsMutateResult> {
-  // Google Ads API requires OAuth + developer token; developer token alone is insufficient.
-  // Attempt a lightweight validation call against Google tokeninfo-style endpoint if customer id present.
+  // apiKey is an OAuth access token (from Integration Core connection or legacy secret).
   const customerId = String(opts.payload.customerId ?? '')
   if (customerId && opts.apiKey.length > 20) {
     try {
       const res = await fetch(
-        `https://googleads.googleapis.com/v18/customers/${customerId}/googleAds:searchStream`,
+        `https://googleads.googleapis.com/v18/customers/${customerId}/googleAds:search`,
         {
           method: 'POST',
           headers: {
             authorization: `Bearer ${opts.apiKey}`,
             'content-type': 'application/json',
-            'developer-token': String(opts.payload.developerToken ?? opts.apiKey),
+            'login-customer-id': customerId.replace(/-/g, ''),
           },
           body: JSON.stringify({ query: 'SELECT campaign.id FROM campaign LIMIT 1' }),
         },

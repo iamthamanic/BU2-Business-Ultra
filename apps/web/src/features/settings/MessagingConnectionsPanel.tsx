@@ -61,6 +61,7 @@ export function MessagingConnectionsPanel({ slug, canManage }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [toggling, setToggling] = useState<string | null>(null)
   const [syncingId, setSyncingId] = useState<string | null>(null)
+  const [oauthFlash, setOauthFlash] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -84,6 +85,28 @@ export function MessagingConnectionsPanel({ slug, canManage }: Props) {
   useEffect(() => {
     load().catch(console.error)
   }, [load])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const status = params.get('oauth_status')
+    const err = params.get('oauth_error')
+    const provider = params.get('oauth_provider') || params.get('oauth') || ''
+    if (!status && !err) return
+    if (status === 'connected') {
+      setOauthFlash(t('connOauthConnected').replace('{provider}', provider || 'OAuth'))
+      load().catch(console.error)
+    } else if (err) {
+      setOauthFlash(`${t('connOauthFailed')}: ${err}`)
+    }
+    params.delete('oauth')
+    params.delete('oauth_status')
+    params.delete('oauth_provider')
+    params.delete('oauth_error')
+    params.delete('oauth_error_detail')
+    params.delete('connection_id')
+    const next = `${window.location.pathname}${params.toString() ? `?${params}` : ''}${window.location.hash}`
+    window.history.replaceState({}, '', next)
+  }, [load, t])
 
   function modulesFor(connectionId: string): string[] {
     const mods = new Set<string>()
@@ -122,7 +145,9 @@ export function MessagingConnectionsPanel({ slug, canManage }: Props) {
       const path =
         c.provider === 'unipile'
           ? `/api/b/${slug}/inbox/unipile/connections/${c.id}/sync`
-          : `/api/b/${slug}/inbox/telegram/connections/${c.id}/sync`
+          : c.provider === 'google'
+            ? `/api/b/${slug}/inbox/google/connections/${c.id}/sync`
+            : `/api/b/${slug}/inbox/telegram/connections/${c.id}/sync`
       await api(path, { method: 'POST' })
     } catch (e) {
       setError(String((e as Error).message || e))
@@ -156,7 +181,7 @@ export function MessagingConnectionsPanel({ slug, canManage }: Props) {
         {t('connInboxBanner')}
       </div>
 
-      <MktTabs level="l3" label={t('connMessagingTitle')}>
+      <MktTabs level="surface" label={t('connMessagingTitle')}>
         <MktTab
           active={sub === 'accounts'}
           label={`${t('connTabAccounts')} (${messagingConnections.length})`}
@@ -169,6 +194,12 @@ export function MessagingConnectionsPanel({ slug, canManage }: Props) {
         />
         <MktTab active={sub === 'log'} label={t('connTabLog')} onClick={() => setSub('log')} />
       </MktTabs>
+
+      {oauthFlash ? (
+        <p className="conn-info-banner" role="status">
+          {oauthFlash}
+        </p>
+      ) : null}
 
       {error ? (
         <p className="inbox-error" role="alert">
@@ -231,7 +262,9 @@ export function MessagingConnectionsPanel({ slug, canManage }: Props) {
                         </td>
                         <td>
                           <div className="conn-row-actions">
-                            {c.provider === 'telegram' || c.provider === 'unipile' ? (
+                            {c.provider === 'telegram' ||
+                            c.provider === 'unipile' ||
+                            c.provider === 'google' ? (
                               <button
                                 type="button"
                                 className="btn"

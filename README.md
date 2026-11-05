@@ -4,11 +4,19 @@ Greenfield modular monolith — **Vite + React + TypeScript** frontend, **Fastif
 
 Locked decisions: [`DECISIONS.md`](./DECISIONS.md). Routing map: [`docs/ROUTING.md`](./docs/ROUTING.md). OpenSEO fork apply notes: [`openseo/FORK_PATCH.md`](./openseo/FORK_PATCH.md). Backups: [`docs/BACKUP_RUNBOOK.md`](./docs/BACKUP_RUNBOOK.md).
 
+Project contracts: [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) · [`docs/SECURITY.md`](./docs/SECURITY.md) · [`docs/INTEGRATIONS.md`](./docs/INTEGRATIONS.md) · [`docs/OPERATIONS.md`](./docs/OPERATIONS.md) · UI [`docs/UI_STYLEGUIDE.md`](./docs/UI_STYLEGUIDE.md) · agent map [`AGENTS.md`](./AGENTS.md).
+
 ## Quick start
 
 ```bash
-cp .env.example .env
+# Preferred local file (gitignored). Legacy `.env` still works.
+cp .env.example .env.local
+# Generate strong SECRETS_MASTER_KEY / SESSION_SECRET (and set BOOTSTRAP_OWNER_PASSWORD):
+# node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+
 docker compose up -d postgres
+# Full stack via Compose: use --env-file so ${POSTGRES_*} match .env.local
+#   docker compose --env-file .env.local up -d postgres
 pnpm install
 pnpm --filter @bu2/shared build
 pnpm --filter @bu2/finance-calc build
@@ -21,9 +29,20 @@ docker compose up -d --build sortanize
 pnpm dev
 ```
 
-- Web: http://127.0.0.1:8741  
-- API: http://127.0.0.1:8742/api/health  
-- Sortanize: http://127.0.0.1:8760/health  
+API env priority (dev/test): process env → `.env.local` → `.env`. Production never auto-loads those files. See [`.env.example`](./.env.example) and [`.github/SECRETS.md`](./.github/SECRETS.md).
+
+### Ports (fixed locally)
+
+Chosen to avoid common stacks (3000/5173/8080/8000). Override only via `.env.local` / `.env` if you must.
+
+| Service | Port | Env | URL |
+|---------|------|-----|-----|
+| Web (Vite) | **8741** | `WEB_PORT` | http://127.0.0.1:8741 |
+| API (Fastify) | **8742** | `API_PORT` | http://127.0.0.1:8742/api/health |
+| Sortanize | **8760** | — | http://127.0.0.1:8760/health |
+| Postgres | **5432** | `DATABASE_URL` | docker compose |
+
+Also set `PUBLIC_WEB_URL` / `PUBLIC_API_URL` / `CORS_ORIGIN` to match (defaults in `.env.example`).
 
 ### First login
 
@@ -42,7 +61,7 @@ Primary auth is **email + password**. Magic Link / OTP remains as a secondary/de
 
 Change password while logged in: `POST /api/auth/password` with `{ "currentPassword": "…", "newPassword": "…" }`.
 
-**Never commit real secrets.** Override `BOOTSTRAP_OWNER_PASSWORD` in `.env` / deploy secrets for anything beyond local.
+**Never commit real secrets.** Override `BOOTSTRAP_OWNER_PASSWORD` in `.env.local` / deploy secrets for anything beyond local. Platform OAuth client IDs live in env; per-business access tokens stay encrypted in Integration Core (Settings → Verbindungen).
 
 Sender: `social@halteverbot123.de`.
 

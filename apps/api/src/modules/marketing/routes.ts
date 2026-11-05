@@ -74,6 +74,36 @@ export async function marketingRoutes(app: FastifyInstance) {
     const connector = await resolveFunnelSource(m.businessId, surface)
     const q = req.query as { window?: string }
     const window = ['24h', '7d', '30d', 'all'].includes(q.window || '') ? q.window! : '30d'
+
+    // Native YouTube: load channel video stats when Direct + connected.
+    if (ch === 'youtube' && connector.provider === 'youtube' && connector.connectionId) {
+      try {
+        const { getGoogleAccessToken } = await import('../../lib/integrations/google/tokens.js')
+        const { listChannelRecentVideos } = await import(
+          '../../lib/integrations/youtube/client.js'
+        )
+        const { getConnectionForBusiness } = await import(
+          '../../lib/integrations/core/connections.js'
+        )
+        const conn = await getConnectionForBusiness(m.businessId, connector.connectionId)
+        if (conn) {
+          const { accessToken } = await getGoogleAccessToken(m.businessId, conn.id)
+          const posts = await listChannelRecentVideos(accessToken, conn.externalAccountId, 25)
+          return {
+            channel: ch,
+            surface,
+            connector,
+            posts,
+            window,
+            mode: 'live' as const,
+            generatedAt: new Date().toISOString(),
+          }
+        }
+      } catch {
+        // Fall through to empty stub with connector status (fail soft for UI).
+      }
+    }
+
     return {
       channel: ch,
       surface,

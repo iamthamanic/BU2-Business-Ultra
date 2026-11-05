@@ -100,7 +100,7 @@ schema.ts          # stable barrel re-export (keep import path `db/schema`)
 | Web shell / features | `apps/web/src/features/*`, `components/*` | UI only; talks via API client / shared Zod | No SQL in frontend (**AGENTS**) |
 | API modules | `apps/api/src/modules/*` | HTTP + service per domain | Tenant via membership + slug |
 | Integration Core | `apps/api/src/lib/integrations/core/*` | Providers, connections, credentials, bindings, capabilities, adapters | Shared; modules own domain tables |
-| OAuth / adapters | `apps/api/src/lib/integrations/{oauth,telegram,unipile,…}` | Provider-specific I/O | DECISIONS Integration Core |
+| OAuth / adapters | `apps/api/src/lib/integrations/{oauth,gmail,telegram,unipile,…}` | Provider-specific I/O | DECISIONS Integration Core |
 | Shared contracts | `packages/shared` | Zod schemas, roles, capability helpers | Single public contract surface for UI↔API |
 | Finance / CMB | `packages/finance-calc` | Pricing/CMB engine + goldens | Internal package |
 | Auth plugin | `apps/api/src/plugins/auth.ts` | Session cookie → user; membership by slug | Identity never from client headers |
@@ -147,13 +147,17 @@ Approximate ownership by table group in `apps/api/src/db/schema.ts`:
 
 ## AuthN / AuthZ boundaries
 
-Summary (binding via DECISIONS + AGENTS Secure-by-Default): session cookie `bu2_session`; roles `owner|admin|editor|viewer`; API under `/api/b/:slug/...` loads membership for that business. Never take identity from client headers (B-09).
+See [SECURITY.md](./SECURITY.md). Summary (binding via DECISIONS + AGENTS Secure-by-Default): session cookie `bu2_session`; roles `owner|admin|editor|viewer`; API under `/api/b/:slug/...` loads membership for that business. Never take identity from client headers (B-09).
 
 ## Shared code rules
 
 - Prefer `@bu2/shared` contracts over duplicated types
 - Reuse Dark-Ops shell / existing feature components before one-offs ([UI_STYLEGUIDE.md](./UI_STYLEGUIDE.md))
 - Integration Core for multi-account connections; `settings_secrets` only for single API-key feature gates (DECISIONS)
+
+## External providers
+
+Canonical detail: [INTEGRATIONS.md](./INTEGRATIONS.md).
 
 ## Exceptions
 

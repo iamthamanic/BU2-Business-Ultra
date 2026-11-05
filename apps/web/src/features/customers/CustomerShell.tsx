@@ -19,6 +19,7 @@ import { useI18n } from '../../lib/i18n'
 import type { MessageKey } from '../../i18n/messages'
 import { companyRoutes } from '../../lib/companyPaths'
 import { CrmEmptyPreview } from '../../components/CrmEmptyPreview'
+import { CrmMultiCheckFilter } from '../../components/CrmMultiCheckFilter'
 import { CustomerCreateModal } from './CustomerCreateModal'
 import type { BuCustomer } from './customerTypes'
 
@@ -60,6 +61,8 @@ export function CustomerShell() {
 
   const [customers, setCustomers] = useState<BuCustomer[]>([])
   const [labelColors, setLabelColors] = useState<Record<string, string | null>>({})
+  const [labelCatalog, setLabelCatalog] = useState<{ name: string; color: string | null }[]>([])
+  const [selectedLabels, setSelectedLabels] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('')
@@ -87,6 +90,7 @@ export function CustomerShell() {
       ])
       setCustomers(r.customers)
       const catalog = labelRes.labels || labelRes.tags || []
+      setLabelCatalog(catalog)
       const map: Record<string, string | null> = {}
       for (const lab of catalog) map[lab.name] = lab.color
       setLabelColors(map)
@@ -102,15 +106,21 @@ export function CustomerShell() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return customers
-    return customers.filter(
-      (c) =>
+    return customers.filter((c) => {
+      if (selectedLabels.length > 0) {
+        const tags = c.tags || []
+        const hit = selectedLabels.some((lab) => tags.includes(lab))
+        if (!hit) return false
+      }
+      if (!q) return true
+      return (
         c.displayName.toLowerCase().includes(q) ||
         (c.email || '').toLowerCase().includes(q) ||
         (c.phone || '').includes(q) ||
-        (c.tags || []).some((tag) => tag.toLowerCase().includes(q)),
-    )
-  }, [customers, query])
+        (c.tags || []).some((tag) => tag.toLowerCase().includes(q))
+      )
+    })
+  }, [customers, query, selectedLabels])
 
   const sorted = useMemo(() => {
     const dir = sortDir === 'asc' ? 1 : -1
@@ -221,6 +231,20 @@ export function CustomerShell() {
               <option value="customer">{t('customerStatusCustomer')}</option>
             </select>
           </label>
+          <CrmMultiCheckFilter
+            options={labelCatalog.map((l) => ({
+              value: l.name,
+              label: l.name,
+              color: l.color,
+            }))}
+            value={selectedLabels}
+            onChange={setSelectedLabels}
+            placeholder={t('customerFilterLabels')}
+            searchPlaceholder={t('customerFilterLabelsSearch')}
+            emptyLabel={t('customerFilterLabelsEmpty')}
+            clearLabel={t('customerFilterLabelsClear')}
+            aria-label={t('customerFilterLabels')}
+          />
           <div className="product-archive-toggle" role="group" aria-label={t('archived')}>
             <button
               type="button"

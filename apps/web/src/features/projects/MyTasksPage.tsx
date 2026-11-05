@@ -1,16 +1,16 @@
 /**
- * MyTasksPage — assignee + project-less tasks with stats and enriched table.
+ * MyTasksPage — tasks assigned to current user across all projects (incl. recurring).
  * Location: apps/web/src/features/projects/MyTasksPage.tsx
  */
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useOutletContext } from 'react-router-dom'
+import { useOutletContext } from 'react-router-dom'
 import { Plus } from '@phosphor-icons/react'
 import { CrmEmptyPreview } from '../../components/CrmEmptyPreview'
 import { api } from '../../lib/api'
 import { useI18n } from '../../lib/i18n'
-import { companyRoutes } from '../../lib/companyPaths'
 import type { MemberInfo } from './MemberAvatar'
 import type { ProjectsOutletContext } from './ProjectsShell'
+import { ProjectsScopeToggle } from './ProjectsScopeToggle'
 import { EmptyTaskTable, TaskTable } from './TaskTable'
 import { TaskCreateModal } from './TaskCreateModal'
 import { TaskDetailModal } from './TaskDetailModal'
@@ -21,12 +21,11 @@ export function MyTasksPage() {
   const slug = ctx?.slug || ''
   const canWrite = ctx?.canWrite ?? false
   const { t } = useI18n()
-  const routes = companyRoutes(slug)
   const [tasks, setTasks] = useState<BuTask[]>([])
   const [members, setMembers] = useState<MemberInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+  const [selected, setSelected] = useState<{ id: string; source: 'task' | 'rule' } | null>(null)
 
   const memberById = useMemo(() => {
     const m: Record<string, MemberInfo> = {}
@@ -40,18 +39,6 @@ export function MyTasksPage() {
     return m
   }, [ctx.projects])
 
-  const stats = useMemo(() => {
-    let open = 0
-    let inProgress = 0
-    let done = 0
-    for (const task of tasks) {
-      if (task.status === 'done') done++
-      else if (task.status === 'in_progress') inProgress++
-      else open++
-    }
-    return { open, inProgress, done }
-  }, [tasks])
-
   async function refresh() {
     if (!slug) return
     setLoading(true)
@@ -64,6 +51,7 @@ export function MyTasksPage() {
   }
 
   async function toggleTaskDone(task: BuTask, done: boolean) {
+    if (task.source === 'rule') return
     await api(`/api/b/${slug}/tasks/${task.id}/status`, {
       method: 'POST',
       body: JSON.stringify({
@@ -72,6 +60,10 @@ export function MyTasksPage() {
       }),
     })
     await refresh()
+  }
+
+  function openTask(task: BuTask) {
+    setSelected({ id: task.id, source: task.source === 'rule' ? 'rule' : 'task' })
   }
 
   useEffect(() => {
@@ -92,12 +84,7 @@ export function MyTasksPage() {
     <div className="stack mkt-shell product-shell crm-shell">
       <header className="product-page-head">
         <div>
-          <Link to={routes.projects} className="muted" style={{ fontSize: 13 }}>
-            ← {t('projects')}
-          </Link>
-          <h1 className="section-title product-page-title" style={{ marginTop: 4 }}>
-            {t('projectsMine')}
-          </h1>
+          <h1 className="section-title product-page-title">{t('projectsMine')}</h1>
           <p className="muted" style={{ margin: '4px 0 0' }}>
             {t('projectsMineLede')}
           </p>
@@ -112,22 +99,9 @@ export function MyTasksPage() {
         ) : null}
       </header>
 
-      {!empty ? (
-        <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
-          <span className="crm-stat">
-            <span className="muted">{t('taskStatOpen')}</span>
-            <strong>{stats.open}</strong>
-          </span>
-          <span className="crm-stat">
-            <span className="muted">{t('taskStatInProgress')}</span>
-            <strong>{stats.inProgress}</strong>
-          </span>
-          <span className="crm-stat">
-            <span className="muted">{t('taskStatDone')}</span>
-            <strong>{stats.done}</strong>
-          </span>
-        </div>
-      ) : null}
+      <div className="crm-subnav project-index-toolbar" role="navigation" aria-label={t('projects')}>
+        <ProjectsScopeToggle slug={slug} active="mine" />
+      </div>
 
       {empty ? (
         <CrmEmptyPreview
@@ -141,7 +115,7 @@ export function MyTasksPage() {
       ) : (
         <TaskTable
           tasks={tasks}
-          onOpen={setSelectedTaskId}
+          onOpen={openTask}
           t={t}
           memberById={memberById}
           showFilters
@@ -167,11 +141,12 @@ export function MyTasksPage() {
       />
       <TaskDetailModal
         slug={slug}
-        taskId={selectedTaskId}
+        taskId={selected?.id ?? null}
+        source={selected?.source ?? 'task'}
         canWrite={canWrite}
         memberById={memberById}
         members={members}
-        onClose={() => setSelectedTaskId(null)}
+        onClose={() => setSelected(null)}
         onChanged={() => {
           refresh().catch(console.error)
         }}
