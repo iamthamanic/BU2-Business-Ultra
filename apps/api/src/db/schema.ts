@@ -238,7 +238,7 @@ export const personas = pgTable('personas', {
   goals: jsonb('goals').$type<string[]>().default([]),
   pains: jsonb('pains').$type<string[]>().default([]),
   channels: jsonb('channels').$type<string[]>().default([]),
-  journey: jsonb('journey').$type<unknown[]>().default([]),
+  journey: jsonb('journey').$type<unknown>().default([]),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
