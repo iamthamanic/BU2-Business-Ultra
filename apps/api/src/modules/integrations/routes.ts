@@ -1,6 +1,6 @@
 /**
  * Integration Core HTTP — connections, bindings, providers (no plaintext credentials).
- * Location: apps/api/src/modules/integrations/routes.ts
+ * Location: apps/api/src/modules/integrations/routes.ts — helpers in ./service.ts
  */
 import type { FastifyInstance } from 'fastify'
 import {
@@ -34,14 +34,7 @@ import { loadMembership, requireUser } from '../../plugins/auth.js'
 
 ensureMockAdapterRegistered()
 ensureImapAdapterRegistered()
-
-function httpError(e: unknown): { status: number; error: string } {
-  const err = e as Error & { statusCode?: number }
-  return {
-    status: err.statusCode && err.statusCode >= 400 ? err.statusCode : 500,
-    error: err.message || 'error',
-  }
-}
+import { httpError } from './service.js'
 
 export async function integrationRoutes(app: FastifyInstance) {
   app.get('/api/b/:slug/integrations/providers', async (req, reply) => {

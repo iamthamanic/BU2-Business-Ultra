@@ -14,22 +14,12 @@ import { hashToken, randomToken } from '../../lib/crypto.js'
 import { writeAudit } from '../../lib/audit.js'
 import { loadMembership, requireRole, requireUser } from '../../plugins/auth.js'
 import { seedDefaultAreaProjects } from '../projects/defaultAreas.js'
+import { listBusinessesForUser } from './service.js'
 
 export async function businessRoutes(app: FastifyInstance) {
   app.get('/api/businesses', async (req, reply) => {
     const user = await requireUser(req)
-    const rows = await db
-      .select({
-        id: businesses.id,
-        name: businesses.name,
-        slug: businesses.slug,
-        status: businesses.status,
-        role: memberships.role,
-        logoPath: businesses.logoPath,
-      })
-      .from(memberships)
-      .innerJoin(businesses, eq(memberships.businessId, businesses.id))
-      .where(eq(memberships.userId, user.id))
+    const rows = await listBusinessesForUser(user.id)
     return { businesses: rows }
   })
 

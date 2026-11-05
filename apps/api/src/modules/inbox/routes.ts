@@ -1,6 +1,6 @@
 /**
  * Omnichannel Inbox HTTP — Telegram E2E (list / sync / reply).
- * Location: apps/api/src/modules/inbox/routes.ts
+ * Location: apps/api/src/modules/inbox/routes.ts — helpers in ./service.ts
  */
 import type { FastifyInstance } from 'fastify'
 import {
@@ -34,14 +34,7 @@ import { loadMembership, requireUser } from '../../plugins/auth.js'
 
 ensureTelegramAdapterRegistered()
 ensureUnipileAdapterRegistered()
-
-function httpError(e: unknown): { status: number; error: string } {
-  const err = e as Error & { statusCode?: number }
-  return {
-    status: err.statusCode && err.statusCode >= 400 ? err.statusCode : 500,
-    error: err.message || 'error',
-  }
-}
+import { httpError } from './service.js'
 
 export async function inboxRoutes(app: FastifyInstance) {
   app.get('/api/b/:slug/inbox/connections', async (req, reply) => {
