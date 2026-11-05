@@ -1,12 +1,13 @@
 /**
  * Brevo transactional + campaign client (business-scoped key).
  */
+import { parseFetchJson } from '../parseFetchJson.js'
 
 export async function brevoGetAccount(apiKey: string) {
   const res = await fetch('https://api.brevo.com/v3/account', {
     headers: { 'api-key': apiKey, accept: 'application/json' },
   })
-  return { ok: res.ok, status: res.status, body: await safeJson(res) }
+  return { ok: res.ok, status: res.status, body: await parseFetchJson(res) }
 }
 
 export async function createEmailCampaign(
@@ -35,7 +36,7 @@ export async function createEmailCampaign(
         recipients: input.recipients ?? { listIds: [] },
       }),
     })
-    const body = (await safeJson(res)) as { id?: number; message?: string }
+    const body = (await parseFetchJson(res)) as { id?: number; message?: string }
     if (res.ok && body.id != null) {
       return { mode: 'live', remoteId: String(body.id) }
     }
@@ -65,14 +66,5 @@ export async function sendEmailCampaignNow(
     return { mode: 'stub', ok: false, detail: `send_http_${res.status}` }
   } catch (e) {
     return { mode: 'stub', ok: false, detail: String(e) }
-  }
-}
-
-async function safeJson(res: Response): Promise<unknown> {
-  const t = await res.text()
-  try {
-    return t ? JSON.parse(t) : null
-  } catch {
-    return { raw: t }
   }
 }

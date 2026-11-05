@@ -326,7 +326,9 @@ export function ProjectsShell() {
       </header>
 
       <div className="crm-subnav project-index-toolbar" role="navigation" aria-label={t('projects')}>
-        <ProjectsScopeToggle slug={slug} active="all" />
+        <div className="project-index-nav">
+          <ProjectsScopeToggle slug={slug} active="all" />
+        </div>
         {!emptyAll ? (
           <div className="project-index-filters" role="search">
             <CrmIconSelect

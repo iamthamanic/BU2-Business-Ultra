@@ -18,6 +18,7 @@ import { api } from '../../lib/api'
 import { useI18n } from '../../lib/i18n'
 import type { MessageKey } from '../../i18n/messages'
 import { companyRoutes } from '../../lib/companyPaths'
+import { ArchiveSegmentToggle } from '../../components/ArchiveSegmentToggle'
 import { CrmEmptyPreview } from '../../components/CrmEmptyPreview'
 import { CrmMultiCheckFilter } from '../../components/CrmMultiCheckFilter'
 import { CustomerCreateModal } from './CustomerCreateModal'
@@ -245,24 +246,15 @@ export function CustomerShell() {
             clearLabel={t('customerFilterLabelsClear')}
             aria-label={t('customerFilterLabels')}
           />
-          <div className="product-archive-toggle" role="group" aria-label={t('archived')}>
-            <button
-              type="button"
-              className={`archive-seg archive-seg--active${archive === 'active' ? ' is-on' : ''}`}
-              aria-pressed={archive === 'active'}
-              onClick={() => setArchive('active')}
-            >
-              {t('active')}
-            </button>
-            <button
-              type="button"
-              className={`archive-seg archive-seg--archived${archive === 'archived' ? ' is-on' : ''}`}
-              aria-pressed={archive === 'archived'}
-              onClick={() => setArchive('archived')}
-            >
-              {t('archived')}
-            </button>
-          </div>
+          <ArchiveSegmentToggle
+            label={t('archived')}
+            value={archive}
+            onChange={setArchive}
+            options={[
+              { value: 'active', label: t('active'), tone: 'active' },
+              { value: 'archived', label: t('archived'), tone: 'archived' },
+            ]}
+          />
           {canWrite ? (
             <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
               <Plus size={14} weight="bold" aria-hidden />

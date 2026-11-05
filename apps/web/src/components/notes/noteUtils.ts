@@ -29,4 +29,5 @@ export type ThreadNote = {
   updatedAt?: string | null
   authorDisplayName?: string | null
   authorUserId?: string | null
+  parentNoteId?: string | null
 }

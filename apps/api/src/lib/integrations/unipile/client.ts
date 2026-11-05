@@ -2,6 +2,7 @@
  * Thin Unipile HTTP client (DSN + X-API-KEY). Fail-closed if env missing.
  * Location: apps/api/src/lib/integrations/unipile/client.ts
  */
+import { parseFetchJsonAs } from '../../parseFetchJson.js'
 
 export type UnipileConfig = {
   baseUrl: string
@@ -43,14 +44,15 @@ async function unipileFetch<T>(
     ...init,
     headers,
   })
-  const text = await res.text()
-  let data: T
   try {
-    data = text ? (JSON.parse(text) as T) : ({} as T)
-  } catch {
-    throw Object.assign(new Error(`unipile_bad_json:${res.status}`), { statusCode: 502 })
+    const data = await parseFetchJsonAs<T>(res, { throwOnBad: true, emptyAs: {} as T })
+    return { status: res.status, data }
+  } catch (e) {
+    const err = e as Error & { statusCode?: number }
+    throw Object.assign(new Error(`unipile_bad_json:${res.status}`), {
+      statusCode: err.statusCode || 502,
+    })
   }
-  return { status: res.status, data }
 }
 
 export type UnipileConnectStart = {

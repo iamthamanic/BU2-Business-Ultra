@@ -12,5 +12,6 @@ export {
   sanitizeNoteHtml,
 } from './NoteEditor'
 export { NoteThread } from './NoteThread'
+export { ThreadedNotesList, type NoteThreadGroup } from './ThreadedNotesList'
 export type { ThreadNote } from './noteUtils'
 export { useNoteComposer } from './useNoteComposer'

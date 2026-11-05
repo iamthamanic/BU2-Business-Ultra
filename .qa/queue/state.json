@@ -3,31 +3,15 @@
   "repo": "iamthamanic/BU2-Business-Ultra",
   "activeIssue": null,
   "featureSlug": null,
-  "phase": "done",
-  "branch": null,
+  "phase": "idle",
+  "branch": "restore/parked-wip-to-main",
   "prUrl": null,
   "milestoneFilter": null,
-  "paused": false,
+  "paused": true,
   "runMode": "loop",
   "queue": [],
-  "completedIssues": [
-    1,
-    2,
-    3,
-    4,
-    5,
-    6,
-    7
-  ],
-  "mergedIssues": [
-    1,
-    2,
-    3,
-    4,
-    5,
-    6,
-    7
-  ],
+  "completedIssues": [1, 2, 3, 4, 5, 6, 7],
+  "mergedIssues": [1, 2, 3, 4, 5, 6, 7],
   "prUrls": {
     "1": "https://github.com/iamthamanic/BU2-Business-Ultra/pull/8",
     "2": "https://github.com/iamthamanic/BU2-Business-Ultra/pull/9",
@@ -54,7 +38,8 @@
   },
   "lastError": null,
   "lastErrorCount": 0,
-  "issuesProcessedInSession": 5,
-  "updatedAt": "2026-11-05T12:17:15.000Z",
-  "lastMergeSha": "28b43f2744dcc09055483ee71727db92406bd764"
+  "issuesProcessedInSession": 0,
+  "updatedAt": "2026-11-05T21:15:00.000Z",
+  "lastMergeSha": null,
+  "note": "park restore mid-merge; queue paused"
 }
