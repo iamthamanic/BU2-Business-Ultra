@@ -11,9 +11,11 @@ type Props = {
   /** When true, only the tip mark is the hover target (for KPI heads / dense headers). */
   iconOnly?: boolean
   className?: string
+  /** Wider bubble for multi-line help (e.g. page intros). */
+  wide?: boolean
 }
 
-export function FunnelTip({ tip, children, iconOnly = false, className = '' }: Props) {
+export function FunnelTip({ tip, children, iconOnly = false, className = '', wide = false }: Props) {
   const tipId = useId()
   const anchorRef = useRef<HTMLSpanElement>(null)
   const [open, setOpen] = useState(false)
@@ -23,7 +25,9 @@ export function FunnelTip({ tip, children, iconOnly = false, className = '' }: P
     const el = anchorRef.current
     if (!el) return
     const r = el.getBoundingClientRect()
-    const width = Math.min(280, Math.max(180, window.innerWidth * 0.65))
+    const cap = wide ? 420 : 280
+    const floor = wide ? 260 : 180
+    const width = Math.min(cap, Math.max(floor, window.innerWidth * (wide ? 0.72 : 0.65)))
     let left = r.left
     if (left + width > window.innerWidth - 12) left = Math.max(12, window.innerWidth - width - 12)
     const below = r.bottom + 6

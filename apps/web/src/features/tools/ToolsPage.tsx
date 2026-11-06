@@ -20,6 +20,7 @@ import {
   type ToolScopeResource,
 } from '@bu2/shared'
 import type { CompanyOutletContext } from '../../components/BusinessShell'
+import { FunnelTip } from '../../components/FunnelTip'
 import { api } from '../../lib/api'
 import { companyRoutes } from '../../lib/companyPaths'
 import { useI18n } from '../../lib/i18n'
@@ -200,13 +201,23 @@ export function ToolsPage() {
     <div className="stack mkt-shell product-shell crm-shell tools-hub">
       <header className="product-page-head tools-hub-head">
         <div className="tools-hub-intro">
-          <h1 className="section-title product-page-title">{t('toolsHub')}</h1>
-          <p className="muted tools-hub-lede">{t('toolsHubLede')}</p>
-          <ul className="tools-hub-how muted">
-            <li>{t('toolsHubHow1')}</li>
-            <li>{t('toolsHubHow2')}</li>
-            <li>{t('toolsHubHow3')}</li>
-          </ul>
+          <h1 className="section-title product-page-title tools-hub-title">
+            <span>{t('toolsHub')}</span>
+            <FunnelTip
+              iconOnly
+              wide
+              className="tools-hub-tip"
+              tip={[
+                t('toolsHubLede'),
+                '',
+                `• ${t('toolsHubHow1')}`,
+                `• ${t('toolsHubHow2')}`,
+                `• ${t('toolsHubHow3')}`,
+              ].join('\n')}
+            >
+              {t('toolsHub')}
+            </FunnelTip>
+          </h1>
         </div>
         <div className="tools-hub-actions">
           <div className="tools-view-toggle" role="group" aria-label={t('toolsViewMode')}>

@@ -799,27 +799,21 @@ select.input,
 }
 
 .tools-hub-intro {
-  flex: 1 1 280px;
+  flex: 1 1 200px;
   min-width: 0;
-  max-width: 42rem;
 }
 
-.tools-hub-lede {
-  margin: 6px 0 0;
-  font-size: 13.5px;
-  line-height: 1.45;
-  color: var(--dim);
+.tools-hub-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
 }
 
-.tools-hub-how {
-  margin: 10px 0 0;
-  padding: 0 0 0 1.15rem;
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--muted);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.tools-hub-tip.funnel-tip {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
 }
 
 .tools-hub-actions {
