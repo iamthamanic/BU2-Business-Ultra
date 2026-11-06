@@ -1,5 +1,5 @@
 /**
- * Finance tab panels — overview through accounts (prototype parity, demo data).
+ * Finance tab panels — empty until connectors supply live data.
  * Location: apps/web/src/features/finance/FinanceScreens.tsx
  */
 import { useMemo, useState, type ReactNode } from 'react'
@@ -19,17 +19,12 @@ import {
 import type { MessageKey } from '../../i18n/messages'
 import { useI18n } from '../../lib/i18n'
 import {
-  FINANCE_DEMO_AS_OF,
-  financeAlerts,
-  financeAnalysis,
-  financeLiquidityFlows,
-  financeOverview as ov,
-  financeProfitability,
-  financeRecurring,
-  financeTransactions,
+  EMPTY_FINANCE,
   formatEur,
+  formatEurOrDash,
+  type FinanceSnapshot,
   type FinanceTx,
-} from './financeDemo'
+} from './financeModel'
 
 export type FinanceScreen =
   | 'overview'
@@ -44,6 +39,11 @@ export type TxFilter = 'all' | 'income' | 'expense' | 'open' | 'recurring'
 
 type NavProps = {
   go: (screen: FinanceScreen, opts?: { txFilter?: TxFilter }) => void
+  data?: FinanceSnapshot
+}
+
+function useFinance(data?: FinanceSnapshot): FinanceSnapshot {
+  return data ?? EMPTY_FINANCE
 }
 
 function Tag({
@@ -57,6 +57,15 @@ function Tag({
   return <span className={`finance-tag${cls}`}>{children}</span>
 }
 
+function EmptyBlock({ title, hint }: { title: string; hint: string }) {
+  return (
+    <div className="finance-empty-block">
+      <strong>{title}</strong>
+      <span>{hint}</span>
+    </div>
+  )
+}
+
 function statusTag(status: FinanceTx['status']) {
   const tone = status === 'Bezahlt' ? 'green' : status === 'Geplant' ? 'blue' : 'red'
   return <Tag tone={tone}>{status}</Tag>
@@ -64,11 +73,15 @@ function statusTag(status: FinanceTx['status']) {
 
 /* ─── Overview ─────────────────────────────────────────────── */
 
-export function FinanceOverview({ go }: NavProps) {
+export function FinanceOverview({ go, data }: NavProps) {
   const { t } = useI18n()
-  const reservePct = Math.round(
-    (ov.reserveProgress.current / ov.reserveProgress.target) * 100,
-  )
+  const ov = useFinance(data)
+  const reservePct =
+    ov.reserveProgress && ov.reserveProgress.target > 0
+      ? Math.round((ov.reserveProgress.current / ov.reserveProgress.target) * 100)
+      : 0
+  const hasMoney = ov.balance !== null || ov.freeAvailable !== null
+  const hasStats = ov.revenue !== null || ov.costs !== null || ov.result !== null
 
   return (
     <div className="finance-screen stack">
@@ -79,20 +92,26 @@ export function FinanceOverview({ go }: NavProps) {
             {t('financeFreeAvailable')}
             <Tag tone="blue">{t('financeEstimate')}</Tag>
           </div>
-          <div className="finance-hero-value num">{formatEur(ov.freeAvailable, 2)}</div>
-          <p className="finance-hero-desc">{t('financeFreeAvailableHint')}</p>
+          <div className="finance-hero-value num">
+            {formatEurOrDash(ov.freeAvailable, 2)}
+          </div>
+          <p className="finance-hero-desc">
+            {hasMoney ? t('financeFreeAvailableHint') : t('financeNoDataHint')}
+          </p>
           <div className="finance-money-bridge">
             <div className="finance-bridge-piece">
               <span className="finance-bridge-label">{t('financeBalance')}</span>
-              <div className="finance-bridge-value num">{formatEur(ov.balance)}</div>
+              <div className="finance-bridge-value num">{formatEurOrDash(ov.balance)}</div>
             </div>
             <div className="finance-bridge-piece">
               <span className="finance-bridge-label">{t('financeObligations')}</span>
-              <div className="finance-bridge-value num">{formatEur(ov.obligations)}</div>
+              <div className="finance-bridge-value num">
+                {formatEurOrDash(ov.obligations)}
+              </div>
             </div>
             <div className="finance-bridge-piece">
               <span className="finance-bridge-label">{t('financeReserves')}</span>
-              <div className="finance-bridge-value num">{formatEur(ov.reserves)}</div>
+              <div className="finance-bridge-value num">{formatEurOrDash(ov.reserves)}</div>
             </div>
           </div>
         </div>
@@ -102,17 +121,25 @@ export function FinanceOverview({ go }: NavProps) {
             <div>
               <span className="muted small">{t('financeLiquidityOutlook')}</span>
               <div className="finance-hero-secondary-value num">
-                +{formatEur(ov.liquidityOutlook)}
+                {ov.liquidityOutlook === null
+                  ? '—'
+                  : `${ov.liquidityOutlook > 0 ? '+' : ''}${formatEur(ov.liquidityOutlook)}`}
               </div>
               <span className="small muted">{t('financeLiquidityOutlookHint')}</span>
             </div>
-            <Tag tone="green">{t('financePositive')}</Tag>
+            {ov.liquidityOutlook !== null && ov.liquidityOutlook > 0 ? (
+              <Tag tone="green">{t('financePositive')}</Tag>
+            ) : (
+              <Tag>{t('financeNoSource')}</Tag>
+            )}
           </div>
           <div>
             <div className="finance-forecast-label">
               <span className="small muted">{t('financePlannedReserves')}</span>
               <span className="small num">
-                {formatEur(ov.reserveProgress.current)} / {formatEur(ov.reserveProgress.target)}
+                {ov.reserveProgress
+                  ? `${formatEur(ov.reserveProgress.current)} / ${formatEur(ov.reserveProgress.target)}`
+                  : '—'}
               </span>
             </div>
             <div className="finance-mini-progress">
@@ -121,11 +148,11 @@ export function FinanceOverview({ go }: NavProps) {
           </div>
           <div className="finance-secondary-item">
             <span>{t('financeNextPayment')}</span>
-            <strong>{ov.nextPayment.when}</strong>
+            <strong>{ov.nextPayment ?? '—'}</strong>
           </div>
           <div className="finance-secondary-item">
             <span>{t('financeOpenIncoming')}</span>
-            <strong className="num">{formatEur(ov.openIncoming)}</strong>
+            <strong className="num">{formatEurOrDash(ov.openIncoming)}</strong>
           </div>
           <button type="button" className="btn finance-btn-sm" onClick={() => go('liquidity')}>
             {t('financeViewForecast')}
@@ -140,10 +167,18 @@ export function FinanceOverview({ go }: NavProps) {
             {t('financeRecordedRevenue')}
             <ChartLineUp size={14} aria-hidden />
           </div>
-          <div className="finance-stat-value num">{formatEur(ov.revenue)}</div>
+          <div className="finance-stat-value num">{formatEurOrDash(ov.revenue)}</div>
           <div className="finance-stat-foot">
-            <strong className="good">+{ov.revenueDeltaPct.toFixed(1).replace('.', ',')} %</strong>{' '}
-            <span>{t('financeVsPeriod')}</span>
+            {ov.revenueDeltaPct !== null ? (
+              <>
+                <strong className="good">
+                  +{ov.revenueDeltaPct.toFixed(1).replace('.', ',')} %
+                </strong>{' '}
+                <span>{t('financeVsPeriod')}</span>
+              </>
+            ) : (
+              <span>{t('financeAwaitingData')}</span>
+            )}
           </div>
         </div>
         <div className="panel finance-stat">
@@ -151,9 +186,16 @@ export function FinanceOverview({ go }: NavProps) {
             {t('financeRecordedCosts')}
             <ArrowRight size={14} aria-hidden />
           </div>
-          <div className="finance-stat-value num">{formatEur(ov.costs)}</div>
+          <div className="finance-stat-value num">{formatEurOrDash(ov.costs)}</div>
           <div className="finance-stat-foot">
-            {t('financeTopCostShare')}: <span className="finance-stat-emph">{ov.topCostShare}</span>
+            {ov.topCostShare ? (
+              <>
+                {t('financeTopCostShare')}:{' '}
+                <span className="finance-stat-emph">{ov.topCostShare}</span>
+              </>
+            ) : (
+              <span>{t('financeAwaitingData')}</span>
+            )}
           </div>
         </div>
         <div className="panel finance-stat">
@@ -161,8 +203,14 @@ export function FinanceOverview({ go }: NavProps) {
             {t('financeProvisionalResult')}
             <Tag>{t('financeNoTaxCalc')}</Tag>
           </div>
-          <div className="finance-stat-value num good">+{formatEur(ov.result)}</div>
-          <div className="finance-stat-foot">{t('financeResultFoot')}</div>
+          <div className={`finance-stat-value num${ov.result !== null && ov.result > 0 ? ' good' : ''}`}>
+            {ov.result === null
+              ? '—'
+              : `${ov.result > 0 ? '+' : ''}${formatEur(ov.result)}`}
+          </div>
+          <div className="finance-stat-foot">
+            {hasStats ? t('financeResultFoot') : t('financeAwaitingData')}
+          </div>
         </div>
       </div>
 
@@ -177,68 +225,33 @@ export function FinanceOverview({ go }: NavProps) {
               {t('financeViewDetails')}
             </button>
           </div>
-          <div className="finance-legend">
-            <span>
-              <i /> {t('financePastTrend')}
-            </span>
-            <span>
-              <i className="dashed" /> {t('financeExpectedTrend')}
-            </span>
-          </div>
-          <svg
-            className="finance-chart-area"
-            viewBox="0 0 710 226"
-            preserveAspectRatio="none"
-            aria-label={t('financeMoneyTrend')}
-          >
-            <defs>
-              <linearGradient id="financeAreaBlue" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#3d8bfd" stopOpacity=".17" />
-                <stop offset="100%" stopColor="#3d8bfd" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <path
-              d="M0 47H710M0 94H710M0 141H710M0 188H710"
-              stroke="#243041"
-              strokeWidth="1"
-              strokeDasharray="4 6"
-            />
-            <path
-              d="M0 140L45 125L85 136L135 108L185 118L227 103L268 118L310 91L350 99L350 225H0Z"
-              fill="url(#financeAreaBlue)"
-            />
-            <path
-              d="M0 140L45 125L85 136L135 108L185 118L227 103L268 118L310 91L350 99"
-              fill="none"
-              stroke="#3d8bfd"
-              strokeWidth="3"
-              strokeLinejoin="round"
-            />
-            <path
-              d="M350 99L395 106L437 77L477 88L522 57L566 77L613 42L659 62L710 39"
-              fill="none"
-              stroke="#f59e0b"
-              strokeWidth="2.5"
-              strokeDasharray="7 5"
-              strokeLinejoin="round"
-            />
-            <line
-              x1="350"
-              y1="18"
-              x2="350"
-              y2="216"
-              stroke="#5d7794"
-              strokeDasharray="3 5"
-            />
-            <circle cx="350" cy="99" r="5" fill="#3d8bfd" stroke="#10161e" strokeWidth="3" />
-          </svg>
-          <div className="finance-chart-labels">
-            <span>01. Okt</span>
-            <span>15. Okt</span>
-            <span>01. Nov</span>
-            <span>15. Nov</span>
-            <span>30. Nov</span>
-          </div>
+          {hasMoney ? (
+            <>
+              <div className="finance-legend">
+                <span>
+                  <i /> {t('financePastTrend')}
+                </span>
+                <span>
+                  <i className="dashed" /> {t('financeExpectedTrend')}
+                </span>
+              </div>
+              <svg
+                className="finance-chart-area"
+                viewBox="0 0 710 226"
+                preserveAspectRatio="none"
+                aria-label={t('financeMoneyTrend')}
+              >
+                <path
+                  d="M0 47H710M0 94H710M0 141H710M0 188H710"
+                  stroke="#243041"
+                  strokeWidth="1"
+                  strokeDasharray="4 6"
+                />
+              </svg>
+            </>
+          ) : (
+            <EmptyBlock title={t('financeChartEmpty')} hint={t('financeConnectHint')} />
+          )}
         </div>
 
         <div className="panel panel-pad">
@@ -247,42 +260,52 @@ export function FinanceOverview({ go }: NavProps) {
               <h2>{t('financeNowImportant')}</h2>
               <p>{t('financeNowImportantHint')}</p>
             </div>
-            <Tag tone="amber">3 {t('financeHints')}</Tag>
+            {ov.alerts.length > 0 ? (
+              <Tag tone="amber">
+                {ov.alerts.length} {t('financeHints')}
+              </Tag>
+            ) : (
+              <Tag>{t('financeNoAlerts')}</Tag>
+            )}
           </div>
-          <div className="finance-alerts">
-            {financeAlerts.map((a) => (
-              <div key={a.id} className="finance-alert-row">
-                <div className={`finance-alert-icon finance-alert-icon--${a.tone}`}>
-                  {a.tone === 'red' ? (
-                    <Clock size={16} aria-hidden />
-                  ) : a.tone === 'blue' ? (
-                    <CalendarBlank size={16} aria-hidden />
-                  ) : (
-                    <Warning size={16} aria-hidden />
-                  )}
+          {ov.alerts.length === 0 ? (
+            <EmptyBlock title={t('financeNoAlertsTitle')} hint={t('financeNoAlertsHint')} />
+          ) : (
+            <div className="finance-alerts">
+              {ov.alerts.map((a) => (
+                <div key={a.id} className="finance-alert-row">
+                  <div className={`finance-alert-icon finance-alert-icon--${a.tone}`}>
+                    {a.tone === 'red' ? (
+                      <Clock size={16} aria-hidden />
+                    ) : a.tone === 'blue' ? (
+                      <CalendarBlank size={16} aria-hidden />
+                    ) : (
+                      <Warning size={16} aria-hidden />
+                    )}
+                  </div>
+                  <div className="finance-alert-info">
+                    <strong>{a.title}</strong>
+                    <span>{a.detail}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="finance-alert-open"
+                    title={t('financeOpen')}
+                    onClick={() =>
+                      go(a.go, a.id === 'overdue' ? { txFilter: 'open' } : undefined)
+                    }
+                  >
+                    <CaretRight size={16} aria-hidden />
+                  </button>
                 </div>
-                <div className="finance-alert-info">
-                  <strong>{a.title}</strong>
-                  <span>{a.detail}</span>
-                </div>
-                <button
-                  type="button"
-                  className="finance-alert-open"
-                  title={t('financeOpen')}
-                  onClick={() =>
-                    go(a.go, a.id === 'overdue' ? { txFilter: 'open' } : undefined)
-                  }
-                >
-                  <CaretRight size={16} aria-hidden />
-                </button>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
           <div className="finance-trust">
-            <span>{t('financeDemoNoLive')}</span>
-            <span>
-              {t('financeLastDemoUpdate')}: {FINANCE_DEMO_AS_OF.slice(0, 5)}
-            </span>
+            <span>{t('financeNoLiveUntilConnected')}</span>
+            <button type="button" className="finance-section-link" onClick={() => go('settings')}>
+              {t('financeDataOrigin')}
+            </button>
           </div>
         </div>
       </div>
@@ -298,14 +321,15 @@ type TxProps = NavProps & {
   onToast: (msg: string) => void
 }
 
-export function FinanceTransactions({ filter, setFilter, onToast }: TxProps) {
+export function FinanceTransactions({ filter, setFilter, onToast, data }: TxProps) {
   const { t } = useI18n()
+  const snap = useFinance(data)
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<FinanceTx | null>(null)
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return financeTransactions.filter((x) => {
+    return snap.transactions.filter((x) => {
       if (filter === 'income' && x.kind !== 'income') return false
       if (filter === 'expense' && x.kind !== 'expense') return false
       if (filter === 'open' && !['Überfällig', 'Geplant'].includes(x.status)) return false
@@ -313,9 +337,13 @@ export function FinanceTransactions({ filter, setFilter, onToast }: TxProps) {
       if (!q) return true
       return [x.name, x.category, x.project, x.desc, x.source].join(' ').toLowerCase().includes(q)
     })
-  }, [filter, search])
+  }, [filter, search, snap.transactions])
 
   function exportCsv() {
+    if (snap.transactions.length === 0) {
+      onToast(t('financeCsvNothing'))
+      return
+    }
     const head = [
       'Datum',
       'Name',
@@ -326,7 +354,7 @@ export function FinanceTransactions({ filter, setFilter, onToast }: TxProps) {
       'Quelle',
       'Betrag EUR',
     ]
-    const rows = financeTransactions.map((x) => [
+    const rows = snap.transactions.map((x) => [
       x.date,
       x.name,
       x.desc,
@@ -344,7 +372,7 @@ export function FinanceTransactions({ filter, setFilter, onToast }: TxProps) {
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
     const a = document.createElement('a')
     a.href = url
-    a.download = 'business-ultra-finance-beispieldaten.csv'
+    a.download = 'business-ultra-finance.csv'
     document.body.appendChild(a)
     a.click()
     a.remove()
@@ -359,6 +387,15 @@ export function FinanceTransactions({ filter, setFilter, onToast }: TxProps) {
     { id: 'open', label: t('financeFilterOpen') },
     { id: 'recurring', label: t('financeFilterRecurring') },
   ]
+
+  const openIncome = snap.transactions
+    .filter((x) => x.kind === 'income' && x.status !== 'Bezahlt')
+    .reduce((s, x) => s + x.amount, 0)
+  const plannedOut = Math.abs(
+    snap.transactions
+      .filter((x) => x.kind === 'expense' && x.status === 'Geplant')
+      .reduce((s, x) => s + x.amount, 0),
+  )
 
   return (
     <div className="finance-screen stack">
@@ -415,8 +452,14 @@ export function FinanceTransactions({ filter, setFilter, onToast }: TxProps) {
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="finance-empty">
-                    <strong>{t('financeTxEmpty')}</strong>
-                    {t('financeTxEmptyHint')}
+                    <strong>
+                      {snap.transactions.length === 0
+                        ? t('financeTxNone')
+                        : t('financeTxEmpty')}
+                    </strong>
+                    {snap.transactions.length === 0
+                      ? t('financeConnectHint')
+                      : t('financeTxEmptyHint')}
                   </td>
                 </tr>
               ) : (
@@ -449,10 +492,9 @@ export function FinanceTransactions({ filter, setFilter, onToast }: TxProps) {
         </div>
         <div className="finance-tablefooter">
           <span>
-            {filtered.length} {t('financeOf')} {financeTransactions.length}{' '}
-            {t('financeSampleEntries')}
+            {filtered.length} {t('financeOf')} {snap.transactions.length} {t('financeEntries')}
           </span>
-          <span>{t('financeAmountsNote')}</span>
+          <span>{t('financeAmountsNoteLive')}</span>
         </div>
       </div>
 
@@ -468,13 +510,13 @@ export function FinanceTransactions({ filter, setFilter, onToast }: TxProps) {
             <div>
               <div className="caps">{t('financeOpenIncome')}</div>
               <div className="finance-boldnumber num" style={{ marginTop: 6 }}>
-                {formatEur(2150)}
+                {snap.transactions.length === 0 ? '—' : formatEur(openIncome)}
               </div>
             </div>
             <div>
               <div className="caps">{t('financePlannedExpenses')}</div>
               <div className="finance-boldnumber num" style={{ marginTop: 6 }}>
-                {formatEur(4300)}
+                {snap.transactions.length === 0 ? '—' : formatEur(plannedOut)}
               </div>
             </div>
           </div>
@@ -486,17 +528,21 @@ export function FinanceTransactions({ filter, setFilter, onToast }: TxProps) {
               <p>{t('financeRecurringHint')}</p>
             </div>
           </div>
-          <div className="finance-list">
-            {financeRecurring.map((r) => (
-              <div key={r.name} className="finance-listrow">
-                <div>
-                  <strong>{r.name}</strong>
-                  <div className="finance-detail">{r.detail}</div>
+          {snap.recurring.length === 0 ? (
+            <EmptyBlock title={t('financeRecurringEmpty')} hint={t('financeConnectHint')} />
+          ) : (
+            <div className="finance-list">
+              {snap.recurring.map((r) => (
+                <div key={r.name} className="finance-listrow">
+                  <div>
+                    <strong>{r.name}</strong>
+                    <div className="finance-detail">{r.detail}</div>
+                  </div>
+                  <strong className="num">{formatEur(r.amount)}</strong>
                 </div>
-                <strong className="num">{formatEur(r.amount)}</strong>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -508,10 +554,7 @@ export function FinanceTransactions({ filter, setFilter, onToast }: TxProps) {
           aria-labelledby="finance-tx-modal-title"
           onClick={() => setSelected(null)}
         >
-          <div
-            className="bu-modal panel crm-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="bu-modal panel crm-modal" onClick={(e) => e.stopPropagation()}>
             <header className="bu-modal-head">
               <div>
                 <h2 id="finance-tx-modal-title">{selected.name}</h2>
@@ -559,34 +602,36 @@ export function FinanceTransactions({ filter, setFilter, onToast }: TxProps) {
 
 /* ─── Analysis ─────────────────────────────────────────────── */
 
-export function FinanceAnalysis() {
+export function FinanceAnalysis({ data }: { data?: FinanceSnapshot }) {
   const { t } = useI18n()
+  const snap = useFinance(data)
   const [mode, setMode] = useState<'cost' | 'revenue' | 'result'>('cost')
 
   const sets = {
     cost: {
       title: t('financeCostTrend'),
       label: t('financeCosts'),
-      values: financeAnalysis.cost,
+      values: snap.analysis.cost,
       color: '#3d8bfd',
     },
     revenue: {
       title: t('financeRevenueTrend'),
       label: t('financeRevenue'),
-      values: financeAnalysis.revenue,
+      values: snap.analysis.revenue,
       color: '#39bc89',
     },
     result: {
       title: t('financeResultTrend'),
       label: t('financeResult'),
-      values: financeAnalysis.result,
+      values: snap.analysis.result,
       color: '#d5a05d',
     },
   }
   const d = sets[mode]
-  const max = Math.max(...d.values) * 1.15
+  const max = d.values.length ? Math.max(...d.values) * 1.15 : 1
   const spacing = 112
   const bar = 48
+  const months = ['Juni', 'Juli', 'August', 'September', 'Oktober', 'November']
 
   return (
     <div className="finance-screen stack">
@@ -618,56 +663,59 @@ export function FinanceAnalysis() {
             </div>
             <Tag tone="blue">{d.label}</Tag>
           </div>
-          <svg
-            className="finance-chart-bars"
-            viewBox="0 0 720 240"
-            preserveAspectRatio="none"
-            aria-label={d.title}
-          >
-            {[0, 1, 2, 3, 4].map((i) => (
-              <path
-                key={i}
-                d={`M0 ${22 + i * 42}H720`}
-                stroke="#243041"
-                strokeDasharray="4 7"
-              />
-            ))}
-            {d.values.map((v, i) => {
-              const height = (v / max) * 182
-              const x = 36 + i * spacing
-              const y = 217 - height
-              return (
-                <g key={i}>
-                  <rect
-                    x={x}
-                    y={y}
-                    width={bar}
-                    height={height}
-                    rx="3"
-                    fill={d.color}
-                    opacity={i === 5 ? 1 : 0.52}
+          {d.values.length === 0 ? (
+            <EmptyBlock title={t('financeChartEmpty')} hint={t('financeConnectHint')} />
+          ) : (
+            <>
+              <svg
+                className="finance-chart-bars"
+                viewBox="0 0 720 240"
+                preserveAspectRatio="none"
+                aria-label={d.title}
+              >
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <path
+                    key={i}
+                    d={`M0 ${22 + i * 42}H720`}
+                    stroke="#243041"
+                    strokeDasharray="4 7"
                   />
-                  <text
-                    x={x + bar / 2}
-                    y={y - 9}
-                    fill="#b8c9dc"
-                    textAnchor="middle"
-                    fontSize="10"
-                  >
-                    {(Math.round(v / 100) / 10).toFixed(1)}k
-                  </text>
-                </g>
-              )
-            })}
-          </svg>
-          <div className="finance-chart-labels">
-            <span>Juni</span>
-            <span>Juli</span>
-            <span>August</span>
-            <span>September</span>
-            <span>Oktober</span>
-            <span>November</span>
-          </div>
+                ))}
+                {d.values.map((v, i) => {
+                  const height = (v / max) * 182
+                  const x = 36 + i * spacing
+                  const y = 217 - height
+                  return (
+                    <g key={i}>
+                      <rect
+                        x={x}
+                        y={y}
+                        width={bar}
+                        height={height}
+                        rx="3"
+                        fill={d.color}
+                        opacity={i === d.values.length - 1 ? 1 : 0.52}
+                      />
+                      <text
+                        x={x + bar / 2}
+                        y={y - 9}
+                        fill="#b8c9dc"
+                        textAnchor="middle"
+                        fontSize="10"
+                      >
+                        {(Math.round(v / 100) / 10).toFixed(1)}k
+                      </text>
+                    </g>
+                  )
+                })}
+              </svg>
+              <div className="finance-chart-labels">
+                {months.slice(0, d.values.length).map((m) => (
+                  <span key={m}>{m}</span>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         <div className="panel panel-pad">
@@ -677,52 +725,64 @@ export function FinanceAnalysis() {
               <p>{t('financeSpendByCategoryHint')}</p>
             </div>
           </div>
-          <div className="finance-list">
-            {financeAnalysis.categories.map((c) => (
-              <div key={c.name} className="finance-listrow">
-                <div style={{ flex: 1 }}>
-                  <div className="finance-pips">
-                    <span className="finance-pip" style={{ background: c.color }} />
-                    <strong>{c.name}</strong>
+          {snap.analysis.categories.length === 0 ? (
+            <EmptyBlock title={t('financeCategoriesEmpty')} hint={t('financeConnectHint')} />
+          ) : (
+            <div className="finance-list">
+              {snap.analysis.categories.map((c) => (
+                <div key={c.name} className="finance-listrow">
+                  <div style={{ flex: 1 }}>
+                    <div className="finance-pips">
+                      <span className="finance-pip" style={{ background: c.color }} />
+                      <strong>{c.name}</strong>
+                    </div>
+                    <div className="finance-hbar">
+                      <span style={{ width: `${c.pct}%`, background: c.color }} />
+                    </div>
                   </div>
-                  <div className="finance-hbar">
-                    <span style={{ width: `${c.pct}%`, background: c.color }} />
-                  </div>
+                  <strong className="num">{formatEur(c.amount)}</strong>
                 </div>
-                <strong className="num">{formatEur(c.amount)}</strong>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       <div className="finance-margin-strip">
         <div className="panel finance-margin-block">
           <div className="caps">{t('financeProvisionalResult')}</div>
-          <div className="finance-large num good">+{formatEur(ov.result)}</div>
+          <div className={`finance-large num${snap.result !== null && snap.result > 0 ? ' good' : ''}`}>
+            {snap.result === null
+              ? '—'
+              : `${snap.result > 0 ? '+' : ''}${formatEur(snap.result)}`}
+          </div>
           <div className="small muted">{t('financeResultFoot')}</div>
         </div>
         <div className="panel finance-margin-block">
           <div className="caps">{t('financeProvisionalMargin')}</div>
           <div className="finance-large num">
-            {financeAnalysis.marginPct.toFixed(1).replace('.', ',')} %
+            {snap.analysis.marginPct === null
+              ? '—'
+              : `${snap.analysis.marginPct.toFixed(1).replace('.', ',')} %`}
           </div>
           <div className="small muted">{t('financeMarginHint')}</div>
         </div>
         <div className="panel finance-margin-block">
           <div className="caps">{t('financeTopCostDriver')}</div>
           <div className="finance-large num">
-            {financeAnalysis.topDriverPct.toFixed(1).replace('.', ',')} %
+            {snap.analysis.topDriverPct === null
+              ? '—'
+              : `${snap.analysis.topDriverPct.toFixed(1).replace('.', ',')} %`}
           </div>
-          <div className="small muted">Externe Leistungen</div>
+          <div className="small muted">{snap.analysis.topDriverName ?? t('financeAwaitingData')}</div>
         </div>
       </div>
 
       <div className="finance-insight">
         <Sparkle size={17} aria-hidden />
         <div>
-          <strong>{t('financeInsightTitle')}</strong>
-          <p>{t('financeInsightBody')}</p>
+          <strong>{t('financeInsightEmptyTitle')}</strong>
+          <p>{t('financeInsightEmptyBody')}</p>
         </div>
       </div>
     </div>
@@ -731,10 +791,11 @@ export function FinanceAnalysis() {
 
 /* ─── Liquidity ────────────────────────────────────────────── */
 
-export function FinanceLiquidity({ go }: NavProps) {
+export function FinanceLiquidity({ go, data }: NavProps) {
   const { t } = useI18n()
+  const snap = useFinance(data)
   const [horizon, setHorizon] = useState<30 | 60 | 90>(30)
-  const mins: Record<30 | 60 | 90, number> = { 30: 18900, 60: 16900, 90: 12400 }
+  const hasBalance = snap.balance !== null
 
   return (
     <div className="finance-screen stack">
@@ -760,17 +821,23 @@ export function FinanceLiquidity({ go }: NavProps) {
       <div className="finance-stats" style={{ marginTop: 0 }}>
         <div className="panel finance-stat">
           <div className="finance-stat-label">{t('financeBalance')}</div>
-          <div className="finance-stat-value num">{formatEur(ov.balance)}</div>
-          <div className="finance-stat-foot">{t('financeExampleStart')}</div>
+          <div className="finance-stat-value num">{formatEurOrDash(snap.balance)}</div>
+          <div className="finance-stat-foot">
+            {hasBalance ? t('financeExampleStart') : t('financeAwaitingData')}
+          </div>
         </div>
         <div className="panel finance-stat">
           <div className="finance-stat-label">{t('financeFreeAvailableShort')}</div>
-          <div className="finance-stat-value num accent">{formatEur(ov.freeAvailable)}</div>
+          <div className="finance-stat-value num accent">
+            {formatEurOrDash(snap.freeAvailable)}
+          </div>
           <div className="finance-stat-foot">{t('financeAfterObligations')}</div>
         </div>
         <div className="panel finance-stat">
           <div className="finance-stat-label">{t('financeLowestProjected')}</div>
-          <div className="finance-stat-value num">{formatEur(mins[horizon])}</div>
+          <div className="finance-stat-value num">
+            {formatEurOrDash(snap.liquidityMinByHorizon[horizon])}
+          </div>
           <div className="finance-stat-foot">
             {t('financeInNext')} {horizon} {t('financeDays')}
           </div>
@@ -792,51 +859,33 @@ export function FinanceLiquidity({ go }: NavProps) {
             </span>
           </div>
         </div>
-        <svg
-          className="finance-chart-area finance-chart-area--tall"
-          viewBox="0 0 1000 285"
-          preserveAspectRatio="none"
-          aria-label={t('financeBalanceForecast')}
-        >
-          <path
-            d="M0 50H1000M0 105H1000M0 160H1000M0 215H1000M0 270H1000"
-            stroke="#243041"
-            strokeDasharray="4 7"
-          />
-          <path
-            d="M20 118L130 101L210 142L300 122L410 161L490 147L610 109"
-            stroke="#3d8bfd"
-            strokeWidth="3.5"
-            fill="none"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M610 109L680 111L750 79L825 90L915 57L980 61"
-            stroke="#f59e0b"
-            strokeDasharray="8 6"
-            strokeWidth="3"
-            fill="none"
-          />
-          <line x1="610" y1="25" x2="610" y2="270" stroke="#53697f" strokeDasharray="4 5" />
-          <circle cx="610" cy="109" r="5" fill="#3d8bfd" stroke="#10161e" strokeWidth="2" />
-          <path
-            d="M610 109L680 140L750 100L825 155L915 90L980 145"
-            stroke="#f59e0b"
-            strokeWidth="1"
-            strokeDasharray="3 7"
-            opacity=".35"
-            fill="none"
-          />
-        </svg>
-        <div className="finance-chart-labels">
-          <span>{t('financeToday')}</span>
-          <span>+7 {t('financeDays')}</span>
-          <span>+14 {t('financeDays')}</span>
-          <span>+21 {t('financeDays')}</span>
-          <span>
-            +{horizon} {t('financeDays')}
-          </span>
-        </div>
+        {hasBalance ? (
+          <>
+            <svg
+              className="finance-chart-area finance-chart-area--tall"
+              viewBox="0 0 1000 285"
+              preserveAspectRatio="none"
+              aria-label={t('financeBalanceForecast')}
+            >
+              <path
+                d="M0 50H1000M0 105H1000M0 160H1000M0 215H1000M0 270H1000"
+                stroke="#243041"
+                strokeDasharray="4 7"
+              />
+            </svg>
+            <div className="finance-chart-labels">
+              <span>{t('financeToday')}</span>
+              <span>+7 {t('financeDays')}</span>
+              <span>+14 {t('financeDays')}</span>
+              <span>+21 {t('financeDays')}</span>
+              <span>
+                +{horizon} {t('financeDays')}
+              </span>
+            </div>
+          </>
+        ) : (
+          <EmptyBlock title={t('financeForecastEmpty')} hint={t('financeConnectHint')} />
+        )}
       </div>
 
       <div className="finance-lower-grid">
@@ -854,21 +903,25 @@ export function FinanceLiquidity({ go }: NavProps) {
               {t('financeViewAll')}
             </button>
           </div>
-          <div className="finance-flowrows">
-            {financeLiquidityFlows.map((f) => (
-              <div key={f.title} className="finance-flowrow">
-                <div className="finance-flowdate">{f.date}</div>
-                <div className="finance-flowinfo">
-                  <b>{f.title}</b>
-                  <span>{f.detail}</span>
+          {snap.liquidityFlows.length === 0 ? (
+            <EmptyBlock title={t('financeFlowsEmpty')} hint={t('financeConnectHint')} />
+          ) : (
+            <div className="finance-flowrows">
+              {snap.liquidityFlows.map((f) => (
+                <div key={f.title} className="finance-flowrow">
+                  <div className="finance-flowdate">{f.date}</div>
+                  <div className="finance-flowinfo">
+                    <b>{f.title}</b>
+                    <span>{f.detail}</span>
+                  </div>
+                  <div className={`finance-flowprice ${f.amount < 0 ? 'bad' : 'good'}`}>
+                    {f.amount > 0 ? '+' : ''}
+                    {formatEur(f.amount)}
+                  </div>
                 </div>
-                <div className={`finance-flowprice ${f.amount < 0 ? 'bad' : 'good'}`}>
-                  {f.amount > 0 ? '+' : ''}
-                  {formatEur(f.amount)}
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
         <div className="panel panel-pad">
           <div className="finance-section-head">
@@ -882,19 +935,34 @@ export function FinanceLiquidity({ go }: NavProps) {
           </div>
           <div className="finance-forecast-label">
             <span className="small">{t('financeTaxReserveManual')}</span>
-            <span className="num">{formatEur(3200)}</span>
+            <span className="num">{formatEurOrDash(snap.taxReserve)}</span>
           </div>
           <div className="finance-progress">
-            <span style={{ width: '64%' }} />
+            <span
+              style={{
+                width:
+                  snap.taxReserve !== null && snap.reserveProgress
+                    ? `${Math.min(100, (snap.taxReserve / Math.max(snap.reserveProgress.target, 1)) * 100)}%`
+                    : '0%',
+              }}
+            />
           </div>
           <div className="finance-forecast-label" style={{ marginTop: 17 }}>
             <span className="small">{t('financeOpsBuffer')}</span>
             <span className="num">
-              {formatEur(9000)} / {formatEur(12000)}
+              {snap.opsBuffer
+                ? `${formatEur(snap.opsBuffer.current)} / ${formatEur(snap.opsBuffer.target)}`
+                : '—'}
             </span>
           </div>
           <div className="finance-progress finance-progress--green">
-            <span style={{ width: '75%' }} />
+            <span
+              style={{
+                width: snap.opsBuffer
+                  ? `${Math.min(100, (snap.opsBuffer.current / Math.max(snap.opsBuffer.target, 1)) * 100)}%`
+                  : '0%',
+              }}
+            />
           </div>
           <p className="finance-footnote">{t('financeBufferFootnote')}</p>
         </div>
@@ -905,10 +973,11 @@ export function FinanceLiquidity({ go }: NavProps) {
 
 /* ─── Profitability ────────────────────────────────────────── */
 
-export function FinanceProfitability({ go }: NavProps) {
+export function FinanceProfitability({ go, data }: NavProps) {
   const { t } = useI18n()
+  const snap = useFinance(data)
   const [mode, setMode] = useState<'customers' | 'products' | 'projects'>('customers')
-  const rows = financeProfitability[mode]
+  const rows = snap.profitability[mode]
   const titles = {
     customers: t('financeProfitByCustomers'),
     products: t('financeProfitByProducts'),
@@ -919,7 +988,9 @@ export function FinanceProfitability({ go }: NavProps) {
     products: t('financeProduct'),
     projects: t('financeProject'),
   }
-  const bePct = (16200 / 21480) * 100
+  const be = snap.profitability.breakEven
+  const rev = snap.revenue
+  const bePct = be !== null && rev !== null && rev > 0 ? (be / rev) * 100 : 0
 
   return (
     <div className="finance-screen stack">
@@ -949,20 +1020,22 @@ export function FinanceProfitability({ go }: NavProps) {
       <div className="finance-stats" style={{ marginTop: 0 }}>
         <div className="panel finance-stat">
           <div className="finance-stat-label">{t('financeRecordedRevenue')}</div>
-          <div className="finance-stat-value num">{formatEur(ov.revenue)}</div>
+          <div className="finance-stat-value num">{formatEurOrDash(snap.revenue)}</div>
           <div className="finance-stat-foot">{t('financeInSelectedPeriod')}</div>
         </div>
         <div className="panel finance-stat">
           <div className="finance-stat-label">{t('financeDirectCosts')}</div>
           <div className="finance-stat-value num">
-            {formatEur(financeProfitability.directCosts)}
+            {formatEurOrDash(snap.profitability.directCosts)}
           </div>
           <div className="finance-stat-foot">{t('financeCostsIncomplete')}</div>
         </div>
         <div className="panel finance-stat">
           <div className="finance-stat-label">{t('financeContribution')}</div>
-          <div className="finance-stat-value num good">
-            {formatEur(financeProfitability.contribution)}
+          <div
+            className={`finance-stat-value num${snap.profitability.contribution !== null ? ' good' : ''}`}
+          >
+            {formatEurOrDash(snap.profitability.contribution)}
           </div>
           <div className="finance-stat-foot">{t('financeBeforeFixed')}</div>
         </div>
@@ -976,42 +1049,48 @@ export function FinanceProfitability({ go }: NavProps) {
           </div>
           <Tag tone="amber">{t('financeAssignmentIncomplete')}</Tag>
         </div>
-        <div className="finance-tablewrap">
-          <table className="finance-data-table">
-            <thead>
-              <tr>
-                <th>{cols[mode]}</th>
-                <th>{t('financeRevenue')}</th>
-                <th>{t('financeDirectCosts')}</th>
-                <th>{t('financeContribution')}</th>
-                <th>{t('financeMargin')}</th>
-                <th>{t('financeColStatus')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(([name, revenue, cost]) => {
-                const db = revenue - cost
-                const margin = (100 * db) / revenue
-                return (
-                  <tr key={name}>
-                    <td>
-                      <strong>{name}</strong>
-                    </td>
-                    <td className="num">{formatEur(revenue)}</td>
-                    <td className="num">{formatEur(cost)}</td>
-                    <td className="num good">{formatEur(db)}</td>
-                    <td className="num">{margin.toFixed(1).replace('.', ',')} %</td>
-                    <td>
-                      <Tag tone={margin >= 45 ? 'green' : 'amber'}>
-                        {margin >= 45 ? t('financePositive') : t('financeReview')}
-                      </Tag>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+        {rows.length === 0 ? (
+          <div style={{ padding: '0 18px 20px' }}>
+            <EmptyBlock title={t('financeProfitEmpty')} hint={t('financeConnectHint')} />
+          </div>
+        ) : (
+          <div className="finance-tablewrap">
+            <table className="finance-data-table">
+              <thead>
+                <tr>
+                  <th>{cols[mode]}</th>
+                  <th>{t('financeRevenue')}</th>
+                  <th>{t('financeDirectCosts')}</th>
+                  <th>{t('financeContribution')}</th>
+                  <th>{t('financeMargin')}</th>
+                  <th>{t('financeColStatus')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(([name, revenue, cost]) => {
+                  const db = revenue - cost
+                  const margin = revenue > 0 ? (100 * db) / revenue : 0
+                  return (
+                    <tr key={name}>
+                      <td>
+                        <strong>{name}</strong>
+                      </td>
+                      <td className="num">{formatEur(revenue)}</td>
+                      <td className="num">{formatEur(cost)}</td>
+                      <td className="num good">{formatEur(db)}</td>
+                      <td className="num">{margin.toFixed(1).replace('.', ',')} %</td>
+                      <td>
+                        <Tag tone={margin >= 45 ? 'green' : 'amber'}>
+                          {margin >= 45 ? t('financePositive') : t('financeReview')}
+                        </Tag>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="panel panel-pad">
@@ -1028,21 +1107,25 @@ export function FinanceProfitability({ go }: NavProps) {
           <div>
             <div className="caps">{t('financeNeededMonthlyRevenue')}</div>
             <div className="finance-boldnumber num" style={{ margin: '9px 0 0' }}>
-              {formatEur(financeProfitability.breakEven)}
+              {formatEurOrDash(be)}
             </div>
             <div className="finance-section-note">{t('financeBreakEvenNote')}</div>
-            <div className="finance-be-track">
-              <span className="fixed" style={{ width: `${bePct}%` }} />
-              <span className="surplus" style={{ width: `${100 - bePct}%` }} />
-            </div>
-            <div className="finance-be-labels">
-              <span>
-                Break-even: {formatEur(financeProfitability.breakEven)}
-              </span>
-              <span>
-                {t('financeRevenue')}: {formatEur(ov.revenue)}
-              </span>
-            </div>
+            {be !== null && rev !== null ? (
+              <>
+                <div className="finance-be-track">
+                  <span className="fixed" style={{ width: `${Math.min(100, bePct)}%` }} />
+                  <span className="surplus" style={{ width: `${Math.max(0, 100 - bePct)}%` }} />
+                </div>
+                <div className="finance-be-labels">
+                  <span>
+                    Break-even: {formatEur(be)}
+                  </span>
+                  <span>
+                    {t('financeRevenue')}: {formatEur(rev)}
+                  </span>
+                </div>
+              </>
+            ) : null}
           </div>
           <div className="finance-infobox">
             <Info size={17} aria-hidden />
@@ -1075,8 +1158,15 @@ type SavedScenario = {
   amount: number
 }
 
-export function FinancePlanning({ onToast }: { onToast: (msg: string) => void }) {
+export function FinancePlanning({
+  onToast,
+  data,
+}: {
+  onToast: (msg: string) => void
+  data?: FinanceSnapshot
+}) {
   const { t } = useI18n()
+  const snap = useFinance(data)
   const [type, setType] = useState<ScenarioType>('hire')
   const [cost, setCost] = useState(2800)
   const [start, setStart] = useState(0)
@@ -1088,9 +1178,12 @@ export function FinancePlanning({ onToast }: { onToast: (msg: string) => void })
   const amount =
     (meta.monthly ? activeMonths * cost : months > start ? cost : 0) *
     (type === 'revenue' ? 1 : -1)
-  const base = 25920 + 8400 + Math.max(0, months - 1) * 1400
+  const base =
+    snap.planningBaseBalance +
+    (snap.liquidityOutlook ?? 0) +
+    Math.max(0, months - 1) * snap.planningMonthlyDrift
   const final = base + amount
-  const percent = Math.max(0, Math.min(100, (100 * final) / base))
+  const percent = base === 0 ? (final === 0 ? 0 : 100) : Math.max(0, Math.min(100, (100 * final) / Math.abs(base || 1)))
 
   const typeLabels: Record<ScenarioType, string> = {
     hire: t('financeScenarioHire'),
@@ -1105,7 +1198,7 @@ export function FinancePlanning({ onToast }: { onToast: (msg: string) => void })
       <div className="finance-toolbar">
         <div>
           <h2 className="finance-small-title">{t('financePlanTitle')}</h2>
-          <p className="finance-pagehint">{t('financePlanHint')}</p>
+          <p className="finance-pagehint">{t('financePlanHintEmpty')}</p>
         </div>
         <Tag tone="blue">{t('financeNotInActuals')}</Tag>
       </div>
@@ -1274,7 +1367,7 @@ export function FinancePlanning({ onToast }: { onToast: (msg: string) => void })
                 <div>
                   <strong>{typeLabels[s.type]}</strong>
                   <div className="finance-detail">
-                    {s.months} {t('financeMonths')} · {t('financeSampleCalc')}
+                    {s.months} {t('financeMonths')}
                   </div>
                 </div>
                 <strong className={`num ${s.amount < 0 ? 'bad' : 'good'}`}>
@@ -1301,7 +1394,7 @@ export function FinanceAccounts() {
           <h2 className="finance-small-title">{t('financeAccountsTitle')}</h2>
           <p className="finance-pagehint">{t('financeAccountsHint')}</p>
         </div>
-        <Tag>{t('financeConceptNoBank')}</Tag>
+        <Tag>{t('financeNoBankYet')}</Tag>
       </div>
 
       <div className="finance-two-column">
@@ -1338,7 +1431,7 @@ export function FinanceAccounts() {
               <strong>{t('financeCurrencies')}</strong>
               <p>{t('financeCurrenciesHint')}</p>
             </div>
-            <span className="finance-status-mini">EUR · {t('financeExample')}</span>
+            <span className="finance-status-mini">EUR</span>
           </div>
         </div>
 
@@ -1352,14 +1445,14 @@ export function FinanceAccounts() {
           <div className="finance-switch-row">
             <div>
               <strong>{t('financeTaxReserve')}</strong>
-              <p>{t('financeTaxReserveHint')}</p>
+              <p>{t('financeTaxReserveHintEmpty')}</p>
             </div>
             <Tag tone="amber">{t('financeManual')}</Tag>
           </div>
           <div className="finance-switch-row">
             <div>
               <strong>{t('financeOpsBuffer')}</strong>
-              <p>{t('financeOpsBufferRuleHint')}</p>
+              <p>{t('financeOpsBufferRuleHintEmpty')}</p>
             </div>
             <span className="finance-status-mini">{t('financeTarget')}</span>
           </div>

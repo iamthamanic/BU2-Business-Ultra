@@ -1,5 +1,5 @@
 /**
- * FinancePage — Dark-Ops finance hub matching offline UX prototype (demo fixtures).
+ * FinancePage — Dark-Ops finance hub (empty until connectors supply data).
  * Location: apps/web/src/features/finance/FinancePage.tsx
  */
 import { useEffect, useState } from 'react'
@@ -14,7 +14,6 @@ import {
 } from '@phosphor-icons/react'
 import { MktTab, MktTabs } from '../../components/MktTabs'
 import { useI18n } from '../../lib/i18n'
-import { FINANCE_DEMO_AS_OF } from './financeDemo'
 import {
   FinanceAccounts,
   FinanceAnalysis,
@@ -52,7 +51,7 @@ export function FinancePage() {
   const { t } = useI18n()
   const [screen, setScreen] = useState<FinanceScreen>('overview')
   const [txFilter, setTxFilter] = useState<TxFilter>('all')
-  const [period, setPeriod] = useState('nov2026')
+  const [period, setPeriod] = useState('current')
   const [toast, setToast] = useState<string | null>(null)
 
   useEffect(() => {
@@ -81,9 +80,7 @@ export function FinancePage() {
             {t('finance')}{' '}
             <span className="finance-screen-tag">{contextLabel}</span>
           </h1>
-          <p className="muted finance-page-sub">
-            {t('financeLede')} {FINANCE_DEMO_AS_OF} · {t('financeAllValuesFictional')}
-          </p>
+          <p className="muted finance-page-sub">{t('financeLedeLive')}</p>
         </div>
         <div className="finance-head-actions">
           <button type="button" className="btn" onClick={() => go('settings')}>
@@ -93,17 +90,10 @@ export function FinancePage() {
             className="select"
             aria-label={t('financePeriod')}
             value={period}
-            onChange={(e) => {
-              if (e.target.value !== 'nov2026') {
-                showToast(t('financePeriodDemoOnly'))
-                setPeriod('nov2026')
-                return
-              }
-              setPeriod(e.target.value)
-            }}
+            onChange={(e) => setPeriod(e.target.value)}
           >
-            <option value="nov2026">November 2026</option>
-            <option value="oct2026">Oktober 2026</option>
+            <option value="current">{t('financePeriodCurrent')}</option>
+            <option value="prev">{t('financePeriodPrev')}</option>
             <option value="90d">{t('financeLast90')}</option>
           </select>
         </div>
@@ -137,7 +127,7 @@ export function FinancePage() {
       {screen === 'planning' ? <FinancePlanning onToast={showToast} /> : null}
       {screen === 'settings' ? <FinanceAccounts /> : null}
 
-      <p className="finance-footnote finance-page-footnote">{t('financeDisclaimer')}</p>
+      <p className="finance-footnote finance-page-footnote">{t('financeDisclaimerLive')}</p>
 
       {toast ? (
         <div className="finance-toaster" role="status" aria-live="polite">

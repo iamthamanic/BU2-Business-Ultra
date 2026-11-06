@@ -11,23 +11,23 @@ Replace the Finance placeholder with Dark-Ops screens matching the offline UX pr
 
 ## Happy Path
 - [x] Finance hub shows 7 tabs matching prototype IA
-- [x] Übersicht: hero frei verfügbar, liquiditätsausblick, 3 stats, chart panel, alerts
-- [x] Transaktionen: filter chips + search + table + open/recurring side panels
-- [x] Analyse / Liquidität / Rentabilität / Planung / Konten: screens render with demo data and local interactions (filters, scenario calc)
-- [x] Period select and Datenherkunft affordance present; CSV export of demo txs works client-side
+- [x] Übersicht: hero / stats / charts / alerts with empty snapshot (— / empty blocks)
+- [x] Transaktionen: filter chips + search + empty table + empty side panels
+- [x] Analyse / Liquidität / Rentabilität / Planung / Konten: screens render without mock amounts; planning local only
+- [x] Period select and Datenherkunft affordance present; CSV no-ops with toast when empty
 - [x] Connector DX section in INTEGRATIONS.md + adapter template file exists
 
 ## Edge Cases
 - [x] Empty filter/search on transactions shows empty state
-- [x] Planning scenario updates delta live; saved scenarios local only
-- [x] No claim of live bank/tax calculation in copy
+- [x] Planning scenario updates delta live from 0 base; saved scenarios local only
+- [x] No mock € amounts; copy does not claim live bank/tax calculation
 
 ## Regression
 - [x] Other nav departments unchanged
 - [x] Finance nav still routes to `/finance`
 
 ## Assumptions
-- UI-first with in-memory demo fixtures (prototype parity); Finance API persistence = later ticket with connectors
+- UI shell with empty snapshot (no mock amounts); Finance API persistence = later ticket with connectors
 - Connector DX = docs + catalog domain groups + template adapter stub; full Social/Paid sync = follow-up slices
 
 ## Screenshots
@@ -44,8 +44,8 @@ Replace the Finance placeholder with Dark-Ops screens matching the offline UX pr
 | Launch SC | N/A |
 
 ## Implementation Notes
-- UI: `apps/web/src/features/finance/{FinancePage,FinanceScreens,financeDemo}.tsx` + Dark-Ops CSS block
-- Demo fixtures only — no Finance mutate API
+- UI: `apps/web/src/features/finance/{FinancePage,FinanceScreens,financeModel}.ts(x)` + Dark-Ops CSS
+- Empty `EMPTY_FINANCE` snapshot — no mock amounts; no Finance mutate API
 - Connector DX: `docs/INTEGRATIONS.md` § Connector DX; `adapterTemplate.ts`; `domainGroup` on `PROVIDER_CATALOG`
 
 ## Composition Gate

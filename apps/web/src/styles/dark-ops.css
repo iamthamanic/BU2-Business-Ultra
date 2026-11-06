@@ -13740,6 +13740,22 @@ button.conn-provider-card:hover:not(:disabled) {
   margin-bottom: 9px;
 }
 
+.finance-empty-block {
+  padding: 28px 12px;
+  text-align: center;
+  color: var(--dim);
+  font-size: 12.5px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.finance-empty-block strong {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 560;
+}
+
 .finance-list {
   display: flex;
   flex-direction: column;
