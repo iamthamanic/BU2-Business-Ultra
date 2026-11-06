@@ -1,5 +1,5 @@
 /**
- * SettingsTeamTab — members list + invite (roles when API supports).
+ * SettingsTeamTab — members list, invite, and Tools/SEO grants for editor/viewer.
  * Location: apps/web/src/features/settings/SettingsTeamTab.tsx
  */
 import { useEffect, useState } from 'react'
@@ -12,6 +12,9 @@ type Member = {
   email: string
   displayName: string | null
   role: string
+  grantSeoOpen?: boolean
+  grantToolsUse?: boolean
+  grantToolsManage?: boolean
 }
 
 type Props = { slug: string; onMembersChanged?: (count: number) => void }
@@ -24,6 +27,7 @@ export function SettingsTeamTab({ slug, onMembersChanged }: Props) {
   const [inviteToken, setInviteToken] = useState('')
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(true)
+  const [busyUserId, setBusyUserId] = useState<string | null>(null)
 
   async function refresh() {
     const r = await api<{ members: Member[] }>(`/api/b/${slug}/members`)
@@ -66,6 +70,25 @@ export function SettingsTeamTab({ slug, onMembersChanged }: Props) {
     }
   }
 
+  async function setGrant(
+    userId: string,
+    patch: { grantToolsUse?: boolean; grantToolsManage?: boolean; grantSeoOpen?: boolean },
+  ) {
+    setBusyUserId(userId)
+    setMsg('')
+    try {
+      await api(`/api/b/${slug}/members/${userId}/grants`, {
+        method: 'PATCH',
+        body: JSON.stringify(patch),
+      })
+      await refresh()
+    } catch (e) {
+      setMsg(String(e))
+    } finally {
+      setBusyUserId(null)
+    }
+  }
+
   if (loading) return <p className="muted">{t('loading')}</p>
 
   return (
@@ -79,19 +102,64 @@ export function SettingsTeamTab({ slug, onMembersChanged }: Props) {
 
       {members.length ? (
         <div className="co-member-list">
-          {members.map((m) => (
-            <div key={m.id} className="co-member-row">
-              <span className="co-member-email">
-                {m.displayName ? `${m.displayName} · ${m.email}` : m.email}
-              </span>
-              <span className="badge">{m.role}</span>
-              {m.role !== 'owner' ? (
-                <button className="btn" type="button" onClick={() => removeMember(m.userId)}>
-                  {t('remove')}
-                </button>
-              ) : null}
-            </div>
-          ))}
+          {members.map((m) => {
+            const grantsEditable = m.role === 'editor' || m.role === 'viewer'
+            const busy = busyUserId === m.userId
+            return (
+              <div key={m.id} className="co-member-row co-member-row--grants">
+                <div className="co-member-main">
+                  <span className="co-member-email">
+                    {m.displayName ? `${m.displayName} · ${m.email}` : m.email}
+                  </span>
+                  <span className="badge">{m.role}</span>
+                  {m.role !== 'owner' ? (
+                    <button className="btn" type="button" onClick={() => removeMember(m.userId)}>
+                      {t('remove')}
+                    </button>
+                  ) : null}
+                </div>
+                {grantsEditable ? (
+                  <div className="co-member-grants" role="group" aria-label={t('memberGrants')}>
+                    <label className="co-grant-check">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(m.grantToolsUse) || Boolean(m.grantToolsManage)}
+                        disabled={busy || Boolean(m.grantToolsManage)}
+                        onChange={(e) =>
+                          void setGrant(m.userId, { grantToolsUse: e.target.checked })
+                        }
+                      />
+                      <span>{t('grantToolsUse')}</span>
+                    </label>
+                    <label className="co-grant-check">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(m.grantToolsManage)}
+                        disabled={busy}
+                        onChange={(e) =>
+                          void setGrant(m.userId, { grantToolsManage: e.target.checked })
+                        }
+                      />
+                      <span>{t('grantToolsManage')}</span>
+                    </label>
+                    <label className="co-grant-check">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(m.grantSeoOpen)}
+                        disabled={busy}
+                        onChange={(e) =>
+                          void setGrant(m.userId, { grantSeoOpen: e.target.checked })
+                        }
+                      />
+                      <span>{t('grantSeoOpen')}</span>
+                    </label>
+                  </div>
+                ) : (
+                  <p className="muted co-member-grants-note">{t('grantsImplicitOwnerAdmin')}</p>
+                )}
+              </div>
+            )
+          })}
         </div>
       ) : (
         <p className="muted">{t('noMembers')}</p>

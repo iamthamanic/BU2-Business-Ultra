@@ -67,7 +67,8 @@ Sidebar: Sortanize-Icon wird durch einen Top-Level-Tab **Tools** ersetzt, der de
 ## Implementation Notes
 - Files: `apps/api/drizzle/0019_tools_hub.sql`, `schema/tools.ts` + `identity.ts`, `modules/tools/*`, `features/tools/ToolsPage.tsx`, `BusinessShell`, `App`, shared tool schemas/auth helpers; CheckMap module/feature removed; e2e updated.
 - Unit tests: none added (covered by e2e tools smoke + `pnpm run checks`).
-- Known limitations: Membership UI does not yet toggle `grant_tools_*` (SQL/API columns exist; Owner/Admin implicit). Scopes stored for policy later — no OAuth/proxy enforcement in v1. Embed & entity deep-links deferred. No Integration Core wiring for custom tool secrets yet.
+- Follow-up shipped: Settings → Team toggles `grantToolsUse` / `grantToolsManage` / `grantSeoOpen` via `PATCH .../members/:userId/grants` (editor/viewer only; Owner/Admin implicit).
+- Remaining limitations: Scopes stored for policy later — no OAuth/proxy enforcement. Embed & entity deep-links deferred. No Integration Core wiring for custom tool secrets yet.
 - Decisions locked: J/C new-tab; K/G company-context query only; L CheckMap DROP; M use/manage grants.
 
 ## Composition Gate

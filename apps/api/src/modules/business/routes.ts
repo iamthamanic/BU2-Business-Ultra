@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { and, eq } from 'drizzle-orm'
+import { z } from 'zod'
 import {
   CreateBusinessSchema,
   InviteSchema,
@@ -297,6 +298,60 @@ export async function businessRoutes(app: FastifyInstance) {
       resourceRef: userId,
     })
     return { ok: true }
+  })
+
+  /** Update Tools (and optional SEO) grants for a member. Owner/admin only; no-op meaning for owner/admin targets. */
+  app.patch('/api/b/:slug/members/:userId/grants', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug, userId } = req.params as { slug: string; userId: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m || !canManageMembers(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    const body = z
+      .object({
+        grantToolsUse: z.boolean().optional(),
+        grantToolsManage: z.boolean().optional(),
+        grantSeoOpen: z.boolean().optional(),
+      })
+      .refine((b) => b.grantToolsUse !== undefined || b.grantToolsManage !== undefined || b.grantSeoOpen !== undefined, {
+        message: 'at_least_one_grant',
+      })
+      .parse(req.body)
+
+    const target = (
+      await db
+        .select()
+        .from(memberships)
+        .where(and(eq(memberships.businessId, m.businessId), eq(memberships.userId, userId)))
+        .limit(1)
+    )[0]
+    if (!target) return reply.code(404).send({ error: 'not_found' })
+    if (target.role === 'owner' || target.role === 'admin') {
+      return reply.code(400).send({ error: 'grants_n_a_for_role' })
+    }
+
+    const patch: {
+      grantToolsUse?: boolean
+      grantToolsManage?: boolean
+      grantSeoOpen?: boolean
+    } = {}
+    if (body.grantToolsUse !== undefined) patch.grantToolsUse = body.grantToolsUse
+    if (body.grantToolsManage !== undefined) patch.grantToolsManage = body.grantToolsManage
+    if (body.grantSeoOpen !== undefined) patch.grantSeoOpen = body.grantSeoOpen
+    // Manage implies use for storage clarity
+    if (patch.grantToolsManage === true) patch.grantToolsUse = true
+
+    await db
+      .update(memberships)
+      .set(patch)
+      .where(and(eq(memberships.businessId, m.businessId), eq(memberships.userId, userId)))
+    await writeAudit({
+      businessId: m.businessId,
+      actorUserId: user.id,
+      action: 'membership.grants_updated',
+      resourceRef: userId,
+      meta: patch,
+    })
+    return { ok: true, grants: patch }
   })
 
   app.get('/api/b/:slug/members', async (req, reply) => {
