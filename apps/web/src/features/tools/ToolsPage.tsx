@@ -307,48 +307,50 @@ export function ToolsPage() {
           ))}
         </div>
       ) : (
-        <div className="panel tools-table-wrap">
-          <table className="product-table">
-            <thead>
-              <tr>
-                <th>{t('toolsName')}</th>
-                <th>{t('toolsKind')}</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {tools.map((tool) => (
-                <tr key={tool.id}>
-                  <td>
-                    <span className="tools-list-name">
-                      <span className="tools-list-ic" data-ic={tool.iconKey}>
-                        <ToolIcon iconKey={tool.iconKey} size={18} />
-                      </span>
-                      {tool.name}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`tools-kind-chip tools-kind-chip--${tool.kind}`}>
-                      {tool.kind === 'system' ? t('toolsKindSystem') : t('toolsKindCustom')}
-                    </span>
-                  </td>
-                  <td className="tools-list-actions">
-                    {renderOpen(tool)}
-                    {canManage && tool.kind === 'custom' ? (
-                      <button
-                        type="button"
-                        className="btn"
-                        onClick={() => void onDelete(tool.id)}
-                        aria-label={t('toolsUninstall')}
-                      >
-                        <Trash size={14} aria-hidden />
-                      </button>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="panel tools-list" role="list" aria-label={t('toolsHub')}>
+          <div className="tools-list-head" aria-hidden>
+            <span className="tools-list-col tools-list-col--tool">{t('toolsName')}</span>
+            <span className="tools-list-col tools-list-col--kind">{t('toolsKind')}</span>
+            <span className="tools-list-col tools-list-col--actions" />
+          </div>
+          {tools.map((tool) => (
+            <div
+              key={tool.id}
+              className="tools-list-row"
+              data-kind={tool.kind}
+              role="listitem"
+            >
+              <div className="tools-list-col tools-list-col--tool">
+                <span className="tools-list-ic" data-ic={tool.iconKey}>
+                  <ToolIcon iconKey={tool.iconKey} size={20} />
+                </span>
+                <div className="tools-list-copy">
+                  <span className="tools-list-title">{tool.name}</span>
+                  <span className="muted tools-list-meta">
+                    {tool.kind === 'system' ? t('toolsCardSystemHint') : t('toolsCardCustomHint')}
+                  </span>
+                </div>
+              </div>
+              <div className="tools-list-col tools-list-col--kind">
+                <span className={`tools-kind-chip tools-kind-chip--${tool.kind}`}>
+                  {tool.kind === 'system' ? t('toolsKindSystem') : t('toolsKindCustom')}
+                </span>
+              </div>
+              <div className="tools-list-col tools-list-col--actions">
+                {renderOpen(tool)}
+                {canManage && tool.kind === 'custom' ? (
+                  <button
+                    type="button"
+                    className="btn tools-card-danger"
+                    onClick={() => void onDelete(tool.id)}
+                    aria-label={t('toolsUninstall')}
+                  >
+                    <Trash size={14} aria-hidden />
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
