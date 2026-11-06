@@ -1,8 +1,8 @@
 /**
- * ToolsPage — company Tools hub (system + custom installs).
+ * ToolsPage — premium Tools hub: catalog tiles + install modal.
  * Location: apps/web/src/features/tools/ToolsPage.tsx
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Link, useOutletContext, useParams } from 'react-router-dom'
 import {
   ArrowsDownUp,
@@ -11,6 +11,7 @@ import {
   PuzzlePiece,
   SquaresFour,
   Trash,
+  X,
   type Icon,
 } from '@phosphor-icons/react'
 import {
@@ -40,7 +41,6 @@ function scopeLabel(res: ToolScopeResource, t: (k: MessageKey) => string): strin
 }
 
 type ViewMode = 'grid' | 'list'
-
 type ScopeDraft = Record<string, { read: boolean; write: boolean }>
 
 function emptyScopes(): ScopeDraft {
@@ -60,9 +60,9 @@ function openCustomTool(tool: ToolInstallDto, slug: string) {
   }
 }
 
-function ToolIcon({ iconKey }: { iconKey: string }) {
+function ToolIcon({ iconKey, size = 22 }: { iconKey: string; size?: number }) {
   const Ic: Icon = iconKey === 'sortanize' ? ArrowsDownUp : PuzzlePiece
-  return <Ic size={22} weight="duotone" aria-hidden />
+  return <Ic size={size} weight="duotone" aria-hidden />
 }
 
 export function ToolsPage() {
@@ -70,11 +70,15 @@ export function ToolsPage() {
   const ctx = useOutletContext<CompanyOutletContext | null>()
   const { t } = useI18n()
   const routes = useMemo(() => companyRoutes(slug), [slug])
+  const titleId = useId()
+  const nameRef = useRef<HTMLInputElement>(null)
+
   const [tools, setTools] = useState<ToolInstallDto[]>([])
   const [canManage, setCanManage] = useState(false)
   const [view, setView] = useState<ViewMode>('grid')
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
+  const [modalErr, setModalErr] = useState<string | null>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [name, setName] = useState('')
   const [manifestId, setManifestId] = useState('')
@@ -101,10 +105,38 @@ export function ToolsPage() {
     void load()
   }, [load])
 
+  useEffect(() => {
+    if (!showAdd) return
+    setModalErr(null)
+    const tmr = window.setTimeout(() => nameRef.current?.focus(), 0)
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !saving) setShowAdd(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.clearTimeout(tmr)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [showAdd, saving])
+
+  function resetForm() {
+    setName('')
+    setManifestId('')
+    setEntryUrl('')
+    setScopes(emptyScopes())
+    setModalErr(null)
+  }
+
+  function closeModal() {
+    if (saving) return
+    setShowAdd(false)
+    resetForm()
+  }
+
   async function onCreate(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    setErr(null)
+    setModalErr(null)
     try {
       await api(`/api/b/${slug}/tools`, {
         method: 'POST',
@@ -116,13 +148,10 @@ export function ToolsPage() {
         }),
       })
       setShowAdd(false)
-      setName('')
-      setManifestId('')
-      setEntryUrl('')
-      setScopes(emptyScopes())
+      resetForm()
       await load()
     } catch (ex) {
-      setErr(ex instanceof Error ? ex.message : t('saveFailed'))
+      setModalErr(ex instanceof Error ? ex.message : t('saveFailed'))
     } finally {
       setSaving(false)
     }
@@ -148,38 +177,60 @@ export function ToolsPage() {
 
   const membership = ctx?.membership
 
+  function renderOpen(tool: ToolInstallDto) {
+    if (tool.manifestId === 'sortanize') {
+      return (
+        <Link className="btn primary tools-card-cta" to={routes.sortanize}>
+          {t('toolsOpen')}
+        </Link>
+      )
+    }
+    return (
+      <button
+        type="button"
+        className="btn primary tools-card-cta"
+        onClick={() => openCustomTool(tool, slug)}
+      >
+        {t('toolsOpen')}
+      </button>
+    )
+  }
+
   return (
     <div className="stack mkt-shell product-shell crm-shell tools-hub">
       <header className="product-page-head tools-hub-head">
-        <div>
+        <div className="tools-hub-intro">
           <h1 className="section-title product-page-title">{t('toolsHub')}</h1>
-          <p className="muted" style={{ margin: '4px 0 0' }}>
-            {t('toolsHubLede')}
-          </p>
+          <p className="muted tools-hub-lede">{t('toolsHubLede')}</p>
+          <ul className="tools-hub-how muted">
+            <li>{t('toolsHubHow1')}</li>
+            <li>{t('toolsHubHow2')}</li>
+            <li>{t('toolsHubHow3')}</li>
+          </ul>
         </div>
         <div className="tools-hub-actions">
-          <div className="product-archive-toggle" role="group" aria-label={t('toolsViewMode')}>
+          <div className="tools-view-toggle" role="group" aria-label={t('toolsViewMode')}>
             <button
               type="button"
-              className={`archive-seg${view === 'grid' ? ' is-active' : ''}`}
+              className={`tools-view-seg${view === 'grid' ? ' is-on' : ''}`}
               aria-pressed={view === 'grid'}
               onClick={() => setView('grid')}
             >
-              <SquaresFour size={14} aria-hidden />
+              <SquaresFour size={15} weight={view === 'grid' ? 'fill' : 'regular'} aria-hidden />
               {t('toolsViewGrid')}
             </button>
             <button
               type="button"
-              className={`archive-seg${view === 'list' ? ' is-active' : ''}`}
+              className={`tools-view-seg${view === 'list' ? ' is-on' : ''}`}
               aria-pressed={view === 'list'}
               onClick={() => setView('list')}
             >
-              <List size={14} aria-hidden />
+              <List size={15} weight={view === 'list' ? 'bold' : 'regular'} aria-hidden />
               {t('toolsViewList')}
             </button>
           </div>
           {canManage ? (
-            <button type="button" className="btn primary" onClick={() => setShowAdd((v) => !v)}>
+            <button type="button" className="btn primary" onClick={() => setShowAdd(true)}>
               <Plus size={14} weight="bold" aria-hidden />
               {t('toolsAdd')}
             </button>
@@ -193,116 +244,47 @@ export function ToolsPage() {
         </p>
       ) : null}
 
-      {showAdd && canManage ? (
-        <form className="panel tools-add-form stack" onSubmit={onCreate}>
-          <h2 className="section-title" style={{ fontSize: 16, margin: 0 }}>
-            {t('toolsAddTitle')}
-          </h2>
-          <label className="stack" style={{ gap: 4 }}>
-            <span className="muted">{t('toolsName')}</span>
-            <input
-              className="input"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              maxLength={120}
-            />
-          </label>
-          <label className="stack" style={{ gap: 4 }}>
-            <span className="muted">{t('toolsManifestId')}</span>
-            <input
-              className="input"
-              value={manifestId}
-              onChange={(e) => setManifestId(e.target.value)}
-              required
-              pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
-              placeholder="my-app"
-            />
-          </label>
-          <label className="stack" style={{ gap: 4 }}>
-            <span className="muted">{t('toolsEntryUrl')}</span>
-            <input
-              className="input"
-              type="url"
-              value={entryUrl}
-              onChange={(e) => setEntryUrl(e.target.value)}
-              required
-              placeholder="https://"
-            />
-          </label>
-          <fieldset className="tools-scope-matrix">
-            <legend className="muted">{t('toolsScopes')}</legend>
-            <div className="tools-scope-grid">
-              <span />
-              <span className="muted">{t('toolsScopeRead')}</span>
-              <span className="muted">{t('toolsScopeWrite')}</span>
-              {TOOL_SCOPE_RESOURCES.map((res) => (
-                <div key={res} className="tools-scope-row">
-                  <span>{scopeLabel(res, t)}</span>
-                  <input
-                    type="checkbox"
-                    checked={scopes[res]?.read ?? false}
-                    onChange={() => toggleScope(res, 'read')}
-                    aria-label={`${res} read`}
-                  />
-                  <input
-                    type="checkbox"
-                    checked={scopes[res]?.write ?? false}
-                    onChange={() => toggleScope(res, 'write')}
-                    aria-label={`${res} write`}
-                  />
-                </div>
-              ))}
-            </div>
-          </fieldset>
-          <div className="row" style={{ gap: 8 }}>
-            <button type="submit" className="btn primary" disabled={saving}>
-              {saving ? t('saving') : t('toolsInstall')}
-            </button>
-            <button type="button" className="btn" onClick={() => setShowAdd(false)}>
-              {t('cancel')}
-            </button>
-          </div>
-        </form>
-      ) : null}
-
       {loading ? (
-        <div className="crm-skel" style={{ height: 120 }} aria-busy="true" />
+        <div className="tools-grid" aria-busy="true">
+          <div className="crm-skel tools-card-skel" />
+          <div className="crm-skel tools-card-skel" />
+          <div className="crm-skel tools-card-skel" />
+        </div>
       ) : tools.length === 0 ? (
-        <div className="panel customer-empty-block" style={{ padding: 28 }}>
+        <div className="panel tools-empty">
+          <PuzzlePiece size={28} weight="duotone" aria-hidden />
           <p className="muted" style={{ margin: 0 }}>
             {t('toolsEmpty')}
           </p>
+          {canManage ? (
+            <button type="button" className="btn primary" onClick={() => setShowAdd(true)}>
+              <Plus size={14} weight="bold" aria-hidden />
+              {t('toolsAdd')}
+            </button>
+          ) : null}
         </div>
       ) : view === 'grid' ? (
         <div className="tools-grid">
           {tools.map((tool) => (
-            <article key={tool.id} className="panel tools-card" data-kind={tool.kind}>
-              <div className="tools-card-ic" data-ic={tool.iconKey}>
-                <ToolIcon iconKey={tool.iconKey} />
+            <article key={tool.id} className="tools-card" data-kind={tool.kind}>
+              <div className="tools-card-top">
+                <div className="tools-card-ic" data-ic={tool.iconKey}>
+                  <ToolIcon iconKey={tool.iconKey} size={24} />
+                </div>
+                <span className={`tools-kind-chip tools-kind-chip--${tool.kind}`}>
+                  {tool.kind === 'system' ? t('toolsKindSystem') : t('toolsKindCustom')}
+                </span>
               </div>
               <h3 className="tools-card-title">{tool.name}</h3>
               <p className="muted tools-card-meta">
-                {tool.kind === 'system' ? t('toolsKindSystem') : t('toolsKindCustom')}
+                {tool.kind === 'system' ? t('toolsCardSystemHint') : t('toolsCardCustomHint')}
               </p>
               <div className="tools-card-actions">
-                {tool.manifestId === 'sortanize' ? (
-                  <Link className="btn primary" to={routes.sortanize}>
-                    {t('toolsOpen')}
-                  </Link>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn primary"
-                    onClick={() => openCustomTool(tool, slug)}
-                  >
-                    {t('toolsOpen')}
-                  </button>
-                )}
+                {renderOpen(tool)}
                 {canManage && tool.kind === 'custom' ? (
                   <button
                     type="button"
-                    className="btn"
+                    className="btn tools-card-danger"
                     onClick={() => void onDelete(tool.id)}
                     aria-label={t('toolsUninstall')}
                   >
@@ -314,7 +296,7 @@ export function ToolsPage() {
           ))}
         </div>
       ) : (
-        <div className="panel" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="panel tools-table-wrap">
           <table className="product-table">
             <thead>
               <tr>
@@ -328,29 +310,26 @@ export function ToolsPage() {
                 <tr key={tool.id}>
                   <td>
                     <span className="tools-list-name">
-                      <ToolIcon iconKey={tool.iconKey} />
+                      <span className="tools-list-ic" data-ic={tool.iconKey}>
+                        <ToolIcon iconKey={tool.iconKey} size={18} />
+                      </span>
                       {tool.name}
                     </span>
                   </td>
-                  <td className="muted">
-                    {tool.kind === 'system' ? t('toolsKindSystem') : t('toolsKindCustom')}
+                  <td>
+                    <span className={`tools-kind-chip tools-kind-chip--${tool.kind}`}>
+                      {tool.kind === 'system' ? t('toolsKindSystem') : t('toolsKindCustom')}
+                    </span>
                   </td>
                   <td className="tools-list-actions">
-                    {tool.manifestId === 'sortanize' ? (
-                      <Link className="btn primary" to={routes.sortanize}>
-                        {t('toolsOpen')}
-                      </Link>
-                    ) : (
+                    {renderOpen(tool)}
+                    {canManage && tool.kind === 'custom' ? (
                       <button
                         type="button"
-                        className="btn primary"
-                        onClick={() => openCustomTool(tool, slug)}
+                        className="btn"
+                        onClick={() => void onDelete(tool.id)}
+                        aria-label={t('toolsUninstall')}
                       >
-                        {t('toolsOpen')}
-                      </button>
-                    )}
-                    {canManage && tool.kind === 'custom' ? (
-                      <button type="button" className="btn" onClick={() => void onDelete(tool.id)}>
                         <Trash size={14} aria-hidden />
                       </button>
                     ) : null}
@@ -363,9 +342,119 @@ export function ToolsPage() {
       )}
 
       {membership && !canManage ? (
-        <p className="muted" style={{ fontSize: 12 }}>
-          {t('toolsManageHint')}
-        </p>
+        <p className="muted tools-manage-hint">{t('toolsManageHint')}</p>
+      ) : null}
+
+      {showAdd && canManage ? (
+        <div
+          className="bu-modal-overlay"
+          role="presentation"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) closeModal()
+          }}
+        >
+          <div
+            className="bu-modal panel crm-modal tools-install-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+          >
+            <header className="bu-modal-head">
+              <h2 id={titleId} className="section-title" style={{ margin: 0 }}>
+                {t('toolsAddTitle')}
+              </h2>
+              <button
+                type="button"
+                className="btn icon-btn"
+                onClick={closeModal}
+                aria-label={t('cancel')}
+                disabled={saving}
+              >
+                <X size={16} weight="bold" aria-hidden />
+              </button>
+            </header>
+            <p className="muted tools-install-lede">{t('toolsAddLede')}</p>
+            <form className="crm-modal-body stack tools-install-form" onSubmit={onCreate}>
+              <label className="field">
+                <span className="label">{t('toolsName')}</span>
+                <input
+                  ref={nameRef}
+                  className="input"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  maxLength={120}
+                  autoComplete="off"
+                />
+              </label>
+              <label className="field">
+                <span className="label">{t('toolsManifestId')}</span>
+                <input
+                  className="input kpi"
+                  value={manifestId}
+                  onChange={(e) => setManifestId(e.target.value)}
+                  required
+                  pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+                  placeholder="my-app"
+                  autoComplete="off"
+                />
+                <span className="muted tools-field-hint">{t('toolsManifestHint')}</span>
+              </label>
+              <label className="field">
+                <span className="label">{t('toolsEntryUrl')}</span>
+                <input
+                  className="input"
+                  type="url"
+                  value={entryUrl}
+                  onChange={(e) => setEntryUrl(e.target.value)}
+                  required
+                  placeholder="https://"
+                  autoComplete="off"
+                />
+                <span className="muted tools-field-hint">{t('toolsEntryHint')}</span>
+              </label>
+              <fieldset className="tools-scope-matrix">
+                <legend>{t('toolsScopes')}</legend>
+                <p className="muted tools-scope-hint">{t('toolsScopesHint')}</p>
+                <div className="tools-scope-grid" role="table" aria-label={t('toolsScopes')}>
+                  <span className="tools-scope-corner" />
+                  <span className="muted tools-scope-col">{t('toolsScopeRead')}</span>
+                  <span className="muted tools-scope-col">{t('toolsScopeWrite')}</span>
+                  {TOOL_SCOPE_RESOURCES.map((res) => (
+                    <div key={res} className="tools-scope-row">
+                      <span>{scopeLabel(res, t)}</span>
+                      <input
+                        type="checkbox"
+                        checked={scopes[res]?.read ?? false}
+                        onChange={() => toggleScope(res, 'read')}
+                        aria-label={`${scopeLabel(res, t)} ${t('toolsScopeRead')}`}
+                      />
+                      <input
+                        type="checkbox"
+                        checked={scopes[res]?.write ?? false}
+                        onChange={() => toggleScope(res, 'write')}
+                        aria-label={`${scopeLabel(res, t)} ${t('toolsScopeWrite')}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </fieldset>
+              {modalErr ? (
+                <p className="error" role="alert">
+                  {modalErr}
+                </p>
+              ) : null}
+              <div className="bu-modal-actions">
+                <button type="button" className="btn" onClick={closeModal} disabled={saving}>
+                  {t('cancel')}
+                </button>
+                <button type="submit" className="btn primary" disabled={saving}>
+                  {saving ? t('saving') : t('toolsInstall')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       ) : null}
     </div>
   )
