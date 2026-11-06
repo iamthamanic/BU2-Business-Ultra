@@ -72,7 +72,7 @@ export function companyRoutes(slug: string) {
     projectsMine: `${base}/projects/mine`,
     projectsRecurring: `${base}/projects/recurring`,
     projectDetail: (id: string) => `${base}/projects/${encodeURIComponent(id)}`,
-    /** Finance department (placeholder) */
+    /** Finance department (demo UI; bank connectors later) */
     finance: `${base}/finance`,
     marketingPersonas: `${base}/marketing/personas`,
     marketingStyleguide: `${base}/marketing/styleguide`,
