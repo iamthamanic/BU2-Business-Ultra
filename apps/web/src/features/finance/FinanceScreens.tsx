@@ -18,6 +18,7 @@ import {
 } from '@phosphor-icons/react'
 import type { MessageKey } from '../../i18n/messages'
 import { useI18n } from '../../lib/i18n'
+import { FunnelConnectHint } from '../marketing/FunnelConnectHint'
 import {
   EMPTY_FINANCE,
   formatEur,
@@ -39,6 +40,7 @@ export type TxFilter = 'all' | 'income' | 'expense' | 'open' | 'recurring'
 
 type NavProps = {
   go: (screen: FinanceScreen, opts?: { txFilter?: TxFilter }) => void
+  settingsHref: string
   data?: FinanceSnapshot
 }
 
@@ -57,7 +59,19 @@ function Tag({
   return <span className={`finance-tag${cls}`}>{children}</span>
 }
 
-function EmptyBlock({ title, hint }: { title: string; hint: string }) {
+/** Same chrome as Marketing/Inbox empty connect banner. */
+function FinanceConnectHint({ settingsHref }: { settingsHref: string }) {
+  const { t } = useI18n()
+  return (
+    <FunnelConnectHint
+      need="connection"
+      settingsHref={settingsHref}
+      message={t('financeConnectBanner')}
+    />
+  )
+}
+
+function EmptyFilterBlock({ title, hint }: { title: string; hint: string }) {
   return (
     <div className="finance-empty-block">
       <strong>{title}</strong>
@@ -73,7 +87,7 @@ function statusTag(status: FinanceTx['status']) {
 
 /* ─── Overview ─────────────────────────────────────────────── */
 
-export function FinanceOverview({ go, data }: NavProps) {
+export function FinanceOverview({ go, settingsHref, data }: NavProps) {
   const { t } = useI18n()
   const ov = useFinance(data)
   const reservePct =
@@ -250,7 +264,7 @@ export function FinanceOverview({ go, data }: NavProps) {
               </svg>
             </>
           ) : (
-            <EmptyBlock title={t('financeChartEmpty')} hint={t('financeConnectHint')} />
+            <FinanceConnectHint settingsHref={settingsHref} />
           )}
         </div>
 
@@ -264,12 +278,18 @@ export function FinanceOverview({ go, data }: NavProps) {
               <Tag tone="amber">
                 {ov.alerts.length} {t('financeHints')}
               </Tag>
+            ) : !hasMoney ? (
+              <Tag>{t('financeNoSource')}</Tag>
             ) : (
               <Tag>{t('financeNoAlerts')}</Tag>
             )}
           </div>
           {ov.alerts.length === 0 ? (
-            <EmptyBlock title={t('financeNoAlertsTitle')} hint={t('financeNoAlertsHint')} />
+            hasMoney ? (
+              <EmptyFilterBlock title={t('financeNoAlertsTitle')} hint={t('financeNoAlertsHint')} />
+            ) : (
+              <FinanceConnectHint settingsHref={settingsHref} />
+            )
           ) : (
             <div className="finance-alerts">
               {ov.alerts.map((a) => (
@@ -321,7 +341,7 @@ type TxProps = NavProps & {
   onToast: (msg: string) => void
 }
 
-export function FinanceTransactions({ filter, setFilter, onToast, data }: TxProps) {
+export function FinanceTransactions({ filter, setFilter, onToast, settingsHref, data }: TxProps) {
   const { t } = useI18n()
   const snap = useFinance(data)
   const [search, setSearch] = useState('')
@@ -451,15 +471,22 @@ export function FinanceTransactions({ filter, setFilter, onToast, data }: TxProp
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="finance-empty">
-                    <strong>
-                      {snap.transactions.length === 0
-                        ? t('financeTxNone')
-                        : t('financeTxEmpty')}
-                    </strong>
-                    {snap.transactions.length === 0
-                      ? t('financeConnectHint')
-                      : t('financeTxEmptyHint')}
+                  <td
+                    colSpan={6}
+                    className={
+                      snap.transactions.length === 0
+                        ? 'finance-empty funnel-table-empty'
+                        : 'finance-empty'
+                    }
+                  >
+                    {snap.transactions.length === 0 ? (
+                      <FinanceConnectHint settingsHref={settingsHref} />
+                    ) : (
+                      <>
+                        <strong>{t('financeTxEmpty')}</strong>
+                        {t('financeTxEmptyHint')}
+                      </>
+                    )}
                   </td>
                 </tr>
               ) : (
@@ -506,20 +533,24 @@ export function FinanceTransactions({ filter, setFilter, onToast, data }: TxProp
               <p>{t('financeOpenItemsHint')}</p>
             </div>
           </div>
-          <div className="finance-metric-flex">
-            <div>
-              <div className="caps">{t('financeOpenIncome')}</div>
-              <div className="finance-boldnumber num" style={{ marginTop: 6 }}>
-                {snap.transactions.length === 0 ? '—' : formatEur(openIncome)}
+          {snap.transactions.length === 0 ? (
+            <FinanceConnectHint settingsHref={settingsHref} />
+          ) : (
+            <div className="finance-metric-flex">
+              <div>
+                <div className="caps">{t('financeOpenIncome')}</div>
+                <div className="finance-boldnumber num" style={{ marginTop: 6 }}>
+                  {formatEur(openIncome)}
+                </div>
+              </div>
+              <div>
+                <div className="caps">{t('financePlannedExpenses')}</div>
+                <div className="finance-boldnumber num" style={{ marginTop: 6 }}>
+                  {formatEur(plannedOut)}
+                </div>
               </div>
             </div>
-            <div>
-              <div className="caps">{t('financePlannedExpenses')}</div>
-              <div className="finance-boldnumber num" style={{ marginTop: 6 }}>
-                {snap.transactions.length === 0 ? '—' : formatEur(plannedOut)}
-              </div>
-            </div>
-          </div>
+          )}
         </div>
         <div className="panel panel-pad">
           <div className="finance-section-head">
@@ -529,7 +560,7 @@ export function FinanceTransactions({ filter, setFilter, onToast, data }: TxProp
             </div>
           </div>
           {snap.recurring.length === 0 ? (
-            <EmptyBlock title={t('financeRecurringEmpty')} hint={t('financeConnectHint')} />
+            <FinanceConnectHint settingsHref={settingsHref} />
           ) : (
             <div className="finance-list">
               {snap.recurring.map((r) => (
@@ -602,7 +633,13 @@ export function FinanceTransactions({ filter, setFilter, onToast, data }: TxProp
 
 /* ─── Analysis ─────────────────────────────────────────────── */
 
-export function FinanceAnalysis({ data }: { data?: FinanceSnapshot }) {
+export function FinanceAnalysis({
+  settingsHref,
+  data,
+}: {
+  settingsHref: string
+  data?: FinanceSnapshot
+}) {
   const { t } = useI18n()
   const snap = useFinance(data)
   const [mode, setMode] = useState<'cost' | 'revenue' | 'result'>('cost')
@@ -664,7 +701,7 @@ export function FinanceAnalysis({ data }: { data?: FinanceSnapshot }) {
             <Tag tone="blue">{d.label}</Tag>
           </div>
           {d.values.length === 0 ? (
-            <EmptyBlock title={t('financeChartEmpty')} hint={t('financeConnectHint')} />
+            <FinanceConnectHint settingsHref={settingsHref} />
           ) : (
             <>
               <svg
@@ -726,7 +763,7 @@ export function FinanceAnalysis({ data }: { data?: FinanceSnapshot }) {
             </div>
           </div>
           {snap.analysis.categories.length === 0 ? (
-            <EmptyBlock title={t('financeCategoriesEmpty')} hint={t('financeConnectHint')} />
+            <FinanceConnectHint settingsHref={settingsHref} />
           ) : (
             <div className="finance-list">
               {snap.analysis.categories.map((c) => (
@@ -778,20 +815,24 @@ export function FinanceAnalysis({ data }: { data?: FinanceSnapshot }) {
         </div>
       </div>
 
-      <div className="finance-insight">
-        <Sparkle size={17} aria-hidden />
-        <div>
-          <strong>{t('financeInsightEmptyTitle')}</strong>
-          <p>{t('financeInsightEmptyBody')}</p>
+      {snap.analysis.cost.length === 0 ? (
+        <FinanceConnectHint settingsHref={settingsHref} />
+      ) : (
+        <div className="finance-insight">
+          <Sparkle size={17} aria-hidden />
+          <div>
+            <strong>{t('financeInsightEmptyTitle')}</strong>
+            <p>{t('financeInsightEmptyBody')}</p>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
 
 /* ─── Liquidity ────────────────────────────────────────────── */
 
-export function FinanceLiquidity({ go, data }: NavProps) {
+export function FinanceLiquidity({ go, settingsHref, data }: NavProps) {
   const { t } = useI18n()
   const snap = useFinance(data)
   const [horizon, setHorizon] = useState<30 | 60 | 90>(30)
@@ -884,7 +925,7 @@ export function FinanceLiquidity({ go, data }: NavProps) {
             </div>
           </>
         ) : (
-          <EmptyBlock title={t('financeForecastEmpty')} hint={t('financeConnectHint')} />
+          <FinanceConnectHint settingsHref={settingsHref} />
         )}
       </div>
 
@@ -904,7 +945,7 @@ export function FinanceLiquidity({ go, data }: NavProps) {
             </button>
           </div>
           {snap.liquidityFlows.length === 0 ? (
-            <EmptyBlock title={t('financeFlowsEmpty')} hint={t('financeConnectHint')} />
+            <FinanceConnectHint settingsHref={settingsHref} />
           ) : (
             <div className="finance-flowrows">
               {snap.liquidityFlows.map((f) => (
@@ -973,7 +1014,7 @@ export function FinanceLiquidity({ go, data }: NavProps) {
 
 /* ─── Profitability ────────────────────────────────────────── */
 
-export function FinanceProfitability({ go, data }: NavProps) {
+export function FinanceProfitability({ go, settingsHref, data }: NavProps) {
   const { t } = useI18n()
   const snap = useFinance(data)
   const [mode, setMode] = useState<'customers' | 'products' | 'projects'>('customers')
@@ -1051,7 +1092,7 @@ export function FinanceProfitability({ go, data }: NavProps) {
         </div>
         {rows.length === 0 ? (
           <div style={{ padding: '0 18px 20px' }}>
-            <EmptyBlock title={t('financeProfitEmpty')} hint={t('financeConnectHint')} />
+            <FinanceConnectHint settingsHref={settingsHref} />
           </div>
         ) : (
           <div className="finance-tablewrap">
@@ -1160,13 +1201,16 @@ type SavedScenario = {
 
 export function FinancePlanning({
   onToast,
+  settingsHref,
   data,
 }: {
   onToast: (msg: string) => void
+  settingsHref: string
   data?: FinanceSnapshot
 }) {
   const { t } = useI18n()
   const snap = useFinance(data)
+  const needsConnect = snap.balance === null
   const [type, setType] = useState<ScenarioType>('hire')
   const [cost, setCost] = useState(2800)
   const [start, setStart] = useState(0)
@@ -1202,6 +1246,8 @@ export function FinancePlanning({
         </div>
         <Tag tone="blue">{t('financeNotInActuals')}</Tag>
       </div>
+
+      {needsConnect ? <FinanceConnectHint settingsHref={settingsHref} /> : null}
 
       <div className="finance-plan-grid">
         <div className="panel panel-pad">
@@ -1385,7 +1431,7 @@ export function FinancePlanning({
 
 /* ─── Accounts & rules ─────────────────────────────────────── */
 
-export function FinanceAccounts() {
+export function FinanceAccounts({ settingsHref }: { settingsHref: string }) {
   const { t } = useI18n()
   return (
     <div className="finance-screen stack">
@@ -1396,6 +1442,8 @@ export function FinanceAccounts() {
         </div>
         <Tag>{t('financeNoBankYet')}</Tag>
       </div>
+
+      <FinanceConnectHint settingsHref={settingsHref} />
 
       <div className="finance-two-column">
         <div className="panel panel-pad">

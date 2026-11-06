@@ -561,6 +561,8 @@ const de = {
   financeAwaitingData: 'Warte auf Datenquelle',
   financeChartEmpty: 'Noch kein Verlauf',
   financeConnectHint: 'Verbinde eine Datenquelle unter Konten & Regeln.',
+  financeConnectBanner:
+    'Finance noch nicht verbunden. Bitte verbinden, um Finanzdaten zu erhalten.',
   financeNoAlerts: 'Keine Hinweise',
   financeNoAlertsTitle: 'Alles ruhig',
   financeNoAlertsHint: 'Hinweise erscheinen, wenn offene Posten oder Auffälligkeiten erkannt werden.',
@@ -2034,6 +2036,8 @@ const en: { [K in keyof typeof de]: string } = {
   financeAwaitingData: 'Waiting for a data source',
   financeChartEmpty: 'No trend yet',
   financeConnectHint: 'Connect a data source under Accounts & rules.',
+  financeConnectBanner:
+    'Finance is not connected yet. Connect a source to see financial data.',
   financeNoAlerts: 'No alerts',
   financeNoAlertsTitle: 'All quiet',
   financeNoAlertsHint: 'Alerts appear when open items or anomalies are detected.',

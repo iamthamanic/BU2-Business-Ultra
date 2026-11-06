@@ -13776,6 +13776,21 @@ button.conn-provider-card:hover:not(:disabled) {
   font-weight: 560;
 }
 
+.finance-shell .funnel-connect-hint {
+  margin: 0;
+}
+
+.finance-empty.funnel-table-empty {
+  text-align: left;
+  padding: 18px;
+}
+
+.finance-empty.funnel-table-empty .funnel-connect-hint {
+  width: 100%;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
 .finance-list {
   display: flex;
   flex-direction: column;

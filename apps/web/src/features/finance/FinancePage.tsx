@@ -12,7 +12,9 @@ import {
   SquaresFour,
   TrendUp,
 } from '@phosphor-icons/react'
+import { useParams } from 'react-router-dom'
 import { MktTab, MktTabs } from '../../components/MktTabs'
+import { companyRoutes } from '../../lib/companyPaths'
 import { useI18n } from '../../lib/i18n'
 import {
   FinanceAccounts,
@@ -48,11 +50,13 @@ const TAB_META: {
 ]
 
 export function FinancePage() {
+  const { slug } = useParams()
   const { t } = useI18n()
   const [screen, setScreen] = useState<FinanceScreen>('overview')
   const [txFilter, setTxFilter] = useState<TxFilter>('all')
   const [period, setPeriod] = useState('current')
   const [toast, setToast] = useState<string | null>(null)
+  const settingsHref = slug ? companyRoutes(slug).settingsConnections : '#'
 
   useEffect(() => {
     if (!toast) return
@@ -112,20 +116,29 @@ export function FinancePage() {
         ))}
       </MktTabs>
 
-      {screen === 'overview' ? <FinanceOverview go={go} /> : null}
+      {screen === 'overview' ? (
+        <FinanceOverview go={go} settingsHref={settingsHref} />
+      ) : null}
       {screen === 'transactions' ? (
         <FinanceTransactions
           go={go}
+          settingsHref={settingsHref}
           filter={txFilter}
           setFilter={setTxFilter}
           onToast={showToast}
         />
       ) : null}
-      {screen === 'analysis' ? <FinanceAnalysis /> : null}
-      {screen === 'liquidity' ? <FinanceLiquidity go={go} /> : null}
-      {screen === 'profitability' ? <FinanceProfitability go={go} /> : null}
-      {screen === 'planning' ? <FinancePlanning onToast={showToast} /> : null}
-      {screen === 'settings' ? <FinanceAccounts /> : null}
+      {screen === 'analysis' ? <FinanceAnalysis settingsHref={settingsHref} /> : null}
+      {screen === 'liquidity' ? (
+        <FinanceLiquidity go={go} settingsHref={settingsHref} />
+      ) : null}
+      {screen === 'profitability' ? (
+        <FinanceProfitability go={go} settingsHref={settingsHref} />
+      ) : null}
+      {screen === 'planning' ? (
+        <FinancePlanning onToast={showToast} settingsHref={settingsHref} />
+      ) : null}
+      {screen === 'settings' ? <FinanceAccounts settingsHref={settingsHref} /> : null}
 
       <p className="finance-footnote finance-page-footnote">{t('financeDisclaimerLive')}</p>
 
