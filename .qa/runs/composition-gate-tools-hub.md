@@ -10,6 +10,7 @@
 2. **List hub** — read-only merge of system Sortanize tile + DB installs; no fan-out side effects.
 3. **Open custom tool** — client opens new tab with slug/manifest query only; **no** server token mint in v1 (no dual consumers).
 4. **Uninstall** — single DELETE by id+tenant; system tile immutable (400).
+5. **Member grants** — `PATCH .../members/:id/grants` updates one membership row + one audit; Owner/Admin targets rejected (400). Cardinality: **once per grant request**.
 
 ## Simulations
 
