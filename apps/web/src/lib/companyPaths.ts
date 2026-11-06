@@ -72,7 +72,7 @@ export function companyRoutes(slug: string) {
     projectsMine: `${base}/projects/mine`,
     projectsRecurring: `${base}/projects/recurring`,
     projectDetail: (id: string) => `${base}/projects/${encodeURIComponent(id)}`,
-    /** Finance department (placeholder) */
+    /** Finance department (demo UI; bank connectors later) */
     finance: `${base}/finance`,
     marketingPersonas: `${base}/marketing/personas`,
     marketingStyleguide: `${base}/marketing/styleguide`,
@@ -96,6 +96,8 @@ export function companyRoutes(slug: string) {
     geo: `${base}/marketing/funnel/organic/website?surface=geo`,
     settings: `${base}/settings`,
     settingsConnections: `${base}/settings#connections`,
+    /** Deep-link to Bank · finAPI panel under Verbindungen */
+    settingsFinanceConnections: `${base}/settings#finance-connections`,
     settingsLabels: `${base}/settings#labels`,
     /** @deprecated use settingsLabels */
     settingsTags: `${base}/settings#labels`,

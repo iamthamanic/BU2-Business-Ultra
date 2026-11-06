@@ -22,23 +22,47 @@ Provider  →  Connection  →  Binding (+ credentials, capability resolver, syn
 Code registry: `apps/api/src/lib/integrations/core/providers.ts`  
 HTTP: `apps/api/src/modules/integrations/*` under `/api/b/:slug/integrations/…`
 
+## Connector DX (batteries-included)
+
+**Goal:** new services are **adapter + catalog row only** — credentials in Connections, no one-off secret UIs.
+
+**Program order:** Social → Paid → Finance → Generic (`domainGroup` on `PROVIDER_CATALOG`).
+
+| Group | Intent | Ist examples |
+|-------|--------|--------------|
+| `social` | Messaging / inbox / organic social | Gmail, Outlook, IMAP, WhatsApp, Instagram, Facebook, Telegram, Unipile |
+| `paid` | Ads / paid social video | YouTube, Google Ads |
+| `finance` | Bank / bookkeeping (credentials-only) | `finapi` (credentials stored; sync pending) |
+| `generic` | Test / catch-all | Mock |
+
+**Add a connector (checklist):**
+
+1. Extend `IntegrationProviderSchema` in `packages/shared`
+2. Add catalog row in `lib/integrations/core/providers.ts` with `domainGroup` + `authMethods` + `connectKind`
+3. Copy `lib/integrations/core/adapterTemplate.ts` → `lib/integrations/<provider>/adapter.ts`, implement `connect` / `resolveCapabilities`, register on boot
+4. Prefer OAuth PKCE or API key; persist via Integration Core credentials — never `settings_secrets` for multi-account
+5. Sync/send live in a follow-up slice after credentials path is green
+
+Template: `apps/api/src/lib/integrations/core/adapterTemplate.ts`
+
 ## Provider catalog (Ist)
 
 From `PROVIDER_CATALOG` (adapterReady flags are code claims; live mode still needs env/keys):
 
-| Provider id | Label | Auth methods | Connect kind |
-|-------------|-------|--------------|--------------|
-| `mock` | Mock (contract tests) | `mock` | mock |
-| `google` | Gmail | `oauth_pkce` | oauth |
-| `youtube` | YouTube | `oauth_pkce` | oauth |
-| `google_ads` | Google Ads | `oauth_pkce` | oauth |
-| `microsoft` | Outlook | `oauth_pkce` | oauth |
-| `imap` | IMAP / POP | `password` | password |
-| `whatsapp` | WhatsApp | `oauth_pkce` | oauth |
-| `instagram` | Instagram | `oauth_pkce` | oauth |
-| `facebook` | Facebook | `oauth_pkce` | oauth |
-| `telegram` | Telegram (Bot) | `bot_token` | bot_token |
-| `unipile` | Telegram (privat) | `aggregator_session`, `api_key` | aggregator |
+| Provider id | Label | Group | Auth methods | Connect kind |
+|-------------|-------|-------|--------------|--------------|
+| `mock` | Mock (contract tests) | generic | `mock` | mock |
+| `google` | Gmail | social | `oauth_pkce` | oauth |
+| `youtube` | YouTube | paid | `oauth_pkce` | oauth |
+| `google_ads` | Google Ads | paid | `oauth_pkce` | oauth |
+| `microsoft` | Outlook | social | `oauth_pkce` | oauth |
+| `imap` | IMAP / POP | social | `password` | password |
+| `whatsapp` | WhatsApp | social | `oauth_pkce` | oauth |
+| `instagram` | Instagram | social | `oauth_pkce` | oauth |
+| `facebook` | Facebook | social | `oauth_pkce` | oauth |
+| `telegram` | Telegram (Bot) | social | `bot_token` | bot_token |
+| `unipile` | Telegram (privat) | social | `aggregator_session`, `api_key` | aggregator |
+| `finapi` | finAPI (Bank) | finance | `api_key` | password (client id/secret form) |
 
 ### Related non-catalog / settings-gated
 

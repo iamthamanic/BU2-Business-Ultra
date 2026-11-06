@@ -28,8 +28,11 @@ import { integrationRoutes } from './modules/integrations/routes.js'
 import { oauthIntegrationRoutes } from './modules/integrations/oauthRoutes.js'
 import { inboxRoutes } from './modules/inbox/routes.js'
 import './lib/integrations/core/mockAdapter.js'
+import { ensureFinapiAdapterRegistered } from './lib/integrations/finapi/adapter.js'
 import { ensureTelegramAdapterRegistered } from './lib/integrations/telegram/adapter.js'
 import { ensureUnipileAdapterRegistered } from './lib/integrations/unipile/adapter.js'
+
+ensureFinapiAdapterRegistered()
 
 async function main() {
   const env = loadEnv()

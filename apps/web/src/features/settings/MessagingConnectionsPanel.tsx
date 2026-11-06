@@ -35,12 +35,15 @@ type ProviderRow = {
   adapterReady: boolean
   selectable?: boolean
   connectKind?: string
+  domainGroup?: string
   redirectUri?: string | null
   oauthConfigured?: boolean | null
   clientConfigured?: boolean
 }
 
-type SubTab = 'accounts' | 'providers' | 'log'
+const FINANCE_PROVIDERS = new Set(['finapi'])
+
+type SubTab = 'accounts' | 'log'
 
 type Props = {
   slug: string
@@ -58,6 +61,7 @@ export function MessagingConnectionsPanel({ slug, canManage }: Props) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showConnect, setShowConnect] = useState(false)
+  const [connectProviderId, setConnectProviderId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [toggling, setToggling] = useState<string | null>(null)
   const [syncingId, setSyncingId] = useState<string | null>(null)
@@ -160,7 +164,31 @@ export function MessagingConnectionsPanel({ slug, canManage }: Props) {
     return providers.find((p) => p.id === id)?.label || id
   }
 
-  const messagingConnections = connections.filter((c) => c.provider !== 'mock')
+  function providerReady(p: ProviderRow): boolean {
+    if (p.selectable != null) return p.selectable
+    return Boolean(p.adapterReady || p.connectKind === 'oauth')
+  }
+
+  function providerStatus(p: ProviderRow): string {
+    if (p.connectKind === 'oauth') {
+      return p.oauthConfigured ? t('connProviderReady') : t('connOauthNeedsClient')
+    }
+    if (p.id === 'unipile' && !p.adapterReady) return t('connUnipileNotConfigured')
+    if (p.adapterReady) return t('connProviderReady')
+    return t('connProviderSoon')
+  }
+
+  function openConnect(providerId?: string) {
+    setConnectProviderId(providerId ?? null)
+    setShowConnect(true)
+  }
+
+  const messagingProviders = providers.filter(
+    (p) => p.id !== 'mock' && p.domainGroup !== 'finance' && !FINANCE_PROVIDERS.has(p.id),
+  )
+  const messagingConnections = connections.filter(
+    (c) => c.provider !== 'mock' && !FINANCE_PROVIDERS.has(c.provider),
+  )
 
   return (
     <section className="panel stack conn-messaging" id="messaging-connections">
@@ -170,7 +198,7 @@ export function MessagingConnectionsPanel({ slug, canManage }: Props) {
           <p className="muted co-card-hint">{t('connMessagingHint')}</p>
         </div>
         {canManage ? (
-          <button type="button" className="btn primary" onClick={() => setShowConnect(true)}>
+          <button type="button" className="btn primary" onClick={() => openConnect()}>
             <Plus size={14} weight="bold" aria-hidden />
             {t('connConnectAccount')}
           </button>
@@ -181,16 +209,50 @@ export function MessagingConnectionsPanel({ slug, canManage }: Props) {
         {t('connInboxBanner')}
       </div>
 
+      <div className="conn-catalog">
+        <div className="conn-catalog-head">
+          <h4 className="conn-catalog-title">{t('connCatalogTitle')}</h4>
+          <p className="muted conn-catalog-hint">{t('connCatalogHint')}</p>
+        </div>
+        <ul className="conn-provider-grid">
+          {messagingProviders.map((p) => {
+            const ready = providerReady(p)
+            const linked = messagingConnections.some((c) => c.provider === p.id)
+            return (
+              <li key={p.id}>
+                <div
+                  className={`conn-provider-card conn-provider-card--premium${!ready ? ' is-disabled' : ''}${linked ? ' is-linked' : ''}`}
+                  data-ic={p.id}
+                >
+                  <ConnProviderIcon id={p.id} size={28} />
+                  <span className="conn-provider-copy">
+                    <span className="conn-provider-name">{p.label}</span>
+                    <span className="muted" style={{ fontSize: 12 }}>
+                      {linked ? t('connStatusConnected') : providerStatus(p)}
+                    </span>
+                  </span>
+                  {canManage ? (
+                    <button
+                      type="button"
+                      className="btn primary conn-provider-cta"
+                      disabled={!ready}
+                      onClick={() => openConnect(p.id)}
+                    >
+                      {t('connectBannerCta')}
+                    </button>
+                  ) : null}
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+
       <MktTabs level="surface" label={t('connMessagingTitle')}>
         <MktTab
           active={sub === 'accounts'}
           label={`${t('connTabAccounts')} (${messagingConnections.length})`}
           onClick={() => setSub('accounts')}
-        />
-        <MktTab
-          active={sub === 'providers'}
-          label={t('connTabProviders')}
-          onClick={() => setSub('providers')}
         />
         <MktTab active={sub === 'log'} label={t('connTabLog')} onClick={() => setSub('log')} />
       </MktTabs>
@@ -233,10 +295,13 @@ export function MessagingConnectionsPanel({ slug, canManage }: Props) {
                       <tr>
                         <td>
                           <div className="conn-prov-cell">
-                            <strong>{providerLabel(c.provider)}</strong>
-                            <span className="muted" style={{ fontSize: 12 }}>
-                              {c.authMethod}
-                            </span>
+                            <ConnProviderIcon id={c.provider} size={18} />
+                            <div>
+                              <strong>{providerLabel(c.provider)}</strong>
+                              <span className="muted" style={{ fontSize: 12, display: 'block' }}>
+                                {c.authMethod}
+                              </span>
+                            </div>
                           </div>
                         </td>
                         <td>{c.displayName || c.externalAccountId}</td>
@@ -325,47 +390,17 @@ export function MessagingConnectionsPanel({ slug, canManage }: Props) {
         )
       ) : null}
 
-      {sub === 'providers' ? (
-        <ul className="conn-provider-list">
-          {providers
-            .filter((p) => p.id !== 'mock')
-            .map((p) => (
-              <li key={p.id}>
-                <div
-                  className={`conn-provider-card${p.adapterReady || p.connectKind === 'oauth' ? '' : ' is-disabled'}`}
-                  data-ic={p.id}
-                >
-                  <ConnProviderIcon id={p.id} />
-                  <span className="conn-provider-copy">
-                    <span className="conn-provider-name">{p.label}</span>
-                    <span className="muted" style={{ fontSize: 12 }}>
-                      {p.connectKind === 'oauth'
-                        ? p.oauthConfigured
-                          ? t('connProviderReady')
-                          : t('connOauthNeedsClient')
-                        : p.adapterReady
-                          ? t('connProviderReady')
-                          : p.id === 'unipile'
-                            ? t('connUnipileNotConfigured')
-                            : t('connProviderSoon')}
-                    </span>
-                    {p.redirectUri ? (
-                      <span className="conn-provider-redirect muted">{p.redirectUri}</span>
-                    ) : null}
-                  </span>
-                </div>
-              </li>
-            ))}
-        </ul>
-      ) : null}
-
       {sub === 'log' ? <p className="muted">{t('connLogSoon')}</p> : null}
 
       {showConnect ? (
         <ConnectAccountModal
           slug={slug}
-          providers={providers}
-          onClose={() => setShowConnect(false)}
+          providers={messagingProviders}
+          initialProviderId={connectProviderId}
+          onClose={() => {
+            setShowConnect(false)
+            setConnectProviderId(null)
+          }}
           onConnected={() => {
             load().catch(console.error)
           }}

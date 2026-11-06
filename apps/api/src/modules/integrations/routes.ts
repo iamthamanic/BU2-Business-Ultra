@@ -5,6 +5,7 @@
 import type { FastifyInstance } from 'fastify'
 import {
   BindingPurposeSchema,
+  ConnectFinapiSchema,
   ConnectImapSchema,
   ConnectMockSchema,
   CreateModuleBindingSchema,
@@ -15,6 +16,7 @@ import {
   canMutateContent,
 } from '@bu2/shared'
 import {
+  connectFinapiAccount,
   connectImapAccount,
   connectMockAccount,
   createModuleBinding,
@@ -22,10 +24,12 @@ import {
   listConnections,
   listModuleBindings,
   resolveBindingCapability,
+  revokeConnection,
   setModuleBindingsEnabled,
   upsertSyncCursor,
 } from '../../lib/integrations/core/connections.js'
 import { PROVIDER_CATALOG } from '../../lib/integrations/core/providers.js'
+import { ensureFinapiAdapterRegistered } from '../../lib/integrations/finapi/adapter.js'
 import { ensureImapAdapterRegistered } from '../../lib/integrations/imap/adapter.js'
 import { and, eq } from 'drizzle-orm'
 import { db } from '../../db/client.js'
@@ -40,6 +44,7 @@ import { uploadYoutubeVideo } from '../../lib/integrations/youtube/client.js'
 import { loadMembership, requireUser } from '../../plugins/auth.js'
 
 ensureImapAdapterRegistered()
+ensureFinapiAdapterRegistered()
 
 export async function integrationRoutes(app: FastifyInstance) {
   app.get('/api/b/:slug/integrations/providers', async (req, reply) => {
@@ -98,6 +103,42 @@ export async function integrationRoutes(app: FastifyInstance) {
       const { status, error } = httpError(e)
       return reply.code(status).send({ error })
     }
+  })
+
+  app.post('/api/b/:slug/integrations/connections/finapi', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug } = req.params as { slug: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m || (!canManageCredentials(m.role) && !user.isSuperadmin)) {
+      return reply.code(403).send({ error: 'forbidden' })
+    }
+    const body = ConnectFinapiSchema.safeParse(req.body)
+    if (!body.success) {
+      return reply.code(400).send({ error: 'invalid_body', issues: body.error.issues })
+    }
+    try {
+      const connection = await connectFinapiAccount({
+        businessId: m.businessId,
+        userId: user.id,
+        ...body.data,
+      })
+      return reply.code(201).send({ connection })
+    } catch (e) {
+      const { status, error } = httpError(e)
+      return reply.code(status).send({ error })
+    }
+  })
+
+  app.delete('/api/b/:slug/integrations/connections/:id', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug, id } = req.params as { slug: string; id: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m || (!canManageCredentials(m.role) && !user.isSuperadmin)) {
+      return reply.code(403).send({ error: 'forbidden' })
+    }
+    const ok = await revokeConnection(m.businessId, id)
+    if (!ok) return reply.code(404).send({ error: 'not_found' })
+    return { ok: true }
   })
 
   app.get('/api/b/:slug/integrations/connections', async (req, reply) => {
