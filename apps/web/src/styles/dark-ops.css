@@ -13105,8 +13105,28 @@ button.conn-provider-card:hover:not(:disabled) {
   flex-wrap: wrap;
 }
 
-.finance-tabs {
+.finance-tabs.mkt-tabs {
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  flex-wrap: nowrap;
   margin-bottom: 8px;
+}
+
+.finance-tabs.mkt-tabs .mkt-tab {
+  flex: 1 1 0;
+  justify-content: center;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .finance-tabs.mkt-tabs {
+    flex-wrap: wrap;
+  }
+
+  .finance-tabs.mkt-tabs .mkt-tab {
+    flex: 1 1 auto;
+  }
 }
 
 .finance-screen {
