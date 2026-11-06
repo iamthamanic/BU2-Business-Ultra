@@ -3870,7 +3870,8 @@ select.input,
   min-width: 0;
 }
 
-.co-card-title-row .conn-provider-icon {
+.co-card-title-row .conn-provider-icon,
+.co-card-title-row .conn-brand-tile {
   margin-top: 2px;
 }
 
@@ -12869,8 +12870,88 @@ a.customer-tag-chip--link:focus-visible {
 
 .conn-prov-cell {
   display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.conn-brand-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, #fff 12%, transparent),
+    0 6px 16px color-mix(in srgb, #000 35%, transparent);
+}
+
+.conn-catalog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--accent) 8%, var(--panel2)) 0%,
+      var(--panel2) 48%,
+      color-mix(in srgb, var(--panel) 70%, #0a0f18) 100%
+    );
+}
+
+.conn-catalog-head {
+  display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+.conn-catalog-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.conn-catalog-hint {
+  margin: 0;
+  font-size: 13px;
+}
+
+.conn-provider-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.conn-provider-card--premium {
+  min-height: 72px;
+  padding: 14px 14px;
+  border-color: color-mix(in srgb, var(--border) 70%, transparent);
+  background: color-mix(in srgb, var(--panel) 88%, #000);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent);
+  cursor: default;
+}
+
+.conn-provider-card--premium .conn-provider-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.conn-provider-card--premium.is-linked {
+  border-color: color-mix(in srgb, var(--good) 45%, var(--border));
+}
+
+.conn-provider-cta {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .conn-usage-tags {

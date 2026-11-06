@@ -143,7 +143,7 @@ export function SettingsConnectionsTab({ slug, secrets, canManage, onSecretsChan
       <section className="panel stack">
         <div className="co-card-head">
           <div className="co-card-title-row">
-            <ConnProviderIcon id="metricool" size={22} />
+            <ConnProviderIcon id="metricool" size={28} />
             <div>
               <h3 className="co-card-title">Metricool</h3>
               <p className="muted co-card-hint">{t('metricoolHint')}</p>
@@ -238,7 +238,7 @@ export function SettingsConnectionsTab({ slug, secrets, canManage, onSecretsChan
       <section className="panel stack">
         <div className="co-card-head">
           <div className="co-card-title-row">
-            <ConnProviderIcon id="brevo" size={22} />
+            <ConnProviderIcon id="brevo" size={28} />
             <div>
               <h3 className="co-card-title">
                 {t('emailMarketing')} · Brevo
@@ -277,7 +277,7 @@ export function SettingsConnectionsTab({ slug, secrets, canManage, onSecretsChan
       <section className="panel stack">
         <div className="co-card-head">
           <div className="co-card-title-row">
-            <ConnProviderIcon id="openseo" size={22} />
+            <ConnProviderIcon id="openseo" size={28} />
             <div>
               <h3 className="co-card-title">OpenSEO</h3>
               <p className="muted co-card-hint">{t('openseoHint')}</p>
@@ -304,7 +304,7 @@ export function SettingsConnectionsTab({ slug, secrets, canManage, onSecretsChan
       <section className="panel stack">
         <div className="co-card-head">
           <div className="co-card-title-row">
-            <ConnProviderIcon id="direct_ads" size={22} />
+            <ConnProviderIcon id="direct_ads" size={28} />
             <div>
               <h3 className="co-card-title">{t('directAdsKeys')}</h3>
               <p className="muted co-card-hint">{t('directAdsHint')}</p>

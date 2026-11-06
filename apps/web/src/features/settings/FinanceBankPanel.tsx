@@ -99,7 +99,7 @@ export function FinanceBankPanel({ slug, canManage }: Props) {
     <section className="panel stack" id="finance-connections">
       <div className="co-card-head">
         <div className="co-card-title-row">
-          <ConnProviderIcon id="finapi" size={22} />
+          <ConnProviderIcon id="finapi" size={28} />
           <div>
             <h3 className="co-card-title">{t('finapiTitle')}</h3>
             <p className="muted co-card-hint">{t('finapiHint')}</p>
