@@ -96,6 +96,8 @@ export function companyRoutes(slug: string) {
     geo: `${base}/marketing/funnel/organic/website?surface=geo`,
     settings: `${base}/settings`,
     settingsConnections: `${base}/settings#connections`,
+    /** Deep-link to Bank · finAPI panel under Verbindungen */
+    settingsFinanceConnections: `${base}/settings#finance-connections`,
     settingsLabels: `${base}/settings#labels`,
     /** @deprecated use settingsLabels */
     settingsTags: `${base}/settings#labels`,

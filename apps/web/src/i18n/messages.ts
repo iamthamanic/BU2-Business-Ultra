@@ -122,6 +122,20 @@ const de = {
   connProviderReady: 'Bereit zum Verbinden',
   connLogSoon: 'Sync- und Webhook-Protokoll folgt.',
   connLegacyHeading: 'API-Keys & Tools',
+  finapiTitle: 'Bank · finAPI',
+  finapiHint:
+    'Open-Banking für Konten und Umsätze. Client-ID und Secret aus dem finAPI-Entwicklerkonto.',
+  finapiEmpty: 'Noch kein Bank-Zugang verbunden.',
+  finapiConnectLabel: 'finAPI Client verbinden',
+  finapiClientId: 'Client-ID',
+  finapiClientSecret: 'Client-Secret',
+  finapiDataKeyOptional: 'Data-Decryption-Key (optional)',
+  finapiMissingFields: 'Client-ID und Client-Secret sind Pflicht.',
+  finapiConnected: 'finAPI verbunden. Konten-Sync folgt.',
+  finapiDisconnected: 'finAPI-Verbindung entfernt.',
+  finapiDisconnectConfirm: 'finAPI-Verbindung wirklich entfernen?',
+  finapiSyncNote:
+    'Zugangsdaten werden verschlüsselt gespeichert. Transaktions-Sync und Bank-Login (Web Form) kommen als nächster Schritt.',
   connUnipileHint:
     'Privates Telegram-Konto verbinden (QR in Telegram → Geräte scannen). Alternativ bestehende Account-ID einfügen.',
   connUnipileStartQr: 'QR-Code starten',
@@ -1599,6 +1613,20 @@ const en: { [K in keyof typeof de]: string } = {
   connProviderReady: 'Ready to connect',
   connLogSoon: 'Sync and webhook log coming later.',
   connLegacyHeading: 'API keys & tools',
+  finapiTitle: 'Bank · finAPI',
+  finapiHint:
+    'Open banking for accounts and transactions. Client ID and secret from your finAPI developer account.',
+  finapiEmpty: 'No bank access connected yet.',
+  finapiConnectLabel: 'Connect finAPI client',
+  finapiClientId: 'Client ID',
+  finapiClientSecret: 'Client secret',
+  finapiDataKeyOptional: 'Data decryption key (optional)',
+  finapiMissingFields: 'Client ID and client secret are required.',
+  finapiConnected: 'finAPI connected. Account sync comes next.',
+  finapiDisconnected: 'finAPI connection removed.',
+  finapiDisconnectConfirm: 'Remove this finAPI connection?',
+  finapiSyncNote:
+    'Credentials are stored encrypted. Transaction sync and bank login (web form) are the next step.',
   connUnipileHint:
     'Connect a personal Telegram account (scan QR in Telegram → Devices). Or paste an existing account id.',
   connUnipileStartQr: 'Start QR code',

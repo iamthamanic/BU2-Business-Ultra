@@ -56,7 +56,7 @@ export function FinancePage() {
   const [txFilter, setTxFilter] = useState<TxFilter>('all')
   const [period, setPeriod] = useState('current')
   const [toast, setToast] = useState<string | null>(null)
-  const settingsHref = slug ? companyRoutes(slug).settingsConnections : '#'
+  const settingsHref = slug ? companyRoutes(slug).settingsFinanceConnections : '#'
 
   useEffect(() => {
     if (!toast) return

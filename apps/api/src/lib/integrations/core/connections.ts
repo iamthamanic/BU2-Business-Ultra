@@ -23,9 +23,11 @@ import { getAdapter } from './adapter.js'
 import { parseCapabilitiesCache, purposeAllowed } from './capabilities.js'
 import { ensureMockAdapterRegistered } from './mockAdapter.js'
 import { ensureImapAdapterRegistered } from '../imap/adapter.js'
+import { ensureFinapiAdapterRegistered } from '../finapi/adapter.js'
 
 ensureMockAdapterRegistered()
 ensureImapAdapterRegistered()
+ensureFinapiAdapterRegistered()
 
 export type PublicConnection = {
   id: string
@@ -138,12 +140,13 @@ export async function connectMockAccount(opts: {
   }
 }
 
-/** Persist any adapter connect result (encrypted credentials + optional inbox bindings). */
+/** Persist any adapter connect result (encrypted credentials + optional module bindings). */
 export async function persistAdapterConnection(opts: {
   businessId: string
   userId: string
   result: AdapterConnectResult
   bindInbox?: boolean
+  bindFinance?: boolean
 }): Promise<PublicConnection> {
   try {
     const inserted = await db
@@ -191,6 +194,19 @@ export async function persistAdapterConnection(opts: {
       }
     }
 
+    if (opts.bindFinance) {
+      const check = purposeAllowed(opts.result.capabilities, 'sync')
+      if (check.allowed) {
+        await db.insert(moduleBindings).values({
+          businessId: opts.businessId,
+          connectionId: conn.id,
+          module: 'finance',
+          purpose: 'sync',
+          enabled: true,
+        })
+      }
+    }
+
     return toPublic(conn)
   } catch (e) {
     const msg = String(e)
@@ -233,6 +249,55 @@ export async function connectImapAccount(opts: {
     result,
     bindInbox: true,
   })
+}
+
+export async function connectFinapiAccount(opts: {
+  businessId: string
+  userId: string
+  clientId: string
+  clientSecret: string
+  dataDecryptionKey?: string
+  displayName?: string
+}): Promise<PublicConnection> {
+  const adapter = getAdapter('finapi')
+  if (!adapter) throw Object.assign(new Error('adapter_unavailable'), { statusCode: 501 })
+  const result = await adapter.connect({
+    externalAccountId: 'pending',
+    displayName: opts.displayName,
+    credential: JSON.stringify({
+      clientId: opts.clientId,
+      clientSecret: opts.clientSecret,
+      dataDecryptionKey: opts.dataDecryptionKey,
+      displayName: opts.displayName,
+    }),
+  })
+  return persistAdapterConnection({
+    businessId: opts.businessId,
+    userId: opts.userId,
+    result,
+    bindFinance: true,
+  })
+}
+
+/** Soft-delete: revoke connection (credentials cascade via FK). */
+export async function revokeConnection(
+  businessId: string,
+  connectionId: string,
+): Promise<boolean> {
+  const conn = await getConnectionForBusiness(businessId, connectionId)
+  if (!conn) return false
+  await db
+    .delete(moduleBindings)
+    .where(
+      and(eq(moduleBindings.businessId, businessId), eq(moduleBindings.connectionId, connectionId)),
+    )
+  await db
+    .delete(connectionCredentials)
+    .where(eq(connectionCredentials.connectionId, connectionId))
+  await db
+    .delete(connections)
+    .where(and(eq(connections.id, connectionId), eq(connections.businessId, businessId)))
+  return true
 }
 
 /** Server-only — never expose via API. */

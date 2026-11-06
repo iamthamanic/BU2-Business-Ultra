@@ -3863,6 +3863,17 @@ select.input,
   font-weight: 650;
 }
 
+.co-card-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.co-card-title-row .conn-provider-icon {
+  margin-top: 2px;
+}
+
 .co-card-hint {
   margin: 4px 0 0;
   font-size: 12px;

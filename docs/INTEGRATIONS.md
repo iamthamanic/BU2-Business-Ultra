@@ -32,7 +32,7 @@ HTTP: `apps/api/src/modules/integrations/*` under `/api/b/:slug/integrations/…
 |-------|--------|--------------|
 | `social` | Messaging / inbox / organic social | Gmail, Outlook, IMAP, WhatsApp, Instagram, Facebook, Telegram, Unipile |
 | `paid` | Ads / paid social video | YouTube, Google Ads |
-| `finance` | Bank / bookkeeping (credentials-only) | *none yet — Finance UI uses demo fixtures until connectors land* |
+| `finance` | Bank / bookkeeping (credentials-only) | `finapi` (credentials stored; sync pending) |
 | `generic` | Test / catch-all | Mock |
 
 **Add a connector (checklist):**
@@ -62,6 +62,7 @@ From `PROVIDER_CATALOG` (adapterReady flags are code claims; live mode still nee
 | `facebook` | Facebook | social | `oauth_pkce` | oauth |
 | `telegram` | Telegram (Bot) | social | `bot_token` | bot_token |
 | `unipile` | Telegram (privat) | social | `aggregator_session`, `api_key` | aggregator |
+| `finapi` | finAPI (Bank) | finance | `api_key` | password (client id/secret form) |
 
 ### Related non-catalog / settings-gated
 

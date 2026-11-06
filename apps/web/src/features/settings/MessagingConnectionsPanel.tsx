@@ -35,10 +35,13 @@ type ProviderRow = {
   adapterReady: boolean
   selectable?: boolean
   connectKind?: string
+  domainGroup?: string
   redirectUri?: string | null
   oauthConfigured?: boolean | null
   clientConfigured?: boolean
 }
+
+const FINANCE_PROVIDERS = new Set(['finapi'])
 
 type SubTab = 'accounts' | 'providers' | 'log'
 
@@ -160,7 +163,12 @@ export function MessagingConnectionsPanel({ slug, canManage }: Props) {
     return providers.find((p) => p.id === id)?.label || id
   }
 
-  const messagingConnections = connections.filter((c) => c.provider !== 'mock')
+  const messagingProviders = providers.filter(
+    (p) => p.id !== 'mock' && p.domainGroup !== 'finance' && !FINANCE_PROVIDERS.has(p.id),
+  )
+  const messagingConnections = connections.filter(
+    (c) => c.provider !== 'mock' && !FINANCE_PROVIDERS.has(c.provider),
+  )
 
   return (
     <section className="panel stack conn-messaging" id="messaging-connections">
@@ -327,9 +335,7 @@ export function MessagingConnectionsPanel({ slug, canManage }: Props) {
 
       {sub === 'providers' ? (
         <ul className="conn-provider-list">
-          {providers
-            .filter((p) => p.id !== 'mock')
-            .map((p) => (
+          {messagingProviders.map((p) => (
               <li key={p.id}>
                 <div
                   className={`conn-provider-card${p.adapterReady || p.connectKind === 'oauth' ? '' : ' is-disabled'}`}
@@ -364,7 +370,7 @@ export function MessagingConnectionsPanel({ slug, canManage }: Props) {
       {showConnect ? (
         <ConnectAccountModal
           slug={slug}
-          providers={providers}
+          providers={messagingProviders}
           onClose={() => setShowConnect(false)}
           onConnected={() => {
             load().catch(console.error)

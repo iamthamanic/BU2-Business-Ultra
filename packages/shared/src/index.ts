@@ -895,6 +895,8 @@ export const IntegrationProviderSchema = z.enum([
   'meta',
   'telegram',
   'unipile',
+  /** Open-banking aggregator (DE) — credentials-first; sync later. */
+  'finapi',
 ])
 export type IntegrationProvider = z.infer<typeof IntegrationProviderSchema>
 
@@ -925,6 +927,7 @@ export const IntegrationModuleSchema = z.enum([
   'crm',
   'projects',
   'calendar',
+  'finance',
 ])
 export type IntegrationModule = z.infer<typeof IntegrationModuleSchema>
 
@@ -1010,6 +1013,16 @@ export const ConnectImapSchema = z.object({
   displayName: z.string().min(1).max(160).optional(),
 })
 export type ConnectImapInput = z.infer<typeof ConnectImapSchema>
+
+/** finAPI client credentials — stored encrypted; bank sync lands later. */
+export const ConnectFinapiSchema = z.object({
+  clientId: z.string().min(4).max(200),
+  clientSecret: z.string().min(8).max(500),
+  /** Optional data-decryption key if enabled in the finAPI project. */
+  dataDecryptionKey: z.string().min(8).max(500).optional(),
+  displayName: z.string().min(1).max(160).optional(),
+})
+export type ConnectFinapiInput = z.infer<typeof ConnectFinapiSchema>
 
 export const OAuthProviderParamSchema = z.enum([
   'google',

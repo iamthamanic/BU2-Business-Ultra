@@ -1,5 +1,5 @@
 /**
- * SettingsConnectionsTab — Metricool brands, Brevo, OpenSEO, Direct Ads keys.
+ * SettingsConnectionsTab — Messaging, Bank (finAPI), Metricool, Brevo, OpenSEO, Ads.
  * Location: apps/web/src/features/settings/SettingsConnectionsTab.tsx
  */
 import { useEffect, useState } from 'react'
@@ -7,6 +7,8 @@ import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { companyRoutes } from '../../lib/companyPaths'
 import { useI18n } from '../../lib/i18n'
+import { ConnProviderIcon } from './connProviderIcons'
+import { FinanceBankPanel } from './FinanceBankPanel'
 import { MessagingConnectionsPanel } from './MessagingConnectionsPanel'
 
 const DIRECT_PROVIDERS = ['google_ads', 'meta_ads', 'tiktok_ads', 'chatgpt_ads'] as const
@@ -54,6 +56,13 @@ export function SettingsConnectionsTab({ slug, secrets, canManage, onSecretsChan
     api<{ instance?: { status?: string } }>(`/api/b/${slug}/openseo`)
       .then((r) => setSeoStatus(r.instance?.status ?? 'not_provisioned'))
       .catch(() => setSeoStatus('—'))
+  }, [slug])
+
+  useEffect(() => {
+    const raw = window.location.hash.replace(/^#/, '').toLowerCase()
+    if (raw !== 'finance-connections' && raw !== 'finapi') return
+    const el = document.getElementById('finance-connections')
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [slug])
 
   function secretFor(p: string) {
@@ -126,14 +135,19 @@ export function SettingsConnectionsTab({ slug, secrets, canManage, onSecretsChan
     <div className="stack" id="connections">
       <MessagingConnectionsPanel slug={slug} canManage={canManage} />
 
+      <FinanceBankPanel slug={slug} canManage={canManage} />
+
       <h3 className="conn-legacy-heading">{t('connLegacyHeading')}</h3>
 
       {/* Metricool */}
       <section className="panel stack">
         <div className="co-card-head">
-          <div>
-            <h3 className="co-card-title">Metricool</h3>
-            <p className="muted co-card-hint">{t('metricoolHint')}</p>
+          <div className="co-card-title-row">
+            <ConnProviderIcon id="metricool" size={22} />
+            <div>
+              <h3 className="co-card-title">Metricool</h3>
+              <p className="muted co-card-hint">{t('metricoolHint')}</p>
+            </div>
           </div>
           <span className={`badge ${mc?.linked.length || metricoolSecret?.valid ? 'ok' : 'warn'}`}>
             {mc?.linked.length || metricoolSecret?.valid ? t('statusConnected') : t('statusOpen')}
@@ -223,9 +237,14 @@ export function SettingsConnectionsTab({ slug, secrets, canManage, onSecretsChan
       {/* Brevo */}
       <section className="panel stack">
         <div className="co-card-head">
-          <div>
-            <h3 className="co-card-title">{t('emailMarketing')} · Brevo</h3>
-            <p className="muted co-card-hint">{t('brevoHint')}</p>
+          <div className="co-card-title-row">
+            <ConnProviderIcon id="brevo" size={22} />
+            <div>
+              <h3 className="co-card-title">
+                {t('emailMarketing')} · Brevo
+              </h3>
+              <p className="muted co-card-hint">{t('brevoHint')}</p>
+            </div>
           </div>
           <span className={`badge ${brevoSecret?.valid ? 'ok' : 'warn'}`}>
             {brevoSecret?.valid ? t('statusConnected') : t('statusOpen')}
@@ -257,9 +276,12 @@ export function SettingsConnectionsTab({ slug, secrets, canManage, onSecretsChan
       {/* OpenSEO */}
       <section className="panel stack">
         <div className="co-card-head">
-          <div>
-            <h3 className="co-card-title">OpenSEO</h3>
-            <p className="muted co-card-hint">{t('openseoHint')}</p>
+          <div className="co-card-title-row">
+            <ConnProviderIcon id="openseo" size={22} />
+            <div>
+              <h3 className="co-card-title">OpenSEO</h3>
+              <p className="muted co-card-hint">{t('openseoHint')}</p>
+            </div>
           </div>
           <span className={`badge ${seoOk ? 'ok' : 'warn'}`}>
             {seoOk ? t('statusConnected') : t('statusOpen')}
@@ -281,9 +303,12 @@ export function SettingsConnectionsTab({ slug, secrets, canManage, onSecretsChan
       {/* Direct Ads */}
       <section className="panel stack">
         <div className="co-card-head">
-          <div>
-            <h3 className="co-card-title">{t('directAdsKeys')}</h3>
-            <p className="muted co-card-hint">{t('directAdsHint')}</p>
+          <div className="co-card-title-row">
+            <ConnProviderIcon id="direct_ads" size={22} />
+            <div>
+              <h3 className="co-card-title">{t('directAdsKeys')}</h3>
+              <p className="muted co-card-hint">{t('directAdsHint')}</p>
+            </div>
           </div>
           <button className="btn" type="button" onClick={() => setShowDirect((v) => !v)}>
             {showDirect ? t('hide') : t('show')}
@@ -294,8 +319,11 @@ export function SettingsConnectionsTab({ slug, secrets, canManage, onSecretsChan
               const st = secretFor(p)
               return (
                 <div key={p} className="stack" style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
-                  <div className="row" style={{ justifyContent: 'space-between' }}>
-                    <strong>{providerLabel(p, t)}</strong>
+                  <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <span className="co-card-title-row" style={{ gap: 8 }}>
+                      <ConnProviderIcon id={p} size={18} />
+                      <strong>{providerLabel(p, t)}</strong>
+                    </span>
                     <span className={`badge ${st?.valid ? 'ok' : 'warn'}`}>
                       {st?.valid ? `${t('statusValid')} ${st.keyHint ?? ''}` : t('statusMissing')}
                     </span>

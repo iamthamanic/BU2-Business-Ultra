@@ -110,6 +110,14 @@ export const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
     connectKind: 'aggregator',
     domainGroup: 'social',
   },
+  {
+    id: 'finapi',
+    label: 'finAPI (Bank)',
+    authMethods: ['api_key'],
+    adapterReady: true,
+    connectKind: 'password',
+    domainGroup: 'finance',
+  },
 ]
 
 export function providersByDomainGroup(group: ProviderDomainGroup): ProviderCatalogEntry[] {
