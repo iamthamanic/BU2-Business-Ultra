@@ -68,6 +68,17 @@ function capabilitiesFor(
   }
   const key = oauthRedirectKey(provider)
   if (key === 'meta') {
+    if (provider === 'meta_ads') {
+      return buildCapabilities(accountType, scopes, [
+        { operation: 'sync', messageFormats: [], window: NONE_WINDOW },
+        {
+          operation: 'publish',
+          messageFormats: [],
+          window: NONE_WINDOW,
+          reason: 'ads_mutate_when_ui_ready',
+        },
+      ])
+    }
     return buildCapabilities(accountType, scopes, [
       { operation: 'read_dm', messageFormats: ['text'], window: CARE_WINDOW },
       { operation: 'send_dm', messageFormats: ['text'], window: CARE_WINDOW },
@@ -85,6 +96,9 @@ function shouldBindInbox(provider: IntegrationProvider): boolean {
   return (
     provider === 'google' ||
     provider === 'microsoft' ||
+    provider === 'imap' ||
+    provider === 'telegram' ||
+    provider === 'unipile' ||
     provider === 'whatsapp' ||
     provider === 'instagram' ||
     provider === 'facebook' ||

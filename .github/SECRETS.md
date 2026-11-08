@@ -39,6 +39,19 @@ Env names:
 - `META_OAUTH_APP_ID` / `META_OAUTH_APP_SECRET`
 - `UNIPILE_DSN` / `UNIPILE_ACCESS_TOKEN` (personal Telegram via Unipile)
 
+### Optional — finAPI (Finance / Open Banking)
+
+Platform app credentials (same pattern as OAuth clients). **Not** the end-user bank login.
+
+- `FINAPI_CLIENT_ID` / `FINAPI_CLIENT_SECRET`
+- `FINAPI_DATA_DECRYPTION_KEY` (optional)
+- `FINAPI_BASE_URL` (optional; defaults to sandbox `https://sandbox.finapi.io`)
+- `GOOGLE_ADS_DEVELOPER_TOKEN` (optional; required for live Google Ads API calls)
+
+Per-business bank access tokens go in Integration Core after Web Form connect — never in global env.
+
+**Status:** finAPI Settings form removed — env only. Bank Web Form still pending. Google Ads OAuth uses `GOOGLE_OAUTH_*`; developer token is separate.
+
 Leave blank until the client exists. Empty = fail-closed (503). Do not use `CHANGE_ME` placeholders.
 
 **Status:** authorize + PKCE + token exchange + encrypted credential persist for Google family (**Gmail**, **YouTube**, **Google Ads**), Microsoft, Meta messaging. Same Google Cloud client; separate connects (different scopes). Callback: `oauth_status=connected`.
@@ -51,7 +64,7 @@ Production must terminate TLS and route `/api/oauth/*/callback` to the API.
 
 | Layer | Examples | Where |
 |-------|----------|--------|
-| Global app | OAuth client id/secret, `SESSION_SECRET`, `SECRETS_MASTER_KEY`, Brevo platform key | Env / GitHub Secrets |
-| Per-business | Access/refresh tokens, Metricool keys, Ads developer tokens tied to a tenant | Integration Core (encrypted at rest with `SECRETS_MASTER_KEY`) |
+| Global app | OAuth client id/secret, finAPI client id/secret, `SESSION_SECRET`, `SECRETS_MASTER_KEY`, Brevo platform key | Env / GitHub Secrets |
+| Per-business | Access/refresh tokens, bank access after finAPI Web Form, Metricool keys, Ads developer tokens tied to a tenant | Integration Core (encrypted at rest with `SECRETS_MASTER_KEY`) |
 
 Never put tenant tokens in global env. Rotating `SECRETS_MASTER_KEY` invalidates sealed credentials — re-connect integrations after a rotation.

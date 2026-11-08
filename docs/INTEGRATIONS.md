@@ -87,6 +87,8 @@ From `PROVIDER_CATALOG` (adapterReady flags are code claims; live mode still nee
 | Kind | Where |
 |------|-------|
 | OAuth client id/secret (platform) | Env — see `.env.example` / `.github/SECRETS.md` |
+| finAPI app client id/secret (platform) | Env: `FINAPI_CLIENT_ID` / `FINAPI_CLIENT_SECRET` (+ optional data key / base URL). Settings UI only verifies env — bank Web Form still pending |
+| Google Ads developer token (platform) | Env: `GOOGLE_ADS_DEVELOPER_TOKEN` (with `GOOGLE_OAUTH_*`) |
 | Per-connection tokens | DB `connection_credentials` (encrypted at rest via app crypto) |
 | Bot tokens / aggregator | Same credentials table / Unipile env (`UNIPILE_DSN`, `UNIPILE_ACCESS_TOKEN`) |
 | Single feature API keys | `settings_secrets` via Settings UI |
@@ -98,6 +100,8 @@ Never commit real values. UI: Settings → Verbindungen.
 - Flow: PKCE authorize → provider → callback → `oauth/complete` upserts connection.
 - Redirect keys: `lib/integrations/oauth/redirects.ts` + `PUBLIC_WEB_URL` / `PUBLIC_API_URL`.
 - Gmail launch: restricted scopes; public OAuth verification is a release-plan item (DECISIONS) — OK for local/dev.
+- Local Gmail inbox sync requires **Gmail API enabled** on the same GCP project as `GOOGLE_OAUTH_CLIENT_ID` (otherwise `gmail_api_403` / `gmail_api_disabled`).
+- Omnichannel sync (`POST /api/b/:slug/inbox/sync`): Gmail, Telegram Bot, Unipile today; Outlook/IMAP/Meta native DMs bind to inbox but sync via Unipile or upcoming adapters.
 
 ## Webhooks / sync
 

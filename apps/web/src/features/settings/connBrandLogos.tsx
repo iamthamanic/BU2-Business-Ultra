@@ -146,6 +146,57 @@ function AdsMark({ size, id, bg }: { size: Size; id: string; bg: string }) {
   )
 }
 
+/** OpenAI / ChatGPT bloom (Simple Icons). */
+function ChatGptMark({ size }: { size: Size }) {
+  return (
+    <Tile id="chatgpt_ads" bg="#10A37F" size={size}>
+      <path
+        fill="#fff"
+        d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"
+      />
+    </Tile>
+  )
+}
+
+/** Google Ads product mark — green disc + yellow/blue triangles (brand colors). */
+function GoogleAdsMark({ size }: { size: Size }) {
+  return (
+    <Tile id="google_ads" bg="#FFF" size={size}>
+      <path
+        fill="#34A853"
+        d="M3.9998 22.9291C1.7908 22.9291 0 21.1383 0 18.9293s1.7908-3.9998 3.9998-3.9998 3.9998 1.7908 3.9998 3.9998-1.7908 3.9998-3.9998 3.9998z"
+      />
+      <path
+        fill="#4285F4"
+        d="M23.4641 16.9287L15.4632 3.072C14.3586 1.1587 11.9121.5028 9.9988 1.6074S7.4295 5.1585 8.5341 7.0718l8.0009 13.8567c1.1046 1.9133 3.5511 2.5679 5.4644 1.4646 1.9134-1.1046 2.568-3.5511 1.4647-5.4644z"
+      />
+      <path
+        fill="#FBBC04"
+        d="M7.5137 4.8438L1.5645 15.1484A4.5 4.5 0 0 1 4 14.4297c2.5597-.0075 4.6248 2.1585 4.4941 4.7148l3.2168-5.5723-3.6094-6.25c-.4499-.7793-.6322-1.6394-.5878-2.4784z"
+      />
+    </Tile>
+  )
+}
+
+function RedditMark({ size }: { size: Size }) {
+  return (
+    <Tile id="reddit_ads" bg="#FF4500" size={size}>
+      <circle cx="12" cy="13" r="7" fill="#fff" />
+      <circle cx="9.2" cy="12.5" r="1.2" fill="#FF4500" />
+      <circle cx="14.8" cy="12.5" r="1.2" fill="#FF4500" />
+      <path
+        fill="#FF4500"
+        d="M9.2 15.2c.8.9 2 1.4 2.8 1.4s2-.5 2.8-1.4"
+        stroke="#FF4500"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+      />
+      <circle cx="17.5" cy="8.2" r="1.3" fill="#fff" />
+      <path d="M14.5 9.2c.6-.8 1.5-1.4 2.6-1.5" stroke="#fff" strokeWidth="1.2" />
+    </Tile>
+  )
+}
+
 function MetricoolMark({ size }: { size: Size }) {
   return (
     <Tile id="metricool" bg="#6C5CE7" size={size}>
@@ -188,13 +239,83 @@ function ChartMark({ size }: { size: Size }) {
   )
 }
 
+function LinkedInMark({ size }: { size: Size }) {
+  return (
+    <Tile id="linkedin" bg="#0A66C2" size={size}>
+      <path
+        fill="#fff"
+        d="M6.4 9.2h2.7v8.6H6.4V9.2zM7.75 5.2a1.55 1.55 0 1 1 0 3.1 1.55 1.55 0 0 1 0-3.1zM11.2 9.2h2.6v1.18h.04c.36-.68 1.24-1.4 2.56-1.4 2.74 0 3.25 1.8 3.25 4.14v4.68h-2.7v-4.15c0-.99-.02-2.26-1.38-2.26-1.38 0-1.59 1.08-1.59 2.19v4.22h-2.78V9.2z"
+      />
+    </Tile>
+  )
+}
+
+/** X (Twitter) — current wordmark. */
+function XMark({ size }: { size: Size }) {
+  return (
+    <Tile id="x" bg="#000" size={size}>
+      <path
+        fill="#fff"
+        d="M16.9 4.5h2.4l-5.25 6 6.17 9H15.7l-3.8-4.96L7.5 19.5H5.1l5.62-6.42L4.8 4.5h4.64l3.43 4.54L16.9 4.5zm-.84 13.2h1.33L8.1 5.86H6.67l9.39 11.84z"
+      />
+    </Tile>
+  )
+}
+
+/** TikTok — note glyph with cyan/magenta offset. */
+function TikTokMark({ size, id = 'tiktok' }: { size: Size; id?: string }) {
+  return (
+    <Tile id={id} bg="#010101" size={size}>
+      <path
+        fill="#25F4EE"
+        d="M14.2 3.5h2.1c.2 1.7 1.1 3.2 2.5 4.2v2.35c-1.15-.05-2.25-.45-3.2-1.15v5.55c0 3-2.4 5.45-5.4 5.45S4.8 17.45 4.8 14.45 7.2 9 10.2 9c.35 0 .7.04 1.05.1v2.45a3.1 3.1 0 0 0-1.05-.18c-1.7 0-3.05 1.35-3.05 3.05S8.5 17.5 10.2 17.5s3.05-1.35 3.05-3.05V3.5h.95z"
+        transform="translate(0.6 0.45)"
+      />
+      <path
+        fill="#FE2C55"
+        d="M14.2 3.5h2.1c.2 1.7 1.1 3.2 2.5 4.2v2.35c-1.15-.05-2.25-.45-3.2-1.15v5.55c0 3-2.4 5.45-5.4 5.45S4.8 17.45 4.8 14.45 7.2 9 10.2 9c.35 0 .7.04 1.05.1v2.45a3.1 3.1 0 0 0-1.05-.18c-1.7 0-3.05 1.35-3.05 3.05S8.5 17.5 10.2 17.5s3.05-1.35 3.05-3.05V3.5h.95z"
+        transform="translate(-0.55 -0.4)"
+      />
+      <path
+        fill="#fff"
+        d="M14.2 3.5h2.1c.2 1.7 1.1 3.2 2.5 4.2v2.35c-1.15-.05-2.25-.45-3.2-1.15v5.55c0 3-2.4 5.45-5.4 5.45S4.8 17.45 4.8 14.45 7.2 9 10.2 9c.35 0 .7.04 1.05.1v2.45a3.1 3.1 0 0 0-1.05-.18c-1.7 0-3.05 1.35-3.05 3.05S8.5 17.5 10.2 17.5s3.05-1.35 3.05-3.05V3.5h.95z"
+      />
+    </Tile>
+  )
+}
+
+function PinterestMark({ size, id = 'pinterest' }: { size: Size; id?: string }) {
+  return (
+    <Tile id={id} bg="#E60023" size={size}>
+      <path
+        fill="#fff"
+        d="M12 3.5c-4.7 0-8.5 3.7-8.5 8.3 0 3.5 2.15 6.5 5.2 7.7-.07-.65-.14-1.65.03-2.36.15-.65 1-4.2 1-4.2s-.25-.5-.25-1.25c0-1.17.68-2.04 1.52-2.04.72 0 1.07.54 1.07 1.18 0 .72-.46 1.8-.7 2.8-.2.84.42 1.52 1.24 1.52 1.49 0 2.5-1.92 2.5-4.2 0-1.73-1.17-3.03-3.3-3.03-2.4 0-3.9 1.78-3.9 3.77 0 .69.2 1.17.52 1.55.15.17.17.3.12.47l-.17.66c-.06.22-.18.27-.4.16-1.12-.46-1.65-1.7-1.65-3.08 0-2.29 1.94-5.04 5.78-5.04 3.1 0 5.14 2.24 5.14 4.65 0 3.18-1.77 5.57-4.39 5.57-.88 0-1.7-.47-1.98-1.01l-.54 2.1c-.2.74-.58 1.48-.93 2.05A8.6 8.6 0 0 0 12 20.3c4.7 0 8.5-3.7 8.5-8.3S16.7 3.5 12 3.5z"
+      />
+    </Tile>
+  )
+}
+
+function StripeMark({ size }: { size: Size }) {
+  return (
+    <Tile id="stripe" bg="#635BFF" size={size}>
+      <path
+        fill="#fff"
+        d="M12.6 9.15c-.7-.28-1.13-.47-1.13-.78 0-.3.28-.5.74-.5.87 0 1.76.34 2.5.9l.7-1.95A6.2 6.2 0 0 0 12.3 5.9c-2.2 0-3.66 1.15-3.66 3.07 0 2.12 2.75 2.66 2.75 4.04 0 .5-.4.66-.96.66-.85 0-1.9-.44-2.74-1.08L7 14.8c.98.58 2.1.96 3.3.96 2.3 0 3.88-1.14 3.88-3.12 0-2.36-2.78-2.76-2.78-4.04.01-.2.14-.45.2-.45z"
+      />
+    </Tile>
+  )
+}
+
 const LOGOS: Record<string, (size: Size) => ReactNode> = {
   google: (s) => <GoogleMark size={s} />,
   youtube: (s) => <YoutubeMark size={s} />,
-  google_ads: (s) => <AdsMark size={s} id="google_ads" bg="#4285F4" />,
+  google_ads: (s) => <GoogleAdsMark size={s} />,
   meta_ads: (s) => <FacebookMark size={s} />,
-  tiktok_ads: (s) => <AdsMark size={s} id="tiktok_ads" bg="#111" />,
-  chatgpt_ads: (s) => <AdsMark size={s} id="chatgpt_ads" bg="#10A37F" />,
+  tiktok_ads: (s) => <TikTokMark size={s} id="tiktok_ads" />,
+  chatgpt_ads: (s) => <ChatGptMark size={s} />,
+  reddit_ads: (s) => <RedditMark size={s} />,
+  pinterest_ads: (s) => <PinterestMark size={s} id="pinterest_ads" />,
+  microsoft_ads: (s) => <MicrosoftMark size={s} />,
   microsoft: (s) => <MicrosoftMark size={s} />,
   imap: (s) => <EnvelopeMark size={s} id="imap" bg="#7C3AED" />,
   whatsapp: (s) => <WhatsappMark size={s} />,
@@ -208,6 +329,13 @@ const LOGOS: Record<string, (size: Size) => ReactNode> = {
   direct_ads: (s) => <ChartMark size={s} />,
   finapi: (s) => <BankMark size={s} />,
   finance: (s) => <BankMark size={s} />,
+  linkedin: (s) => <LinkedInMark size={s} />,
+  x: (s) => <XMark size={s} />,
+  tiktok: (s) => <TikTokMark size={s} />,
+  pinterest: (s) => <PinterestMark size={s} />,
+  datev: (s) => <BankMark size={s} />,
+  lexoffice: (s) => <BankMark size={s} />,
+  stripe: (s) => <StripeMark size={s} />,
 }
 
 /** Colored brand tile — prefer over generic Phosphor for connection chrome. */

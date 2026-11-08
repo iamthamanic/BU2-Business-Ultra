@@ -120,22 +120,43 @@ export function InboxPage() {
     }
   }
 
+  function mapInboxError(code: string): string {
+    switch (code) {
+      case 'gmail_api_disabled':
+        return t('inboxErr_gmail_api_disabled')
+      case 'gmail_insufficient_scopes':
+        return t('inboxErr_gmail_insufficient_scopes')
+      case 'gmail_api_403':
+        return t('inboxErr_gmail_api_403')
+      case 'gmail_token_expired':
+        return t('inboxErr_gmail_token_expired')
+      default:
+        return code
+    }
+  }
+
   async function syncAll() {
-    if (!slug || !connections.length) return
+    if (!slug) return
     setSyncing(true)
     setError(null)
     try {
-      for (const c of connections) {
-        if (c.provider === 'telegram') {
-          await api(`/api/b/${slug}/inbox/telegram/connections/${c.id}/sync`, { method: 'POST' })
-        } else if (c.provider === 'unipile') {
-          await api(`/api/b/${slug}/inbox/unipile/connections/${c.id}/sync`, { method: 'POST' })
-        }
+      const summary = await api<{
+        results: Array<{ ok: boolean; error?: string; skipped?: boolean }>
+        synced: number
+        failed: number
+      }>(`/api/b/${slug}/inbox/sync`, { method: 'POST' })
+      const firstFail = summary.results.find((r) => !r.ok && r.error)
+      if (firstFail?.error) {
+        setError(mapInboxError(firstFail.error))
+      } else if (summary.synced === 0 && summary.results.every((r) => r.skipped)) {
+        setError(t('inboxErr_no_syncable'))
       }
       await refreshList()
       if (selectedId) await openThread(selectedId)
     } catch (e) {
-      setError(String((e as Error).message || e))
+      const code =
+        e && typeof e === 'object' && 'message' in e ? String((e as Error).message) : String(e)
+      setError(mapInboxError(code))
     } finally {
       setSyncing(false)
     }
@@ -196,17 +217,15 @@ export function InboxPage() {
           </p>
         </div>
         <div className="product-page-actions">
-          {hasConnection ? (
-            <button
-              type="button"
-              className="btn"
-              disabled={syncing || !canWrite}
-              onClick={() => syncAll().catch(console.error)}
-            >
-              <ArrowsClockwise size={14} weight="bold" aria-hidden />
-              {syncing ? t('inboxSyncing') : t('inboxSync')}
-            </button>
-          ) : null}
+          <button
+            type="button"
+            className="btn"
+            disabled={syncing || !canWrite}
+            onClick={() => syncAll().catch(console.error)}
+          >
+            <ArrowsClockwise size={14} weight="bold" aria-hidden />
+            {syncing ? t('inboxSyncing') : t('inboxSync')}
+          </button>
           <Link className="btn" to={routes.settingsConnections}>
             <PlugsConnected size={14} weight="bold" aria-hidden />
             {t('connConnectAccount')}

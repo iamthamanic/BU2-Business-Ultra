@@ -9,6 +9,7 @@ import {
   getMicrosoftOAuthConfig,
   GOOGLE_PROVIDER_SCOPES,
   OAUTH_SCOPES,
+  scopesForProvider,
   type OAuthClientConfig,
 } from './config.js'
 import { oauthRedirectKey, oauthRedirectUri, type OAuthRedirectProvider } from './redirects.js'
@@ -250,13 +251,15 @@ export async function exchangeMetaCode(opts: {
         ? 'whatsapp'
         : opts.provider === 'facebook'
           ? 'facebook'
-          : 'meta'
+          : opts.provider === 'meta_ads'
+            ? 'meta_ads'
+            : 'meta'
 
   return {
     accessToken,
     refreshToken: null,
     expiresAt,
-    scopes: [...OAUTH_SCOPES.meta],
+    scopes: scopesForProvider(opts.provider),
     externalAccountId: me.id,
     displayName: (typeof me.name === 'string' && me.name.trim()) || me.id,
     accountType,

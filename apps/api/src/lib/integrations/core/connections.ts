@@ -24,10 +24,12 @@ import { parseCapabilitiesCache, purposeAllowed } from './capabilities.js'
 import { ensureMockAdapterRegistered } from './mockAdapter.js'
 import { ensureImapAdapterRegistered } from '../imap/adapter.js'
 import { ensureFinapiAdapterRegistered } from '../finapi/adapter.js'
+import { ensureAdsKeyAdaptersRegistered, isAdsKeyProvider } from '../adsKey/adapter.js'
 
 ensureMockAdapterRegistered()
 ensureImapAdapterRegistered()
 ensureFinapiAdapterRegistered()
+ensureAdsKeyAdaptersRegistered()
 
 export type PublicConnection = {
   id: string
@@ -254,9 +256,6 @@ export async function connectImapAccount(opts: {
 export async function connectFinapiAccount(opts: {
   businessId: string
   userId: string
-  clientId: string
-  clientSecret: string
-  dataDecryptionKey?: string
   displayName?: string
 }): Promise<PublicConnection> {
   const adapter = getAdapter('finapi')
@@ -264,18 +263,38 @@ export async function connectFinapiAccount(opts: {
   const result = await adapter.connect({
     externalAccountId: 'pending',
     displayName: opts.displayName,
-    credential: JSON.stringify({
-      clientId: opts.clientId,
-      clientSecret: opts.clientSecret,
-      dataDecryptionKey: opts.dataDecryptionKey,
-      displayName: opts.displayName,
-    }),
+    credential: 'env',
   })
   return persistAdapterConnection({
     businessId: opts.businessId,
     userId: opts.userId,
     result,
     bindFinance: true,
+  })
+}
+
+export async function connectAdsApiKeyAccount(opts: {
+  businessId: string
+  userId: string
+  provider: string
+  apiKey: string
+  displayName?: string
+}): Promise<PublicConnection> {
+  if (!isAdsKeyProvider(opts.provider)) {
+    throw Object.assign(new Error('ads_provider_unsupported'), { statusCode: 400 })
+  }
+  const adapter = getAdapter(opts.provider)
+  if (!adapter) throw Object.assign(new Error('adapter_unavailable'), { statusCode: 501 })
+  const result = await adapter.connect({
+    externalAccountId: 'pending',
+    displayName: opts.displayName,
+    credential: opts.apiKey,
+  })
+  return persistAdapterConnection({
+    businessId: opts.businessId,
+    userId: opts.userId,
+    result,
+    bindInbox: false,
   })
 }
 

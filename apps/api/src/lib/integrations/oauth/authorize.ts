@@ -93,7 +93,7 @@ export function buildOAuthAuthorizeUrl(opts: {
   u.searchParams.set('client_id', cfg.clientId)
   u.searchParams.set('redirect_uri', redirectUri)
   u.searchParams.set('state', state)
-  u.searchParams.set('scope', OAUTH_SCOPES.meta.join(','))
+  u.searchParams.set('scope', scopesForProvider(opts.provider).join(','))
   // Meta dialog does not use PKCE the same way; keep verifier for future Graph token steps.
   return { authorizeUrl: u.toString(), state, codeVerifier: verifier, redirectUri }
 }

@@ -31,6 +31,7 @@ import {
 } from '../../lib/integrations/unipile/inboxSync.js'
 import { ensureUnipileAdapterRegistered } from '../../lib/integrations/unipile/adapter.js'
 import { syncGmailConnection } from '../../lib/integrations/gmail/inboxSync.js'
+import { syncAllInboxConnections } from '../../lib/integrations/inbox/syncAll.js'
 import { httpError } from '../../lib/httpError.js'
 import { loadMembership, requireUser } from '../../plugins/auth.js'
 
@@ -98,6 +99,27 @@ export async function inboxRoutes(app: FastifyInstance) {
     try {
       const result = await syncGmailConnection(m.businessId, id)
       return { result }
+    } catch (e) {
+      const { status, error } = httpError(e)
+      return reply.code(status).send({ error })
+    }
+  })
+
+  /** Sync every inbox-bound mail / messenger / Unipile account. */
+  app.post('/api/b/:slug/inbox/sync', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug } = req.params as { slug: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m || (!canMutateContent(m.role) && !user.isSuperadmin)) {
+      return reply.code(403).send({ error: 'forbidden' })
+    }
+    try {
+      const summary = await syncAllInboxConnections(m.businessId)
+      const firstFail = summary.results.find((r) => !r.ok)
+      if (summary.failed > 0 && summary.synced === 0 && firstFail?.error) {
+        return reply.code(502).send({ error: firstFail.error, ...summary })
+      }
+      return summary
     } catch (e) {
       const { status, error } = httpError(e)
       return reply.code(status).send({ error })

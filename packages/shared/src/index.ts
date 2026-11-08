@@ -13,6 +13,9 @@ export const SecretProviderSchema = z.enum([
   'meta_ads',
   'tiktok_ads',
   'chatgpt_ads',
+  'reddit_ads',
+  'pinterest_ads',
+  'microsoft_ads',
 ])
 export type SecretProvider = z.infer<typeof SecretProviderSchema>
 
@@ -934,6 +937,12 @@ export const IntegrationProviderSchema = z.enum([
   'google',
   'youtube',
   'google_ads',
+  'meta_ads',
+  'tiktok_ads',
+  'chatgpt_ads',
+  'reddit_ads',
+  'pinterest_ads',
+  'microsoft_ads',
   'microsoft',
   'imap',
   'whatsapp',
@@ -1075,6 +1084,7 @@ export const OAuthProviderParamSchema = z.enum([
   'google',
   'youtube',
   'google_ads',
+  'meta_ads',
   'microsoft',
   'whatsapp',
   'instagram',
@@ -1082,6 +1092,19 @@ export const OAuthProviderParamSchema = z.enum([
 ])
 export type OAuthProviderParam = z.infer<typeof OAuthProviderParamSchema>
 
+/** API-key connect for paid providers without OAuth yet. */
+export const ConnectAdsApiKeySchema = z.object({
+  provider: z.enum([
+    'tiktok_ads',
+    'chatgpt_ads',
+    'reddit_ads',
+    'pinterest_ads',
+    'microsoft_ads',
+  ]),
+  apiKey: z.string().min(8).max(2000),
+  displayName: z.string().min(1).max(160).optional(),
+})
+export type ConnectAdsApiKeyInput = z.infer<typeof ConnectAdsApiKeySchema>
 
 /** Link personal Telegram via Unipile (existing account_id or after QR finalize). */
 export const LinkUnipileTelegramSchema = z.object({

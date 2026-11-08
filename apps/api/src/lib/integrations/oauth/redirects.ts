@@ -22,7 +22,13 @@ export function oauthRedirectKey(
   // Gmail + YouTube + Google Ads share one Google Cloud OAuth client / callback.
   if (provider === 'google' || provider === 'youtube' || provider === 'google_ads') return 'google'
   if (provider === 'microsoft') return 'microsoft'
-  if (provider === 'whatsapp' || provider === 'instagram' || provider === 'facebook' || provider === 'meta') {
+  if (
+    provider === 'whatsapp' ||
+    provider === 'instagram' ||
+    provider === 'facebook' ||
+    provider === 'meta' ||
+    provider === 'meta_ads'
+  ) {
     return 'meta'
   }
   return null

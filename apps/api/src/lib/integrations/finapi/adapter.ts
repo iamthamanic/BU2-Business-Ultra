@@ -1,17 +1,11 @@
 /**
- * finAPI adapter — stores client credentials; transaction sync lands later.
+ * finAPI adapter — platform client from env; bank Web Form connect lands next.
  * Location: apps/api/src/lib/integrations/finapi/adapter.ts
  */
 import type { StructuredCapability } from '@bu2/shared'
 import type { AdapterConnectInput, AdapterConnectResult, ProviderAdapter } from '../core/adapter.js'
 import { registerAdapter } from '../core/adapter.js'
-
-export type FinapiConnectFields = {
-  clientId: string
-  clientSecret: string
-  dataDecryptionKey?: string
-  displayName?: string
-}
+import { getFinapiPlatformConfig, verifyFinapiPlatformCredentials } from './config.js'
 
 function finapiCapabilities(accountType: string): StructuredCapability[] {
   return [
@@ -22,71 +16,52 @@ function finapiCapabilities(accountType: string): StructuredCapability[] {
       accountType,
       messageFormats: [],
       availability: 'degraded',
-      reason: 'sync_worker_pending',
+      reason: 'bank_web_form_pending',
     },
   ]
-}
-
-export function encodeFinapiCredential(fields: FinapiConnectFields): string {
-  return JSON.stringify({
-    clientId: fields.clientId,
-    clientSecret: fields.clientSecret,
-    dataDecryptionKey: fields.dataDecryptionKey || undefined,
-  })
 }
 
 export const finapiAdapter: ProviderAdapter = {
   provider: 'finapi',
   async connect(input: AdapterConnectInput): Promise<AdapterConnectResult> {
-    let fields: FinapiConnectFields
-    try {
-      fields = JSON.parse(input.credential) as FinapiConnectFields
-    } catch {
-      throw Object.assign(new Error('finapi_invalid_credential'), { statusCode: 400 })
+    const cfg = getFinapiPlatformConfig()
+    if (!cfg.configured) {
+      throw Object.assign(new Error('finapi_env_not_configured'), { statusCode: 503 })
     }
-    const clientId = String(fields.clientId || '').trim()
-    const clientSecret = String(fields.clientSecret || '')
-    const dataDecryptionKey = fields.dataDecryptionKey
-      ? String(fields.dataDecryptionKey).trim()
-      : undefined
-    if (!clientId || !clientSecret) {
-      throw Object.assign(new Error('finapi_missing_fields'), { statusCode: 400 })
+    const probe = await verifyFinapiPlatformCredentials()
+    if (!probe.ok) {
+      throw Object.assign(new Error(probe.detail), { statusCode: 502 })
     }
-    if (clientId.length > 200 || clientSecret.length > 500) {
-      throw Object.assign(new Error('finapi_field_too_long'), { statusCode: 400 })
-    }
-    const accountType = 'finapi_client'
+    const accountType = 'finapi_platform'
     const caps = await this.resolveCapabilities({
       accountType,
       scopes: ['finapi.accounts', 'finapi.transactions'],
     })
+    /** Store a non-secret marker — real client secret stays in env only. */
+    const marker = JSON.stringify({
+      source: 'env',
+      clientIdHint: cfg.clientId.slice(0, 4) + '…',
+      baseUrl: cfg.baseUrl,
+      verifiedAt: new Date().toISOString(),
+    })
     return {
       provider: 'finapi',
       authMethod: 'api_key',
-      externalAccountId: `finapi:${clientId}`.slice(0, 160),
-      displayName: input.displayName?.trim() || fields.displayName?.trim() || `finAPI · ${clientId}`,
+      externalAccountId: `finapi:platform:${cfg.clientId}`.slice(0, 160),
+      displayName: input.displayName?.trim() || 'finAPI (App)',
       accountType,
-      credentials: [
-        {
-          kind: 'finapi_config',
-          plaintext: encodeFinapiCredential({
-            clientId,
-            clientSecret,
-            dataDecryptionKey,
-          }),
-        },
-      ],
+      credentials: [{ kind: 'finapi_platform', plaintext: marker }],
       capabilities: caps,
       health: {
         ok: true,
         adapter: 'finapi',
         checkedAt: new Date().toISOString(),
-        note: 'credentials_stored_sync_pending',
+        note: 'platform_env_verified_bank_web_form_pending',
       },
     }
   },
   async resolveCapabilities(ctx): Promise<StructuredCapability[]> {
-    return finapiCapabilities(ctx.accountType || 'finapi_client')
+    return finapiCapabilities(ctx.accountType || 'finapi_platform')
   },
 }
 

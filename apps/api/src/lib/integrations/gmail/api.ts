@@ -77,12 +77,37 @@ async function gmailJson<T>(
     json = { raw: text }
   }
   if (!res.ok) {
-    throw Object.assign(new Error(`gmail_api_${res.status}`), {
-      statusCode: 502,
+    throw Object.assign(new Error(classifyGmailHttpError(res.status, json)), {
+      statusCode: res.status === 403 || res.status === 401 ? res.status : 502,
       detail: json,
     })
   }
   return json as T
+}
+
+/** Map Google Gmail HTTP failures to actionable error codes for the UI. */
+function classifyGmailHttpError(status: number, body: unknown): string {
+  const blob = JSON.stringify(body || {}).toLowerCase()
+  if (status === 403) {
+    if (
+      blob.includes('has not been used') ||
+      blob.includes('is disabled') ||
+      blob.includes('accessnotconfigured') ||
+      blob.includes('service_disabled')
+    ) {
+      return 'gmail_api_disabled'
+    }
+    if (
+      blob.includes('insufficientpermissions') ||
+      blob.includes('insufficient authentication scopes') ||
+      blob.includes('access_denied')
+    ) {
+      return 'gmail_insufficient_scopes'
+    }
+    return 'gmail_api_403'
+  }
+  if (status === 401) return 'gmail_token_expired'
+  return `gmail_api_${status}`
 }
 
 export async function listInboxThreads(

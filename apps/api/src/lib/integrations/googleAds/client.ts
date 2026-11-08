@@ -14,6 +14,10 @@ async function adsFetch(opts: {
     authorization: `Bearer ${opts.accessToken}`,
     'content-type': 'application/json',
   }
+  const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN?.trim()
+  if (developerToken) {
+    headers['developer-token'] = developerToken
+  }
   if (opts.loginCustomerId) {
     headers['login-customer-id'] = opts.loginCustomerId.replace(/-/g, '')
   }

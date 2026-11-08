@@ -6,7 +6,7 @@ import type { IntegrationProvider } from '@bu2/shared'
 import { oauthRedirectKey, type OAuthRedirectProvider } from './redirects.js'
 
 function trimEnv(name: string): string {
-  return (process.env[name] || '').trim()
+  return process.env[name]?.trim() ?? ''
 }
 
 export type OAuthClientConfig = {
@@ -75,9 +75,20 @@ export const OAUTH_SCOPES: Record<OAuthRedirectProvider, string[]> = {
   ],
 }
 
+/** Meta Marketing API — separate connect from messaging channels. */
+export const META_ADS_SCOPES = [
+  'ads_read',
+  'ads_management',
+  'business_management',
+  'pages_show_list',
+] as const
+
 export function scopesForProvider(provider: IntegrationProvider | string): string[] {
   if (provider === 'google' || provider === 'youtube' || provider === 'google_ads') {
     return GOOGLE_PROVIDER_SCOPES[provider]
+  }
+  if (provider === 'meta_ads') {
+    return [...META_ADS_SCOPES]
   }
   const key = oauthRedirectKey(provider)
   return key ? OAUTH_SCOPES[key] : []

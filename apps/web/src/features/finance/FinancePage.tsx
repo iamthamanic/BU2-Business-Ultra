@@ -87,9 +87,6 @@ export function FinancePage() {
           <p className="muted finance-page-sub">{t('financeLedeLive')}</p>
         </div>
         <div className="finance-head-actions">
-          <button type="button" className="btn" onClick={() => go('settings')}>
-            {t('financeDataOrigin')}
-          </button>
           <select
             className="select"
             aria-label={t('financePeriod')}
