@@ -995,6 +995,10 @@ export function CustomerDetail() {
       ...billing,
       relationStatus: cust.relationStatus,
       kind: cust.kind,
+      isCustomer: Boolean(cust.isCustomer),
+      isPartner: Boolean(cust.isPartner),
+      partnerCategory: cust.isPartner ? cust.partnerCategory || null : null,
+      partnerStatus: cust.partnerStatus === 'inactive' ? 'inactive' : 'active',
     })
   }
 
@@ -1073,7 +1077,7 @@ export function CustomerDetail() {
     <div className="stack mkt-shell product-shell crm-shell">
       <header className="product-page-head customer-detail-head">
         <div className="customer-identity">
-          <Link to={routes.customer} className="muted customer-back">
+          <Link to={routes.contacts} className="muted customer-back">
             ← {t('customer')}
           </Link>
           <div className="customer-identity-row">
@@ -1093,16 +1097,32 @@ export function CustomerDetail() {
                   )}
                   {c.kind === 'org' ? t('customerKindOrg') : t('customerKindPerson')}
                 </span>
-                <span className={`crm-status crm-status--${c.relationStatus}`}>
-                  {statusIcon(c.relationStatus)}
-                  {statusLabel(c.relationStatus, t)}
-                </span>
+                {c.isCustomer ? (
+                  <span className={`crm-status crm-status--${c.relationStatus}`}>
+                    {statusIcon(c.relationStatus)}
+                    {statusLabel(c.relationStatus, t)}
+                  </span>
+                ) : null}
+                {c.isPartner ? (
+                  <span
+                    className={`crm-status crm-status--${c.partnerStatus === 'inactive' ? 'archived' : 'active'}`}
+                  >
+                    {t('contactRolePartner')}
+                    {c.partnerCategory ? ` · ${c.partnerCategory}` : ''}
+                  </span>
+                ) : null}
               </div>
               <div className="customer-meta-row">
-                {c.customerNumber != null ? (
+                {c.customerNumber != null && c.isCustomer ? (
                   <span className="customer-meta-item customer-number-chip" title={t('customerNumber')}>
                     <IdentificationCard size={14} weight="regular" aria-hidden />
-                    {c.customerNumberLabel || String(c.customerNumber).padStart(6, '0')}
+                    {c.customerNumberLabel || `K-${String(c.customerNumber).padStart(6, '0')}`}
+                  </span>
+                ) : null}
+                {c.partnerNumber != null && c.isPartner ? (
+                  <span className="customer-meta-item customer-number-chip" title={t('contactRolePartner')}>
+                    <IdentificationCard size={14} weight="regular" aria-hidden />
+                    {c.partnerNumberLabel || `P-${String(c.partnerNumber).padStart(6, '0')}`}
                   </span>
                 ) : null}
                 {c.email ? (
@@ -1117,9 +1137,11 @@ export function CustomerDetail() {
                     {c.phone}
                   </span>
                 ) : null}
-                <span className="customer-meta-item muted">
-                  {t('customerSince')} {since}
-                </span>
+                {c.isCustomer ? (
+                  <span className="customer-meta-item muted">
+                    {t('customerSince')} {since}
+                  </span>
+                ) : null}
               </div>
             </div>
           </div>
@@ -1145,7 +1167,7 @@ export function CustomerDetail() {
                 onClick={async () => {
                   await api(`/api/b/${slug}/customers/${id}/archive`, { method: 'POST' })
                   await ctx.refreshList?.()
-                  navigate(routes.customer)
+                  navigate(routes.contacts)
                 }}
               >
                 {t('archive')}
@@ -1292,6 +1314,7 @@ export function CustomerDetail() {
               )}
             </section>
 
+            {c.isCustomer ? (
             <section className="panel customer-card customer-overview-card customer-stats-card">
               <header className="customer-card-head">
                 <h2 className="crm-section-title" style={{ margin: 0 }}>
@@ -1396,6 +1419,7 @@ export function CustomerDetail() {
                 )
               })()}
             </section>
+            ) : null}
 
             <section className="panel customer-card customer-overview-card">
               <header className="customer-card-head">
@@ -1431,20 +1455,38 @@ export function CustomerDetail() {
                 </h2>
               </header>
               <div className="customer-settings-row customer-settings-row--3">
-                <label className="field">
-                  <span className="label">{t('customerNumber')}</span>
-                  <input
-                    className="input"
-                    readOnly
-                    disabled
-                    value={
-                      c.customerNumber != null
-                        ? c.customerNumberLabel || String(c.customerNumber).padStart(6, '0')
-                        : '—'
-                    }
-                    aria-label={t('customerNumber')}
-                  />
-                </label>
+                {c.isCustomer ? (
+                  <label className="field">
+                    <span className="label">{t('customerNumber')}</span>
+                    <input
+                      className="input"
+                      readOnly
+                      disabled
+                      value={
+                        c.customerNumber != null
+                          ? c.customerNumberLabel || String(c.customerNumber).padStart(6, '0')
+                          : '—'
+                      }
+                      aria-label={t('customerNumber')}
+                    />
+                  </label>
+                ) : null}
+                {c.isPartner ? (
+                  <label className="field">
+                    <span className="label">{t('partnerNumber')}</span>
+                    <input
+                      className="input"
+                      readOnly
+                      disabled
+                      value={
+                        c.partnerNumber != null
+                          ? c.partnerNumberLabel || String(c.partnerNumber).padStart(6, '0')
+                          : '—'
+                      }
+                      aria-label={t('partnerNumber')}
+                    />
+                  </label>
+                ) : null}
                 {c.kind === 'person' ? (
                   <>
                     <label className="field">
@@ -1484,20 +1526,95 @@ export function CustomerDetail() {
                   </label>
                 )}
               </div>
-              <div className="customer-settings-row customer-settings-row--3">
-                <div className="field">
-                  <span className="label">{t('customerStatus')}</span>
-                  <CrmIconSelect
-                    name="relationStatus"
-                    value={c.relationStatus}
-                    options={statusOptions}
-                    disabled={!canWrite}
-                    aria-label={t('customerStatus')}
-                    onChange={(v) =>
-                      setData({ ...data, customer: { ...c, relationStatus: v } })
-                    }
-                  />
+              <fieldset className="field customer-settings-span-2" style={{ border: 0, padding: 0 }}>
+                <legend className="label">{t('contactRoles')}</legend>
+                <div className="bu-modal-row-2" style={{ marginTop: 6 }}>
+                  <label className="crm-check-row">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(c.isCustomer)}
+                      disabled={!canWrite}
+                      onChange={(e) =>
+                        setData({
+                          ...data,
+                          customer: { ...c, isCustomer: e.target.checked },
+                        })
+                      }
+                    />
+                    <span>{t('contactRoleCustomer')}</span>
+                  </label>
+                  <label className="crm-check-row">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(c.isPartner)}
+                      disabled={!canWrite}
+                      onChange={(e) =>
+                        setData({
+                          ...data,
+                          customer: { ...c, isPartner: e.target.checked },
+                        })
+                      }
+                    />
+                    <span>{t('contactRolePartner')}</span>
+                  </label>
                 </div>
+              </fieldset>
+              {c.isPartner ? (
+                <div className="customer-settings-row customer-settings-row--3">
+                  <label className="field">
+                    <span className="label">{t('partnerCategory')}</span>
+                    <input
+                      className="input"
+                      disabled={!canWrite}
+                      value={c.partnerCategory || ''}
+                      onChange={(e) =>
+                        setData({
+                          ...data,
+                          customer: { ...c, partnerCategory: e.target.value || null },
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="field">
+                    <span className="label">{t('partnerStatus')}</span>
+                    <select
+                      className="input"
+                      disabled={!canWrite}
+                      value={c.partnerStatus || 'active'}
+                      onChange={(e) =>
+                        setData({
+                          ...data,
+                          customer: {
+                            ...c,
+                            partnerStatus: e.target.value as 'active' | 'inactive',
+                          },
+                        })
+                      }
+                    >
+                      <option value="active">{t('partnerStatusActive')}</option>
+                      <option value="inactive">{t('partnerStatusInactive')}</option>
+                    </select>
+                  </label>
+                </div>
+              ) : null}
+              <div className="customer-settings-row customer-settings-row--3">
+                {c.isCustomer ? (
+                  <div className="field">
+                    <span className="label">{t('customerStatus')}</span>
+                    <CrmIconSelect
+                      name="relationStatus"
+                      value={c.relationStatus}
+                      options={statusOptions}
+                      disabled={!canWrite}
+                      aria-label={t('customerStatus')}
+                      onChange={(v) =>
+                        setData({ ...data, customer: { ...c, relationStatus: v } })
+                      }
+                    />
+                  </div>
+                ) : (
+                  <div className="field" />
+                )}
                 <div className="field">
                   <span className="label">{t('customerKind')}</span>
                   <CrmIconSelect

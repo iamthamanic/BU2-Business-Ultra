@@ -45,6 +45,7 @@ Source of truth for implementation. Overrides conflicting Cursor user-rules (no 
 | Inbox build order | 01 Connection Core → 02 Telegram Bot E2E → **02b Telegram User via Unipile** → 03 Gmail/Outlook → 04 CRM/team → 05 Meta → 06 long-tail/automations |
 | Gmail launch | Restricted scopes; OAuth verification / assessment in public release plan (OK for local/dev) |
 | Arch-sharpen (2026-11-05) | **Stay modular monolith**; sharpen for navigability — API modules = `routes` + `service`; Drizzle schema split by ownership with stable `db/schema` barrel; web `features/` names match API modules (`customers`, `products`); `components/` = shared-only. **Anti-goals:** no microservices; no SagaTree `#94` `domains/` + eradicated-`components/` frontend; no HTTP/URL/table renames as part of structure-only refactors. Detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Contacts (2026-11-08) | Nav **Kontakte** with tabs Kunden/Partner; SoR table `contacts` (renamed from `customers`, IDs kept); dual roles `isCustomer`/`isPartner`; numbers `K-` / `P-` from 100100; partner free-text category; role removal keeps history (future billing may block); API `/customers` kept + `/contacts` list alias; UI `/contacts` with `/customer` redirect |
 
 ## Precedence notes (from PRD S-058)
 

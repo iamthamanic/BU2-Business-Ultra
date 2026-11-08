@@ -18,7 +18,7 @@ Admin stays **global** (no company prefix): `/admin`. Auth: `/login`, `/login/ve
 |---|---|
 | **Marketing** | Hub · Organic (channels) · Paid (channels) · Custom (channels) · Persona Journey · SEO · GEO |
 | **Product** | Katalog (default) · CostMyBusiness |
-| **Customer** | Kunden list + detail tabs |
+| **Contacts** | Kontakte (Kunden / Partner tabs) + detail |
 | **Projects** | Overview · Mine · Recurring · Detail |
 | **Tools** | Sortanize |
 | Footer | Einstellungen · language · logout |
@@ -46,7 +46,7 @@ SEO/GEO stay under Marketing in the sidebar; URLs remain `/tools/seo` and `/tool
 | OpenSEO / SEO | `/co/:slug/tools/seo` | same | Marketing dept (nav) |
 | GEO | `/co/:slug/tools/geo` | same page family as SEO | Marketing dept; AI Visibility surface |
 | Catalog / Katalog | _(none)_ | `/co/:slug/product/katalog` | Under Product; `/catalog` + `/katalog` redirect here |
-| Kunden | — | `/co/:slug/customer`, `/co/:slug/customer/:id` | CRM list + 5 tabs |
+| Kontakte | — | `/co/:slug/contacts`, `/co/:slug/contacts/:id` | Kunden/Partner tabs; `/customer` redirects |
 | Inbox | — | `/co/:slug/inbox` | Omnichannel messaging (Telegram Bot first) |
 | Projekte | — | `/co/:slug/projects`, `/mine`, `/recurring`, `/:id` | Area/custom + tasks/board |
 | Settings / keys | _(in-admin / overlays)_ | `/co/:slug/settings` (+ `#connections`) | Footer |

@@ -261,7 +261,17 @@ export const CustomerAddressSchema = z.object({
   country: z.string().max(120).nullable().optional(),
 })
 
-/** CRM customer fields (shared by create + patch). */
+/** Suggested partner categories (UI chips; free text still allowed). */
+export const PARTNER_CATEGORY_SUGGESTIONS = [
+  'Dienstleister',
+  'Lieferant',
+  'Subunternehmer',
+  'Kooperationspartner',
+  'Behörde',
+  'Sonstige',
+] as const
+
+/** CRM contact fields (shared by create + patch). Table: contacts. */
 const CustomerFieldsSchema = z.object({
   kind: z.enum(['person', 'org']).default('person'),
   displayName: z.string().max(200).optional(),
@@ -280,7 +290,13 @@ const CustomerFieldsSchema = z.object({
   billingPostalCode: z.string().max(32).nullable().optional(),
   billingCity: z.string().max(120).nullable().optional(),
   billingCountry: z.string().max(120).nullable().optional(),
+  /** Customer lifecycle — ignored for partner-only KPI filters. */
   relationStatus: z.enum(['lead', 'prospect', 'customer']).default('lead'),
+  /** Dual roles — at least one required on create. Defaults preserve legacy customer create. */
+  isCustomer: z.boolean().default(true),
+  isPartner: z.boolean().default(false),
+  partnerCategory: z.string().max(80).nullable().optional(),
+  partnerStatus: z.enum(['active', 'inactive']).default('active'),
   /** ISO date YYYY-MM-DD */
   birthDate: z
     .string()
@@ -292,8 +308,15 @@ const CustomerFieldsSchema = z.object({
   tags: z.array(z.string().max(40)).max(40).default([]),
 })
 
-/** CRM customer create. */
-export const CustomerSchema = CustomerFieldsSchema.superRefine((v, ctx) => {
+function refineContactName(
+  v: {
+    kind?: string
+    displayName?: string | null
+    firstName?: string | null
+    lastName?: string | null
+  },
+  ctx: z.RefinementCtx,
+) {
   const dn = (v.displayName || '').trim()
   const fn = (v.firstName || '').trim()
   const ln = (v.lastName || '').trim()
@@ -306,16 +329,40 @@ export const CustomerSchema = CustomerFieldsSchema.superRefine((v, ctx) => {
   if (!dn && !fn && !ln) {
     ctx.addIssue({ code: 'custom', message: 'name_required', path: ['firstName'] })
   }
+}
+
+/** CRM contact create (legacy route name: customers). */
+export const CustomerSchema = CustomerFieldsSchema.superRefine((v, ctx) => {
+  refineContactName(v, ctx)
+  if (!v.isCustomer && !v.isPartner) {
+    ctx.addIssue({ code: 'custom', message: 'role_required', path: ['isCustomer'] })
+  }
 })
 export type CustomerInput = z.infer<typeof CustomerSchema>
-export const CustomerPatchSchema = CustomerFieldsSchema.partial()
+export const CustomerPatchSchema = CustomerFieldsSchema.partial().superRefine((v, ctx) => {
+  if (v.isCustomer === false && v.isPartner === false) {
+    ctx.addIssue({ code: 'custom', message: 'role_required', path: ['isCustomer'] })
+  }
+})
 export type CustomerPatchInput = z.infer<typeof CustomerPatchSchema>
 
-/** CRM customer row as returned by API (persisted + labels). */
+/** Alias — contacts are the SoR; API still speaks "customer" for compat. */
+export const ContactSchema = CustomerSchema
+export const ContactPatchSchema = CustomerPatchSchema
+export type ContactInput = CustomerInput
+export type ContactPatchInput = CustomerPatchInput
+
+/** CRM contact row as returned by API. */
 export const CustomerDtoSchema = CustomerFieldsSchema.extend({
   id: z.string().uuid(),
-  customerNumber: z.number().int().optional(),
-  customerNumberLabel: z.string().optional(),
+  customerNumber: z.number().int().nullable().optional(),
+  customerNumberLabel: z.string().nullable().optional(),
+  partnerNumber: z.number().int().nullable().optional(),
+  partnerNumberLabel: z.string().nullable().optional(),
+  isCustomer: z.boolean(),
+  isPartner: z.boolean(),
+  partnerCategory: z.string().nullable().optional(),
+  partnerStatus: z.string(),
   displayName: z.string(),
   email: z.string().nullable(),
   phone: z.string().nullable(),
@@ -344,6 +391,7 @@ export const CustomerDtoSchema = CustomerFieldsSchema.extend({
     .optional(),
 })
 export type CustomerDto = z.infer<typeof CustomerDtoSchema>
+export type ContactDto = CustomerDto
 
 export const CustomerNoteDtoSchema = z.object({
   id: z.string().uuid(),
@@ -1014,12 +1062,11 @@ export const ConnectImapSchema = z.object({
 })
 export type ConnectImapInput = z.infer<typeof ConnectImapSchema>
 
-/** finAPI client credentials — stored encrypted; bank sync lands later. */
+/**
+ * finAPI connect — platform client id/secret come from env (`FINAPI_*`).
+ * Body only carries optional display label; bank Web Form is the next slice.
+ */
 export const ConnectFinapiSchema = z.object({
-  clientId: z.string().min(4).max(200),
-  clientSecret: z.string().min(8).max(500),
-  /** Optional data-decryption key if enabled in the finAPI project. */
-  dataDecryptionKey: z.string().min(8).max(500).optional(),
   displayName: z.string().min(1).max(160).optional(),
 })
 export type ConnectFinapiInput = z.infer<typeof ConnectFinapiSchema>
@@ -1034,6 +1081,7 @@ export const OAuthProviderParamSchema = z.enum([
   'facebook',
 ])
 export type OAuthProviderParam = z.infer<typeof OAuthProviderParamSchema>
+
 
 /** Link personal Telegram via Unipile (existing account_id or after QR finalize). */
 export const LinkUnipileTelegramSchema = z.object({

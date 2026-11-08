@@ -63,8 +63,11 @@ export function companyRoutes(slug: string) {
     catalog: `${base}/product`,
     marketing: `${base}/marketing`,
     product: `${base}/product`,
-    customer: `${base}/customer`,
-    customerDetail: (id: string) => `${base}/customer/${encodeURIComponent(id)}`,
+    /** @deprecated Prefer `contacts` — kept for bookmarks; redirects in App. */
+    customer: `${base}/contacts`,
+    customerDetail: (id: string) => `${base}/contacts/${encodeURIComponent(id)}`,
+    contacts: `${base}/contacts`,
+    contactDetail: (id: string) => `${base}/contacts/${encodeURIComponent(id)}`,
     /** Omnichannel messaging inbox */
     inbox: `${base}/inbox`,
     projects: `${base}/projects`,

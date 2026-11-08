@@ -14,9 +14,14 @@ import {
 } from '../../db/schema.js'
 
 export const CUSTOMER_NUMBER_START = 100100
+export const PARTNER_NUMBER_START = 100100
 
 export function formatCustomerNumber(n: number): string {
-  return String(n).padStart(6, '0')
+  return `K-${String(n).padStart(6, '0')}`
+}
+
+export function formatPartnerNumber(n: number): string {
+  return `P-${String(n).padStart(6, '0')}`
 }
 
 export async function allocateCustomerNumber(businessId: string): Promise<number> {
@@ -27,6 +32,16 @@ export async function allocateCustomerNumber(businessId: string): Promise<number
     .from(customers)
     .where(eq(customers.businessId, businessId))
   return Number(row?.max ?? CUSTOMER_NUMBER_START - 1) + 1
+}
+
+export async function allocatePartnerNumber(businessId: string): Promise<number> {
+  const [row] = await db
+    .select({
+      max: sql<number>`coalesce(max(${customers.partnerNumber}), ${PARTNER_NUMBER_START - 1})`,
+    })
+    .from(customers)
+    .where(eq(customers.businessId, businessId))
+  return Number(row?.max ?? PARTNER_NUMBER_START - 1) + 1
 }
 
 export function formatAddressLine(parts: {
@@ -88,10 +103,18 @@ export function toCustomer(
   row: typeof customers.$inferSelect,
   org?: { id: string; displayName: string } | null,
 ) {
+  const customerNumber = row.customerNumber ?? null
+  const partnerNumber = row.partnerNumber ?? null
   return {
     id: row.id,
-    customerNumber: row.customerNumber,
-    customerNumberLabel: formatCustomerNumber(row.customerNumber),
+    customerNumber,
+    customerNumberLabel: customerNumber != null ? formatCustomerNumber(customerNumber) : null,
+    partnerNumber,
+    partnerNumberLabel: partnerNumber != null ? formatPartnerNumber(partnerNumber) : null,
+    isCustomer: row.isCustomer,
+    isPartner: row.isPartner,
+    partnerCategory: row.partnerCategory ?? null,
+    partnerStatus: row.partnerStatus,
     kind: row.kind,
     displayName: row.displayName,
     firstName: row.firstName ?? null,
@@ -127,6 +150,9 @@ export function toCustomer(
     updatedAt: row.updatedAt,
   }
 }
+
+/** Alias — contacts SoR. */
+export const toContact = toCustomer
 
 export async function loadOrgSummary(businessId: string, orgCustomerId: string | null) {
   if (!orgCustomerId) return null
@@ -219,6 +245,8 @@ export async function loadCustomer(businessId: string, id: string) {
     .limit(1)
   return rows[0] ?? null
 }
+
+export const loadContact = loadCustomer
 
 export async function addEvent(
   customerId: string,

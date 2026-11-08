@@ -108,10 +108,10 @@ export function BusinessShell({
     if (canSeeNavTab(tabs, 'customer')) {
       items.push({
         key: 'customer',
-        to: routes.customer,
-        label: t('customer'),
+        to: routes.contacts,
+        label: t('contacts'),
         icon: UsersThree,
-        dataIc: 'customer',
+        dataIc: 'contacts',
       })
     }
     if (canSeeNavTab(tabs, 'projects')) {

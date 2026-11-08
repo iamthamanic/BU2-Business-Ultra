@@ -52,6 +52,13 @@ function CoRedirect({ to }: { to: string }) {
   return <Navigate to={path} replace />
 }
 
+/** Legacy `/co/:slug/customer/:id` → `/contacts/:id`. */
+function CustomerIdRedirect() {
+  const { slug, id } = useParams()
+  if (!slug || !id) return <Navigate to="/" replace />
+  return <Navigate to={`${companyBase(slug)}/contacts/${encodeURIComponent(id)}`} replace />
+}
+
 /** Bookmarks: `/b/:slug/*` → canonical `/co/:slug/...` */
 function LegacyBu2Redirect() {
   const { slug, '*': rest } = useParams()
@@ -124,9 +131,11 @@ export function App() {
         <Route path="product/costmybusiness/*" element={<CoRedirect to="product" />} />
         <Route path="product/costmybusiness" element={<CoRedirect to="product" />} />
         <Route path="product/cmb" element={<CoRedirect to="product" />} />
-        <Route path="customer" element={<CustomerShell />}>
+        <Route path="contacts" element={<CustomerShell />}>
           <Route path=":id" element={<CustomerDetail />} />
         </Route>
+        <Route path="customer" element={<CoRedirect to="contacts" />} />
+        <Route path="customer/:id" element={<CustomerIdRedirect />} />
         <Route path="inbox" element={<InboxPage />} />
         <Route path="projects" element={<ProjectsShell />}>
           <Route path="mine" element={<MyTasksPage />} />

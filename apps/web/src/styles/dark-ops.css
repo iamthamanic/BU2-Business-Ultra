@@ -14299,3 +14299,17 @@ button.conn-provider-card:hover:not(:disabled) {
     font-size: 36px;
   }
 }
+
+.crm-check-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+.crm-check-row input {
+  accent-color: var(--accent);
+}
+
