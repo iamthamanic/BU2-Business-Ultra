@@ -2,7 +2,7 @@
  * TaskTable — enriched task list with filters (status toggle/prio/assignee/mode/search).
  * Location: apps/web/src/features/projects/TaskTable.tsx
  */
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import {
   ArrowDown,
   ArrowUp,
@@ -16,13 +16,17 @@ import {
   SquaresFour,
 } from '@phosphor-icons/react'
 import { CrmIconSelect, type CrmIconSelectOption } from '../../components/CrmIconSelect'
+import { FunnelExportMenu } from '../../components/FunnelExportMenu'
+import { FunnelTip } from '../../components/FunnelTip'
 import type { MessageKey } from '../../i18n/messages'
+import type { FunnelExportPayload } from '../../lib/funnelExport'
+import { usePersistedTableColumns, type TableColumnDef } from '../../lib/tableColumns'
 import { MemberAvatar, memberDisplayName, type MemberInfo } from './MemberAvatar'
 import { TaskPriorityBadge, TaskStatusBadge } from './TaskBadges'
 import type { BuTask, BuTaskMode } from './projectTypes'
 import {
-  TASK_PRIORITIES,
   formatReopenCountdown,
+  taskPriorityLabel,
   taskRhythmLabel,
   taskStatusLabel,
 } from './taskLabels'
@@ -38,6 +42,7 @@ type Props = {
   tasks: BuTask[]
   onOpen: (task: BuTask) => void
   t: TFn
+  slug?: string
   memberById?: MemberById
   showFilters?: boolean
   showProject?: boolean
@@ -100,6 +105,7 @@ export function TaskTable({
   tasks,
   onOpen,
   t,
+  slug = '',
   memberById = {},
   showFilters = false,
   showProject = false,
@@ -114,6 +120,28 @@ export function TaskTable({
   const [priority, setPriority] = useState('')
   const [assignee, setAssignee] = useState('')
   const [mode, setMode] = useState('')
+
+  const cols: (TableColumnDef & { tip: MessageKey })[] = useMemo(
+    () =>
+      (
+        [
+          { key: 'title', label: t('taskTitle'), tip: 'tipTaskTitle' as const, locked: true },
+          { key: 'status', label: t('taskStatus'), tip: 'tipTaskStatus' as const },
+          { key: 'priority', label: t('taskPriority'), tip: 'tipTaskPriority' as const },
+          { key: 'assignee', label: t('taskAssignee'), tip: 'tipTaskAssignee' as const },
+          { key: 'due', label: t('taskDue'), tip: 'tipTaskDue' as const },
+          { key: 'rhythm', label: t('taskRecurrenceFreq'), tip: 'tipTaskRhythm' as const },
+          { key: 'mode', label: t('taskMode'), tip: 'tipTaskMode' as const },
+        ] as const
+      ).map((c) => ({ ...c, description: t(c.tip) })),
+    [t],
+  )
+
+  const { visibleKeys, visibleColumns, setVisibleKeys, reset } = usePersistedTableColumns({
+    slug: slug || '_',
+    tableId: 'tasks',
+    columns: cols,
+  })
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase()
@@ -206,7 +234,160 @@ export function TaskTable({
     [t],
   )
 
-  const colSpan = showProject ? 9 : 8
+  function getExportPayload(): FunnelExportPayload {
+    const today = new Date().toISOString().slice(0, 10)
+    return {
+      kind: 'Custom',
+      channel: 'tasks',
+      from: today,
+      to: today,
+      filters: [
+        { label: t('taskStatus'), value: status ? taskStatusLabel(status, t) : t('filterAll') },
+        {
+          label: t('taskPriority'),
+          value: priority
+            ? taskPriorityLabel(priority, t)
+            : t('taskFilterAllPriority'),
+        },
+        {
+          label: t('taskAssignee'),
+          value:
+            assignee === '__none__'
+              ? t('taskAssigneeNone')
+              : assignee
+                ? memberDisplayName(memberById[assignee], assignee)
+                : t('taskFilterAllAssignee'),
+        },
+        {
+          label: t('taskMode'),
+          value:
+            mode === 'recurring'
+              ? t('taskModeRecurring')
+              : mode === 'once'
+                ? t('taskModeOnce')
+                : t('taskFilterAllMode'),
+        },
+        ...(q.trim() ? [{ label: t('taskFilterSearch'), value: q.trim() }] : []),
+      ],
+      kpis: [{ label: t('taskTitle'), value: String(filtered.length) }],
+      columns: cols.map((c) => ({ key: c.key, label: c.label })),
+      rows: filtered.map((task) => {
+        const member = task.assigneeUserId ? memberById[task.assigneeUserId] : null
+        return {
+          title: task.title,
+          status: taskStatusLabel(task.status, t),
+          priority: taskPriorityLabel(task.priority, t),
+          assignee: member ? memberDisplayName(member) : t('taskAssigneeNone'),
+          due: formatDue(task.dueAt, t),
+          rhythm: taskRhythmLabel(task, t),
+          mode: taskMode(task) === 'recurring' ? t('taskModeRecurring') : t('taskModeOnce'),
+        }
+      }),
+    }
+  }
+
+  const colSpan = Math.max(visibleColumns.length, 1) + 1
+
+  function renderCells(task: BuTask): ReactNode {
+    const member = task.assigneeUserId ? memberById[task.assigneeUserId] : null
+    const due = formatDue(task.dueAt, t)
+    const isOverdue =
+      Boolean(task.dueAt) &&
+      new Date(task.dueAt!).getTime() < Date.now() &&
+      task.status !== 'done'
+    const isDone = task.status === 'done'
+    const isRule = task.source === 'rule'
+    const reopenLabel =
+      isRule && isDone && task.reopensAt ? formatReopenCountdown(task.reopensAt, t) : ''
+    const modeLabel = taskMode(task) === 'recurring' ? t('taskModeRecurring') : t('taskModeOnce')
+    const rhythm = taskRhythmLabel(task, t)
+
+    return visibleColumns.map((col) => {
+      if (col.key === 'title') {
+        return (
+          <td key={col.key}>
+            <span className={`task-table-title-cell task-prio-rail--${task.priority}`}>
+              <strong className="task-table-title">{task.title}</strong>
+              {showProject ? (
+                <span className="muted task-table-sub">
+                  {task.projectId
+                    ? projectNameById[task.projectId] || t('projects')
+                    : t('taskInbox')}
+                </span>
+              ) : null}
+            </span>
+          </td>
+        )
+      }
+      if (col.key === 'status') {
+        return (
+          <td key={col.key}>
+            <span className="task-status-with-reopen">
+              <TaskStatusBadge status={task.status} t={t} />
+              {reopenLabel ? (
+                <span className="task-reopen-chip" title={reopenLabel}>
+                  <ArrowsClockwise size={11} weight="bold" aria-hidden />
+                  {reopenLabel}
+                </span>
+              ) : null}
+            </span>
+          </td>
+        )
+      }
+      if (col.key === 'priority') {
+        return (
+          <td key={col.key}>
+            <TaskPriorityBadge priority={task.priority} t={t} />
+          </td>
+        )
+      }
+      if (col.key === 'assignee') {
+        return (
+          <td key={col.key}>
+            {member ? (
+              <span className="task-table-assignee">
+                <MemberAvatar member={member} size={22} />
+                <span className="task-table-assignee-name">{memberDisplayName(member)}</span>
+              </span>
+            ) : (
+              <span className="muted">{t('taskAssigneeNone')}</span>
+            )}
+          </td>
+        )
+      }
+      if (col.key === 'due') {
+        return (
+          <td key={col.key} className={isOverdue ? 'task-due--overdue' : 'muted'}>
+            {due}
+          </td>
+        )
+      }
+      if (col.key === 'rhythm') {
+        return (
+          <td key={col.key} className="muted">
+            {rhythm}
+          </td>
+        )
+      }
+      if (col.key === 'mode') {
+        return (
+          <td key={col.key}>
+            <span
+              className={`task-mode-chip${taskMode(task) === 'recurring' ? ' is-recurring' : ''}`}
+            >
+              {taskMode(task) === 'recurring' ? (
+                <ArrowsClockwise size={12} weight="bold" aria-hidden />
+              ) : (
+                <Circle size={12} weight="regular" aria-hidden />
+              )}
+              {modeLabel}
+            </span>
+          </td>
+        )
+      }
+      return <td key={col.key}>—</td>
+    })
+  }
 
   return (
     <div className={`stack task-table-wrap${compact ? ' is-compact' : ''}`}>
@@ -281,6 +462,15 @@ export function TaskTable({
                 />
               </div>
             </div>
+            <FunnelExportMenu
+              getPayload={getExportPayload}
+              columnPicker={{
+                columns: cols,
+                visibleKeys,
+                onChange: setVisibleKeys,
+                onReset: reset,
+              }}
+            />
           </div>
         </>
       ) : null}
@@ -292,19 +482,23 @@ export function TaskTable({
               <th className="task-table-check-col">
                 <span className="sr-only">{t('taskStatusDone')}</span>
               </th>
-              <th>{t('taskTitle')}</th>
-              <th>{t('taskStatus')}</th>
-              <th>{t('taskPriority')}</th>
-              <th>{t('taskAssignee')}</th>
-              <th>{t('taskDue')}</th>
-              <th>{t('taskRecurrenceFreq')}</th>
-              <th>{t('taskMode')}</th>
+              {visibleColumns.map((col) => {
+                const tip = cols.find((c) => c.key === col.key)?.tip
+                return (
+                  <th key={col.key}>
+                    <span>{col.label}</span>
+                    {tip ? (
+                      <FunnelTip tip={t(tip)} iconOnly>
+                        {col.label}
+                      </FunnelTip>
+                    ) : null}
+                  </th>
+                )
+              })}
             </tr>
           </thead>
           <tbody>
             {filtered.map((task) => {
-              const member = task.assigneeUserId ? memberById[task.assigneeUserId] : null
-              const due = formatDue(task.dueAt, t)
               const isOverdue =
                 Boolean(task.dueAt) &&
                 new Date(task.dueAt!).getTime() < Date.now() &&
@@ -317,9 +511,6 @@ export function TaskTable({
                   : ''
               const toggleDisabled =
                 !canWrite || !onToggleDone || task.status === 'blocked' || isRule
-              const modeLabel =
-                taskMode(task) === 'recurring' ? t('taskModeRecurring') : t('taskModeOnce')
-              const rhythm = taskRhythmLabel(task, t)
               return (
                 <tr
                   key={`${task.source || 'task'}-${task.id}`}
@@ -339,56 +530,7 @@ export function TaskTable({
                       }}
                     />
                   </td>
-                  <td>
-                    <span className={`task-table-title-cell task-prio-rail--${task.priority}`}>
-                      <strong className="task-table-title">{task.title}</strong>
-                      {showProject ? (
-                        <span className="muted task-table-sub">
-                          {task.projectId
-                            ? projectNameById[task.projectId] || t('projects')
-                            : t('taskInbox')}
-                        </span>
-                      ) : null}
-                    </span>
-                  </td>
-                  <td>
-                    <span className="task-status-with-reopen">
-                      <TaskStatusBadge status={task.status} t={t} />
-                      {reopenLabel ? (
-                        <span className="task-reopen-chip" title={reopenLabel}>
-                          <ArrowsClockwise size={11} weight="bold" aria-hidden />
-                          {reopenLabel}
-                        </span>
-                      ) : null}
-                    </span>
-                  </td>
-                  <td>
-                    <TaskPriorityBadge priority={task.priority} t={t} />
-                  </td>
-                  <td>
-                    {member ? (
-                      <span className="task-table-assignee">
-                        <MemberAvatar member={member} size={22} />
-                        <span className="task-table-assignee-name">{memberDisplayName(member)}</span>
-                      </span>
-                    ) : (
-                      <span className="muted">{t('taskAssigneeNone')}</span>
-                    )}
-                  </td>
-                  <td className={isOverdue ? 'task-due--overdue' : 'muted'}>{due}</td>
-                  <td className="muted">{rhythm}</td>
-                  <td>
-                    <span
-                      className={`task-mode-chip${taskMode(task) === 'recurring' ? ' is-recurring' : ''}`}
-                    >
-                      {taskMode(task) === 'recurring' ? (
-                        <ArrowsClockwise size={12} weight="bold" aria-hidden />
-                      ) : (
-                        <Circle size={12} weight="regular" aria-hidden />
-                      )}
-                      {modeLabel}
-                    </span>
-                  </td>
+                  {renderCells(task)}
                 </tr>
               )
             })}

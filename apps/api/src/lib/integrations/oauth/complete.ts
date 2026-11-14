@@ -54,14 +54,19 @@ function capabilitiesFor(
       { operation: 'sync', messageFormats: [], window: NONE_WINDOW },
     ])
   }
-  if (provider === 'google_ads') {
+  if (
+    provider === 'google_ads' ||
+    provider === 'chatgpt_ads' ||
+    provider === 'reddit_ads' ||
+    provider === 'microsoft_ads'
+  ) {
     return buildCapabilities(accountType, scopes, [
       { operation: 'insights', messageFormats: [], window: NONE_WINDOW },
       {
         operation: 'publish',
         messageFormats: [],
         window: NONE_WINDOW,
-        reason: 'mutate_when_ui_ready',
+        reason: 'ads_mutate_when_ui_ready',
       },
       { operation: 'sync', messageFormats: [], window: NONE_WINDOW },
     ])
@@ -80,14 +85,41 @@ function capabilitiesFor(
       ])
     }
     return buildCapabilities(accountType, scopes, [
-      { operation: 'read_dm', messageFormats: ['text'], window: CARE_WINDOW },
-      { operation: 'send_dm', messageFormats: ['text'], window: CARE_WINDOW },
+      {
+        operation: 'read_dm',
+        messageFormats: ['text', 'image', 'file', 'audio'],
+        window: CARE_WINDOW,
+      },
+      {
+        operation: 'send_dm',
+        messageFormats: ['text', 'image', 'file', 'audio', 'voice'],
+        window: CARE_WINDOW,
+      },
+      { operation: 'sync', messageFormats: [], window: NONE_WINDOW },
+    ])
+  }
+  if (
+    key === 'linkedin' ||
+    key === 'tiktok' ||
+    key === 'x' ||
+    key === 'pinterest' ||
+    provider === 'tiktok_ads' ||
+    provider === 'pinterest_ads'
+  ) {
+    return buildCapabilities(accountType, scopes, [
+      { operation: 'insights', messageFormats: [], window: NONE_WINDOW },
+      {
+        operation: 'publish',
+        messageFormats: ['text', 'image', 'video'],
+        window: NONE_WINDOW,
+        reason: 'publish_when_channel_ui_ready',
+      },
       { operation: 'sync', messageFormats: [], window: NONE_WINDOW },
     ])
   }
   return buildCapabilities(accountType, scopes, [
-    { operation: 'read_mail', messageFormats: ['text', 'html'], window: NONE_WINDOW },
-    { operation: 'send_mail', messageFormats: ['text', 'html'], window: NONE_WINDOW },
+    { operation: 'read_mail', messageFormats: ['text', 'html', 'file'], window: NONE_WINDOW },
+    { operation: 'send_mail', messageFormats: ['text', 'html', 'file'], window: NONE_WINDOW },
     { operation: 'sync', messageFormats: [], window: NONE_WINDOW },
   ])
 }

@@ -23,7 +23,7 @@ export async function catalogRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     if (m.status === 'archived') return reply.code(409).send({ error: 'business_archived' })
     const body = CatalogProductSchema.parse(req.body)
     const [product] = await db
@@ -52,7 +52,7 @@ export async function catalogRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     const body = CatalogProductSchema.partial().parse(req.body)
     const [product] = await db
       .update(catalogProducts)
@@ -67,7 +67,7 @@ export async function catalogRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     await db
       .update(catalogProducts)
       .set({ archivedAt: new Date(), active: false, updatedAt: new Date() })

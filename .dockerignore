@@ -1,0 +1,17 @@
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+.git
+.env
+.env.*
+!.env.example
+playwright-report
+test-results
+coverage
+.project-memory
+**/.DS_Store
+apps/e2e
+deploy/ionos-legal
+deploy/business-ultra-legal
+*.md
+!README.md

@@ -30,9 +30,9 @@ HTTP: `apps/api/src/modules/integrations/*` under `/api/b/:slug/integrations/…
 
 | Group | Intent | Ist examples |
 |-------|--------|--------------|
-| `social` | Messaging / inbox / organic social | Gmail, Outlook, IMAP, WhatsApp, Instagram, Facebook, Telegram, Unipile |
+| `social` | Messaging / inbox / organic social | Gmail, Outlook, IMAP, WhatsApp, Instagram, Facebook, LinkedIn, TikTok, X, Pinterest, Telegram, Unipile |
 | `paid` | Ads / paid social video | YouTube, Google Ads |
-| `finance` | Bank / bookkeeping (credentials-only) | `finapi` (credentials stored; sync pending) |
+| `finance` | Bank / bookkeeping | `finapi` (credentials stored; **adapter sync pending**). Domain SoR already live: `finance_accounts` / `finance_transactions` / `finance_settings` + `/api/b/:slug/finance/*` |
 | `generic` | Test / catch-all | Mock |
 
 **Add a connector (checklist):**
@@ -55,14 +55,30 @@ From `PROVIDER_CATALOG` (adapterReady flags are code claims; live mode still nee
 | `google` | Gmail | social | `oauth_pkce` | oauth |
 | `youtube` | YouTube | paid | `oauth_pkce` | oauth |
 | `google_ads` | Google Ads | paid | `oauth_pkce` | oauth |
+| `meta_ads` | Meta Ads | paid | `oauth_pkce` | oauth |
+| `tiktok_ads` | TikTok Ads | paid | `oauth_pkce` | oauth (same TikTok app as organic) |
+| `pinterest_ads` | Pinterest Ads | paid | `oauth_pkce` | oauth (same Pinterest app) |
+| `chatgpt_ads` | ChatGPT Ads | paid | `oauth_pkce` | oauth (`CHATGPT_ADS_*`) |
+| `reddit_ads` | Reddit Ads | paid | `oauth_pkce` | oauth (`REDDIT_OAUTH_*`) |
+| `microsoft_ads` | Microsoft Ads | paid | `oauth_pkce` | oauth (same Azure AD app as Outlook) |
 | `microsoft` | Outlook | social | `oauth_pkce` | oauth |
 | `imap` | IMAP / POP | social | `password` | password |
 | `whatsapp` | WhatsApp | social | `oauth_pkce` | oauth |
 | `instagram` | Instagram | social | `oauth_pkce` | oauth |
 | `facebook` | Facebook | social | `oauth_pkce` | oauth |
+| `linkedin` | LinkedIn | social | `oauth_pkce` | oauth |
+| `tiktok` | TikTok | social | `oauth_pkce` | oauth |
+| `x` | X | social | `oauth_pkce` | oauth |
+| `pinterest` | Pinterest | social | `oauth_pkce` | oauth |
 | `telegram` | Telegram (Bot) | social | `bot_token` | bot_token |
 | `unipile` | Telegram (privat) | social | `aggregator_session`, `api_key` | aggregator |
 | `finapi` | finAPI (Bank) | finance | `api_key` | password (client id/secret form) |
+
+**Platform env pattern:** one Developer Console Client ID/Secret per family (`GOOGLE_OAUTH_*`, `META_OAUTH_*`, `LINKEDIN_OAUTH_*`, `TIKTOK_OAUTH_*`, `X_OAUTH_*`, `PINTEREST_OAUTH_*`, `REDDIT_OAUTH_*`, `CHATGPT_ADS_*`; Microsoft Ads reuses `MICROSOFT_OAUTH_*`). Paste redirect URIs from `GET /api/oauth/redirect-uris`. End-user tokens → `connection_credentials`.
+
+**Sync / Publish:** Connect stores tokens first. Channel workers live under `lib/integrations/social/` (organic LinkedIn/TikTok/X/Pinterest) and ads mutate helpers — same pattern as Meta DMs / Inbox (credentials path green, deeper workers follow).
+
+**PKCE:** Verifier is sealed in an HttpOnly cookie (`bu2_oauth_pkce`, path `/api/oauth`) plus in-memory fallback — multi-instance safe without Redis. Ads keys are **not** stored in `settings_secrets` (PUT → 410); use OAuth connect only.
 
 ### Related non-catalog / settings-gated
 

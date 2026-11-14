@@ -4,7 +4,7 @@
  */
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
-import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import {
   ArrowBendUpLeft,
   ArrowSquareOut,
@@ -33,6 +33,7 @@ import {
   UsersThree,
   WhatsappLogo,
 } from '@phosphor-icons/react'
+import { PARTNER_CATEGORY_SUGGESTIONS } from '@bu2/shared'
 import { CrmIconSelect, type CrmIconSelectOption } from '../../components/CrmIconSelect'
 import { FunnelDateRangePicker } from '../../components/FunnelDateRangePicker'
 import { FunnelTip } from '../../components/FunnelTip'
@@ -304,7 +305,12 @@ export function CustomerDetail() {
   const canWrite = ctx?.canWrite ?? false
   const { t } = useI18n()
   const navigate = useNavigate()
+  const location = useLocation()
   const routes = companyRoutes(slug)
+  const listBack = /\/partner(?:\/|$)/.test(location.pathname) ? routes.partner : routes.customer
+  const listBackLabel = /\/partner(?:\/|$)/.test(location.pathname)
+    ? t('contactTabPartners')
+    : t('contactTabCustomers')
 
   const [tab, setTab] = useState<Tab>('overview')
   const [data, setData] = useState<DetailPayload | null>(null)
@@ -1077,8 +1083,8 @@ export function CustomerDetail() {
     <div className="stack mkt-shell product-shell crm-shell">
       <header className="product-page-head customer-detail-head">
         <div className="customer-identity">
-          <Link to={routes.contacts} className="muted customer-back">
-            ← {t('customer')}
+          <Link to={listBack} className="muted customer-back">
+            ← {listBackLabel}
           </Link>
           <div className="customer-identity-row">
             <span className="customer-av" aria-hidden>
@@ -1167,7 +1173,7 @@ export function CustomerDetail() {
                 onClick={async () => {
                   await api(`/api/b/${slug}/customers/${id}/archive`, { method: 'POST' })
                   await ctx.refreshList?.()
-                  navigate(routes.contacts)
+                  navigate(listBack)
                 }}
               >
                 {t('archive')}
@@ -1453,82 +1459,121 @@ export function CustomerDetail() {
                 <h2 className="crm-section-title" style={{ margin: 0 }}>
                   {t('customerMasterData')}
                 </h2>
+                {(c.isCustomer && c.customerNumber != null) ||
+                (c.isPartner && c.partnerNumber != null) ? (
+                  <div className="customer-id-chips" aria-label={t('customerMasterData')}>
+                    {c.isCustomer && c.customerNumber != null ? (
+                      <span className="customer-id-chip" title={t('customerNumber')}>
+                        {c.customerNumberLabel ||
+                          `K-${String(c.customerNumber).padStart(6, '0')}`}
+                      </span>
+                    ) : null}
+                    {c.isPartner && c.partnerNumber != null ? (
+                      <span className="customer-id-chip customer-id-chip--partner" title={t('partnerNumber')}>
+                        {c.partnerNumberLabel ||
+                          `P-${String(c.partnerNumber).padStart(6, '0')}`}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
               </header>
-              <div className="customer-settings-row customer-settings-row--3">
-                {c.isCustomer ? (
-                  <label className="field">
-                    <span className="label">{t('customerNumber')}</span>
-                    <input
-                      className="input"
-                      readOnly
-                      disabled
-                      value={
-                        c.customerNumber != null
-                          ? c.customerNumberLabel || String(c.customerNumber).padStart(6, '0')
-                          : '—'
-                      }
-                      aria-label={t('customerNumber')}
-                    />
-                  </label>
-                ) : null}
-                {c.isPartner ? (
-                  <label className="field">
-                    <span className="label">{t('partnerNumber')}</span>
-                    <input
-                      className="input"
-                      readOnly
-                      disabled
-                      value={
-                        c.partnerNumber != null
-                          ? c.partnerNumberLabel || String(c.partnerNumber).padStart(6, '0')
-                          : '—'
-                      }
-                      aria-label={t('partnerNumber')}
-                    />
-                  </label>
-                ) : null}
-                {c.kind === 'person' ? (
-                  <>
-                    <label className="field">
-                      <span className="label">{t('customerFirstName')}</span>
+
+              <section className="customer-form-section" aria-labelledby="customer-section-identity">
+                <h3 id="customer-section-identity" className="customer-form-section-title">
+                  {t('customerSectionIdentity')}
+                </h3>
+                <div className="customer-settings-row">
+                  {c.kind === 'person' ? (
+                    <>
+                      <label className="field">
+                        <span className="label">{t('customerFirstName')}</span>
+                        <input
+                          className="input"
+                          disabled={!canWrite}
+                          value={c.firstName || ''}
+                          onChange={(e) =>
+                            syncPersonDisplayName({ firstName: e.target.value || null })
+                          }
+                        />
+                      </label>
+                      <label className="field">
+                        <span className="label">{t('customerLastName')}</span>
+                        <input
+                          className="input"
+                          disabled={!canWrite}
+                          value={c.lastName || ''}
+                          onChange={(e) =>
+                            syncPersonDisplayName({ lastName: e.target.value || null })
+                          }
+                        />
+                      </label>
+                    </>
+                  ) : (
+                    <label className="field customer-settings-span-2">
+                      <span className="label">{t('customerCompany')}</span>
                       <input
                         className="input"
                         disabled={!canWrite}
-                        value={c.firstName || ''}
+                        value={c.displayName}
                         onChange={(e) =>
-                          syncPersonDisplayName({ firstName: e.target.value || null })
+                          setData({ ...data, customer: { ...c, displayName: e.target.value } })
                         }
                       />
                     </label>
-                    <label className="field">
-                      <span className="label">{t('customerLastName')}</span>
-                      <input
-                        className="input"
-                        disabled={!canWrite}
-                        value={c.lastName || ''}
-                        onChange={(e) =>
-                          syncPersonDisplayName({ lastName: e.target.value || null })
-                        }
-                      />
-                    </label>
-                  </>
-                ) : (
-                  <label className="field customer-settings-span-2">
-                    <span className="label">{t('customerCompany')}</span>
-                    <input
-                      className="input"
+                  )}
+                </div>
+                <div className="customer-settings-row">
+                  <div className="field">
+                    <span className="label">{t('customerKind')}</span>
+                    <CrmIconSelect
+                      name="kind"
+                      value={c.kind}
+                      options={kindOptions}
                       disabled={!canWrite}
-                      value={c.displayName}
-                      onChange={(e) =>
-                        setData({ ...data, customer: { ...c, displayName: e.target.value } })
-                      }
+                      aria-label={t('customerKind')}
+                      onChange={(v) => syncPersonDisplayName({ kind: v })}
                     />
-                  </label>
-                )}
-              </div>
-              <fieldset className="field customer-settings-span-2" style={{ border: 0, padding: 0 }}>
-                <legend className="label">{t('contactRoles')}</legend>
-                <div className="bu-modal-row-2" style={{ marginTop: 6 }}>
+                  </div>
+                  {c.kind === 'person' ? (
+                    <div className="field">
+                      <span className="label">{t('customerCompany')}</span>
+                      <CrmIconSelect
+                        name="orgCustomerId"
+                        value={orgPick}
+                        options={companySelectOptions}
+                        disabled={!canWrite || orgBusy}
+                        aria-label={t('customerCompany')}
+                        onChange={(v) => void applyCompanyLink(v)}
+                      />
+                      {orgPick === '__create__' ? (
+                        <div className="customer-company-create">
+                          <input
+                            className="input"
+                            disabled={!canWrite || orgBusy}
+                            value={newOrgName}
+                            placeholder={t('customerCompanyNamePh')}
+                            onChange={(e) => setNewOrgName(e.target.value)}
+                          />
+                          <button
+                            type="button"
+                            className="btn primary"
+                            disabled={!canWrite || orgBusy || !newOrgName.trim()}
+                            onClick={() => void createAndLinkCompany()}
+                          >
+                            {orgBusy ? '…' : t('customerCompanyCreate')}
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              </section>
+
+              <section className="customer-form-section" aria-labelledby="customer-section-roles">
+                <h3 id="customer-section-roles" className="customer-form-section-title">
+                  {t('contactRoles')}
+                </h3>
+                <div className="customer-role-checks" role="group" aria-label={t('contactRoles')}>
                   <label className="crm-check-row">
                     <input
                       type="checkbox"
@@ -1558,233 +1603,219 @@ export function CustomerDetail() {
                     <span>{t('contactRolePartner')}</span>
                   </label>
                 </div>
-              </fieldset>
-              {c.isPartner ? (
-                <div className="customer-settings-row customer-settings-row--3">
-                  <label className="field">
-                    <span className="label">{t('partnerCategory')}</span>
-                    <input
-                      className="input"
-                      disabled={!canWrite}
-                      value={c.partnerCategory || ''}
-                      onChange={(e) =>
-                        setData({
-                          ...data,
-                          customer: { ...c, partnerCategory: e.target.value || null },
-                        })
-                      }
-                    />
-                  </label>
-                  <label className="field">
-                    <span className="label">{t('partnerStatus')}</span>
-                    <select
-                      className="input"
-                      disabled={!canWrite}
-                      value={c.partnerStatus || 'active'}
-                      onChange={(e) =>
-                        setData({
-                          ...data,
-                          customer: {
-                            ...c,
-                            partnerStatus: e.target.value as 'active' | 'inactive',
-                          },
-                        })
-                      }
-                    >
-                      <option value="active">{t('partnerStatusActive')}</option>
-                      <option value="inactive">{t('partnerStatusInactive')}</option>
-                    </select>
-                  </label>
-                </div>
-              ) : null}
-              <div className="customer-settings-row customer-settings-row--3">
-                {c.isCustomer ? (
-                  <div className="field">
-                    <span className="label">{t('customerStatus')}</span>
-                    <CrmIconSelect
-                      name="relationStatus"
-                      value={c.relationStatus}
-                      options={statusOptions}
-                      disabled={!canWrite}
-                      aria-label={t('customerStatus')}
-                      onChange={(v) =>
-                        setData({ ...data, customer: { ...c, relationStatus: v } })
-                      }
-                    />
-                  </div>
-                ) : (
-                  <div className="field" />
-                )}
-                <div className="field">
-                  <span className="label">{t('customerKind')}</span>
-                  <CrmIconSelect
-                    name="kind"
-                    value={c.kind}
-                    options={kindOptions}
-                    disabled={!canWrite}
-                    aria-label={t('customerKind')}
-                    onChange={(v) => syncPersonDisplayName({ kind: v })}
-                  />
-                </div>
-                {c.kind === 'person' ? (
-                  <div className="field">
-                    <span className="label">{t('customerCompany')}</span>
-                    <CrmIconSelect
-                      name="orgCustomerId"
-                      value={orgPick}
-                      options={companySelectOptions}
-                      disabled={!canWrite || orgBusy}
-                      aria-label={t('customerCompany')}
-                      onChange={(v) => void applyCompanyLink(v)}
-                    />
-                    {orgPick === '__create__' ? (
-                      <div className="customer-company-create">
-                        <input
-                          className="input"
-                          disabled={!canWrite || orgBusy}
-                          value={newOrgName}
-                          placeholder={t('customerCompanyNamePh')}
-                          onChange={(e) => setNewOrgName(e.target.value)}
+                {c.isCustomer || c.isPartner ? (
+                  <div className="customer-settings-row">
+                    {c.isCustomer ? (
+                      <div className="field">
+                        <span className="label">{t('customerStatus')}</span>
+                        <CrmIconSelect
+                          name="relationStatus"
+                          value={c.relationStatus}
+                          options={statusOptions}
+                          disabled={!canWrite}
+                          aria-label={t('customerStatus')}
+                          onChange={(v) =>
+                            setData({ ...data, customer: { ...c, relationStatus: v } })
+                          }
                         />
-                        <button
-                          type="button"
-                          className="btn primary"
-                          disabled={!canWrite || orgBusy || !newOrgName.trim()}
-                          onClick={() => void createAndLinkCompany()}
-                        >
-                          {orgBusy ? '…' : t('customerCompanyCreate')}
-                        </button>
                       </div>
                     ) : null}
+                    {c.isPartner ? (
+                      <>
+                        <label className="field">
+                          <span className="label">{t('partnerCategory')}</span>
+                          <select
+                            className="input"
+                            disabled={!canWrite}
+                            value={c.partnerCategory || ''}
+                            onChange={(e) =>
+                              setData({
+                                ...data,
+                                customer: {
+                                  ...c,
+                                  partnerCategory: e.target.value.trim() || null,
+                                },
+                              })
+                            }
+                            aria-label={t('partnerCategory')}
+                          >
+                            <option value="">{t('partnerCategorySelect')}</option>
+                            {PARTNER_CATEGORY_SUGGESTIONS.map((cat) => (
+                              <option key={cat} value={cat}>
+                                {cat}
+                              </option>
+                            ))}
+                            {c.partnerCategory &&
+                            !(PARTNER_CATEGORY_SUGGESTIONS as readonly string[]).includes(
+                              c.partnerCategory,
+                            ) ? (
+                              <option value={c.partnerCategory}>{c.partnerCategory}</option>
+                            ) : null}
+                          </select>
+                        </label>
+                        <label className="field">
+                          <span className="label">{t('partnerStatus')}</span>
+                          <select
+                            className="input"
+                            disabled={!canWrite}
+                            value={c.partnerStatus || 'active'}
+                            onChange={(e) =>
+                              setData({
+                                ...data,
+                                customer: {
+                                  ...c,
+                                  partnerStatus: e.target.value as 'active' | 'inactive',
+                                },
+                              })
+                            }
+                          >
+                            <option value="active">{t('partnerStatusActive')}</option>
+                            <option value="inactive">{t('partnerStatusInactive')}</option>
+                          </select>
+                        </label>
+                      </>
+                    ) : null}
                   </div>
-                ) : (
-                  <div className="field" aria-hidden />
-                )}
-              </div>
-              <div className="customer-profile-contact-row">
-                <label className="field">
-                  <span className="label">{t('email')}</span>
-                  <input
-                    className="input"
-                    disabled={!canWrite}
-                    value={c.email || ''}
-                    onChange={(e) =>
-                      setData({ ...data, customer: { ...c, email: e.target.value || null } })
-                    }
-                  />
-                </label>
-                <label className="field">
-                  <span className="label">{t('customerPhone')}</span>
-                  <input
-                    className="input"
-                    disabled={!canWrite}
-                    value={c.phone || ''}
-                    onChange={(e) =>
-                      setData({ ...data, customer: { ...c, phone: e.target.value || null } })
-                    }
-                  />
-                </label>
-                <label className="field">
-                  <span className="label">{t('customerBirthDate')}</span>
-                  <input
-                    type="date"
-                    className="input"
-                    disabled={!canWrite}
-                    value={birthDateInputValue(c.birthDate)}
-                    onChange={(e) =>
-                      setData({
-                        ...data,
-                        customer: { ...c, birthDate: e.target.value || null },
-                      })
-                    }
-                  />
-                </label>
-              </div>
+                ) : null}
+              </section>
 
-              <fieldset className="customer-address-block">
-                <legend className="label">{t('customerAddress')}</legend>
-                <label className="field">
-                  <span className="label">{t('customerStreet')}</span>
-                  <input
-                    className="input"
-                    disabled={!canWrite}
-                    value={c.street || ''}
-                    onChange={(e) => {
-                      const street = e.target.value || null
-                      setData({
-                        ...data,
-                        customer: {
-                          ...c,
-                          street,
-                          ...(billingSame ? { billingStreet: street } : {}),
-                        },
-                      })
-                    }}
-                  />
-                </label>
-                <div className="customer-address-row">
+              <section className="customer-form-section" aria-labelledby="customer-section-contact">
+                <h3 id="customer-section-contact" className="customer-form-section-title">
+                  {t('customerSectionContact')}
+                </h3>
+                <div className="customer-settings-row">
                   <label className="field">
-                    <span className="label">{t('customerPostalCode')}</span>
+                    <span className="label">{t('email')}</span>
                     <input
                       className="input"
                       disabled={!canWrite}
-                      value={c.postalCode || ''}
+                      value={c.email || ''}
+                      onChange={(e) =>
+                        setData({ ...data, customer: { ...c, email: e.target.value || null } })
+                      }
+                    />
+                  </label>
+                  <label className="field">
+                    <span className="label">{t('customerPhone')}</span>
+                    <input
+                      className="input"
+                      disabled={!canWrite}
+                      value={c.phone || ''}
+                      onChange={(e) =>
+                        setData({ ...data, customer: { ...c, phone: e.target.value || null } })
+                      }
+                    />
+                  </label>
+                </div>
+                <div className="customer-settings-row">
+                  <label className="field">
+                    <span className="label">{t('customerBirthDate')}</span>
+                    <input
+                      type="date"
+                      className="input"
+                      disabled={!canWrite}
+                      value={birthDateInputValue(c.birthDate)}
+                      onChange={(e) =>
+                        setData({
+                          ...data,
+                          customer: { ...c, birthDate: e.target.value || null },
+                        })
+                      }
+                    />
+                  </label>
+                </div>
+              </section>
+
+              <section className="customer-form-section" aria-labelledby="customer-section-address">
+                <h3 id="customer-section-address" className="customer-form-section-title">
+                  {t('customerAddress')}
+                </h3>
+                <div className="customer-address-fields">
+                  <label className="field">
+                    <span className="label">{t('customerStreet')}</span>
+                    <input
+                      className="input"
+                      disabled={!canWrite}
+                      value={c.street || ''}
                       onChange={(e) => {
-                        const postalCode = e.target.value || null
+                        const street = e.target.value || null
                         setData({
                           ...data,
                           customer: {
                             ...c,
-                            postalCode,
-                            ...(billingSame ? { billingPostalCode: postalCode } : {}),
+                            street,
+                            ...(billingSame ? { billingStreet: street } : {}),
                           },
                         })
                       }}
                     />
                   </label>
-                  <label className="field customer-address-city">
-                    <span className="label">{t('customerCity')}</span>
+                  <div className="customer-address-row">
+                    <label className="field">
+                      <span className="label">{t('customerPostalCode')}</span>
+                      <input
+                        className="input"
+                        disabled={!canWrite}
+                        value={c.postalCode || ''}
+                        onChange={(e) => {
+                          const postalCode = e.target.value || null
+                          setData({
+                            ...data,
+                            customer: {
+                              ...c,
+                              postalCode,
+                              ...(billingSame ? { billingPostalCode: postalCode } : {}),
+                            },
+                          })
+                        }}
+                      />
+                    </label>
+                    <label className="field customer-address-city">
+                      <span className="label">{t('customerCity')}</span>
+                      <input
+                        className="input"
+                        disabled={!canWrite}
+                        value={c.city || ''}
+                        onChange={(e) => {
+                          const city = e.target.value || null
+                          setData({
+                            ...data,
+                            customer: {
+                              ...c,
+                              city,
+                              ...(billingSame ? { billingCity: city } : {}),
+                            },
+                          })
+                        }}
+                      />
+                    </label>
+                  </div>
+                  <label className="field">
+                    <span className="label">{t('customerCountry')}</span>
                     <input
                       className="input"
                       disabled={!canWrite}
-                      value={c.city || ''}
+                      value={c.country || ''}
                       onChange={(e) => {
-                        const city = e.target.value || null
+                        const country = e.target.value || null
                         setData({
                           ...data,
                           customer: {
                             ...c,
-                            city,
-                            ...(billingSame ? { billingCity: city } : {}),
+                            country,
+                            ...(billingSame ? { billingCountry: country } : {}),
                           },
                         })
                       }}
                     />
                   </label>
                 </div>
-                <label className="field">
-                  <span className="label">{t('customerCountry')}</span>
-                  <input
-                    className="input"
-                    disabled={!canWrite}
-                    value={c.country || ''}
-                    onChange={(e) => {
-                      const country = e.target.value || null
-                      setData({
-                        ...data,
-                        customer: {
-                          ...c,
-                          country,
-                          ...(billingSame ? { billingCountry: country } : {}),
-                        },
-                      })
-                    }}
-                  />
-                </label>
-              </fieldset>
+              </section>
 
-              <fieldset className="customer-address-block">
-                <legend className="label">{t('customerBillingAddress')}</legend>
+              <section className="customer-form-section" aria-labelledby="customer-section-billing">
+                <h3 id="customer-section-billing" className="customer-form-section-title">
+                  {t('customerBillingAddress')}
+                </h3>
                 <label className="customer-billing-same">
                   <input
                     type="checkbox"
@@ -1810,7 +1841,7 @@ export function CustomerDetail() {
                   <span>{t('customerBillingSame')}</span>
                 </label>
                 {!billingSame ? (
-                  <>
+                  <div className="customer-address-fields">
                     <label className="field">
                       <span className="label">{t('customerStreet')}</span>
                       <input
@@ -1869,10 +1900,9 @@ export function CustomerDetail() {
                         }
                       />
                     </label>
-                  </>
+                  </div>
                 ) : null}
-              </fieldset>
-
+              </section>
             </form>
 
             <aside className="customer-profile-rail">
@@ -2099,26 +2129,36 @@ export function CustomerDetail() {
                 <span>{t('customerChannelAll')}</span>
                 <span className="customer-channel-count">{commEvents.length}</span>
               </button>
-              {(['email', 'whatsapp', 'phone'] as const).map((ch) => (
-                <div key={ch} className="customer-channel-item is-muted">
-                  <span style={{ textTransform: 'capitalize' }}>{ch}</span>
-                  <span className="muted" style={{ fontSize: 11 }}>
-                    {t('customerChannelDisconnected')}
-                  </span>
-                </div>
-              ))}
+              {(['email', 'whatsapp', 'phone'] as const).map((ch) => {
+                const connected = Boolean(data?.channels?.[ch]?.connected)
+                return (
+                  <div
+                    key={ch}
+                    className={`customer-channel-item${connected ? ' is-on' : ' is-muted'}`}
+                  >
+                    <span style={{ textTransform: 'capitalize' }}>{ch}</span>
+                    <span className="muted" style={{ fontSize: 11 }}>
+                      {connected
+                        ? t('customerChannelConnected')
+                        : t('customerChannelDisconnected')}
+                    </span>
+                  </div>
+                )
+              })}
             </aside>
 
             <div className="customer-comms-main stack">
-              <section className="panel customer-card">
-                <div className="customer-empty-block">
-                  <ChatCircle size={24} weight="regular" aria-hidden />
-                  <p style={{ margin: 0 }}>{t('customerCommsEmptyTitle')}</p>
-                  <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-                    {t('customerCommsHint')}
-                  </p>
-                </div>
-              </section>
+              {commEvents.length === 0 ? (
+                <section className="panel customer-card">
+                  <div className="customer-empty-block">
+                    <ChatCircle size={24} weight="regular" aria-hidden />
+                    <p style={{ margin: 0 }}>{t('customerCommsEmptyTitle')}</p>
+                    <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+                      {t('customerCommsHint')}
+                    </p>
+                  </div>
+                </section>
+              ) : null}
 
               <section className="panel customer-card">
                 <header className="customer-card-head">

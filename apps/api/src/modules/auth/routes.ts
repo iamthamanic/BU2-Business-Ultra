@@ -1,184 +1,203 @@
 /**
- * Auth routes: password login, magic-link/OTP, session, password change.
- * Location: apps/api/src/modules/auth/routes.ts — helpers in ./service.ts
+ * Auth routes: Better Auth wrappers + bootstrap + /me.
+ * Location: apps/api/src/modules/auth/routes.ts
  */
-import type { FastifyInstance } from 'fastify'
-import { eq } from 'drizzle-orm'
+import type { FastifyInstance, FastifyReply } from 'fastify'
+import { fromNodeHeaders } from 'better-auth/node'
 import {
+  BootstrapSetupSchema,
   ChangePasswordSchema,
   MagicLinkRequestSchema,
-  MagicLinkVerifySchema,
   OtpVerifySchema,
   PasswordLoginSchema,
 } from '@bu2/shared'
-import { db } from '../../db/client.js'
-import { authChallenges, sessions, users } from '../../db/schema.js'
-import { hashToken, randomOtp, randomToken } from '../../lib/crypto.js'
-import { hashPassword, verifyPassword } from '../../lib/password.js'
-import { sendMagicLinkEmail } from '../../lib/brevo.js'
-import { loadEnv } from '../../lib/env.js'
-import { writeAudit } from '../../lib/audit.js'
+import { auth } from '../../lib/betterAuth.js'
+import { hasPlatformCapability } from '../../lib/authorize.js'
 import { requireUser } from '../../plugins/auth.js'
-import { SESSION_DAYS, ensureUser, createSession, sessionCookieOpts } from './service.js'
+import { writeAudit } from '../../lib/audit.js'
+import { isBootstrapRequired, runBootstrap } from './bootstrap.js'
 
-/** Auth abuse controls (P-05) — tighter on login/OTP than session reads. */
 const authLoginLimit = { max: 20, timeWindow: '1 minute' as const }
 const authChallengeLimit = { max: 10, timeWindow: '1 minute' as const }
 const authSessionLimit = { max: 60, timeWindow: '1 minute' as const }
 
+async function applyAuthResponse(reply: FastifyReply, response: Response) {
+  response.headers.forEach((value, key) => {
+    if (key.toLowerCase() === 'set-cookie') {
+      reply.header('set-cookie', value)
+    }
+  })
+  const text = await response.text()
+  let body: unknown = null
+  try {
+    body = text ? JSON.parse(text) : null
+  } catch {
+    body = text
+  }
+  return reply.code(response.status).send(body)
+}
+
 export async function authRoutes(app: FastifyInstance) {
-  /** Primary: email + password → session cookie */
-  app.post('/api/auth/login', { config: { rateLimit: authLoginLimit } }, async (req, reply) => {
-    const body = PasswordLoginSchema.parse(req.body)
-    const email = body.email.toLowerCase()
-    const rows = await db.select().from(users).where(eq(users.email, email)).limit(1)
-    const user = rows[0]
-    // Uniform error — avoid email enumeration
-    if (!user?.passwordHash) {
-      return reply.code(401).send({ error: 'invalid_credentials' })
-    }
-    const ok = await verifyPassword(body.password, user.passwordHash)
-    if (!ok) {
-      return reply.code(401).send({ error: 'invalid_credentials' })
-    }
-    await createSession(user.id, reply)
-    await writeAudit({ actorUserId: user.id, action: 'auth.login', meta: { method: 'password' } })
-    return { ok: true, user: { id: user.id, email: user.email } }
+  app.get('/api/setup/status', { config: { rateLimit: authSessionLimit } }, async () => {
+    return { required: await isBootstrapRequired() }
   })
 
-  /** Set or change password for the logged-in user */
+  app.post('/api/setup', { config: { rateLimit: authChallengeLimit } }, async (req, reply) => {
+    try {
+      const body = BootstrapSetupSchema.parse(req.body)
+      const result = await runBootstrap(body)
+      // Auto sign-in after bootstrap
+      const signIn = await auth.api.signInEmail({
+        body: { email: body.email, password: body.password },
+        asResponse: true,
+      })
+      if (signIn instanceof Response) {
+        signIn.headers.forEach((value, key) => {
+          if (key.toLowerCase() === 'set-cookie') reply.header('set-cookie', value)
+        })
+      }
+      return { ok: true, ...result }
+    } catch (e) {
+      const err = e as Error & { statusCode?: number }
+      return reply.code(err.statusCode ?? 400).send({ error: err.message })
+    }
+  })
+
+  app.post('/api/auth/login', { config: { rateLimit: authLoginLimit } }, async (req, reply) => {
+    const body = PasswordLoginSchema.parse(req.body)
+    const response = await auth.api.signInEmail({
+      body: { email: body.email.toLowerCase(), password: body.password },
+      asResponse: true,
+    })
+    response.headers.forEach((value, key) => {
+      if (key.toLowerCase() === 'set-cookie') reply.header('set-cookie', value)
+    })
+    if (!response.ok) {
+      return reply.code(401).send({ error: 'invalid_credentials' })
+    }
+    const cookieHeader =
+      response.headers.getSetCookie?.()?.join('; ') ?? response.headers.get('set-cookie') ?? ''
+    const session = await auth.api
+      .getSession({ headers: fromNodeHeaders({ cookie: cookieHeader }) })
+      .catch(() => null)
+    if (!session?.user?.id) {
+      return reply.code(401).send({ error: 'invalid_credentials' })
+    }
+    const { eq } = await import('drizzle-orm')
+    const { db } = await import('../../db/client.js')
+    const { users } = await import('../../db/schema.js')
+    const rows = await db.select().from(users).where(eq(users.id, session.user.id)).limit(1)
+    const u = rows[0]
+    if (!u || u.status !== 'active') {
+      return reply.code(401).send({ error: 'invalid_credentials' })
+    }
+    await writeAudit({
+      actorUserId: u.id,
+      action: 'auth.login',
+      meta: { method: 'password' },
+    })
+    const canCreateCompanies = await hasPlatformCapability(u.id, 'companies.create')
+    return {
+      ok: true,
+      user: {
+        id: u.id,
+        email: u.email,
+        displayName: u.displayName,
+        isSuperadmin: u.isSuperadmin,
+        isBreakglassOperator: u.isBreakglassOperator,
+        locale: u.locale,
+        platformCapabilities: {
+          'companies.create': canCreateCompanies,
+        },
+      },
+    }
+  })
+
   app.post('/api/auth/password', { config: { rateLimit: authLoginLimit } }, async (req, reply) => {
     const actor = await requireUser(req).catch(() => null)
     if (!actor) return reply.code(401).send({ error: 'unauthorized' })
     const body = ChangePasswordSchema.parse(req.body)
-    const rows = await db.select().from(users).where(eq(users.id, actor.id)).limit(1)
-    const user = rows[0]
-    if (!user) return reply.code(401).send({ error: 'unauthorized' })
-
-    if (user.passwordHash) {
-      if (!body.currentPassword) {
-        return reply.code(400).send({ error: 'current_password_required' })
-      }
-      const match = await verifyPassword(body.currentPassword, user.passwordHash)
-      if (!match) {
-        return reply.code(401).send({ error: 'invalid_credentials' })
-      }
+    try {
+      await auth.api.changePassword({
+        body: {
+          newPassword: body.newPassword,
+          currentPassword: body.currentPassword ?? '',
+        },
+        headers: fromNodeHeaders(req.headers),
+      })
+      await writeAudit({ actorUserId: actor.id, action: 'auth.password_changed', meta: {} })
+      return { ok: true }
+    } catch {
+      return reply.code(400).send({ error: 'password_change_failed' })
     }
-
-    const passwordHash = await hashPassword(body.newPassword)
-    await db.update(users).set({ passwordHash }).where(eq(users.id, user.id))
-    await writeAudit({ actorUserId: user.id, action: 'auth.password_changed', meta: {} })
-    return { ok: true }
   })
 
   app.post('/api/auth/magic-link', { config: { rateLimit: authChallengeLimit } }, async (req, reply) => {
     const body = MagicLinkRequestSchema.parse(req.body)
-    const email = body.email.toLowerCase()
-    // Existence check without enumeration: always 200
     try {
-      await ensureUser(email)
-    } catch (e) {
-      const err = e as Error & { statusCode?: number }
-      if (err.statusCode === 403) {
-        return reply.code(200).send({ ok: true, mode: 'queued' })
-      }
-      throw e
+      await auth.api.signInMagicLink({
+        body: {
+          email: body.email.toLowerCase(),
+          callbackURL: `${process.env.PUBLIC_WEB_URL ?? 'http://127.0.0.1:8741'}/login/verify`,
+        },
+        headers: fromNodeHeaders(req.headers),
+      })
+    } catch {
+      // Invite-only / unknown email — always 200 (no enumeration)
     }
-    const token = randomToken(24)
-    const otp = randomOtp()
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000)
-    await db.insert(authChallenges).values({
-      email,
-      tokenHash: hashToken(token),
-      otpHash: hashToken(otp),
-      expiresAt,
-    })
-    const env = loadEnv()
-    const magicUrl = `${env.PUBLIC_WEB_URL}/login/verify?token=${encodeURIComponent(token)}`
-    const sent = await sendMagicLinkEmail({ to: email, magicUrl, otp })
-    await writeAudit({ action: 'auth.magic_link_requested', meta: { email, mode: sent.mode } })
-    return { ok: true, mode: sent.mode }
-  })
-
-  app.post('/api/auth/verify', { config: { rateLimit: authChallengeLimit } }, async (req, reply) => {
-    const body = MagicLinkVerifySchema.parse(req.body)
-    const rows = await db
-      .select()
-      .from(authChallenges)
-      .where(eq(authChallenges.tokenHash, hashToken(body.token)))
-      .limit(1)
-    const challenge = rows[0]
-    if (!challenge || challenge.consumedAt || challenge.expiresAt.getTime() < Date.now()) {
-      return reply.code(400).send({ error: 'invalid_or_expired' })
-    }
-    await db
-      .update(authChallenges)
-      .set({ consumedAt: new Date() })
-      .where(eq(authChallenges.id, challenge.id))
-    const user = await ensureUser(challenge.email)
-    await createSession(user.id, reply)
-    await writeAudit({ actorUserId: user.id, action: 'auth.login', meta: { method: 'magic_link' } })
-    return { ok: true, user: { id: user.id, email: user.email } }
+    return { ok: true, mode: 'queued' }
   })
 
   app.post('/api/auth/verify-otp', { config: { rateLimit: authChallengeLimit } }, async (req, reply) => {
     const body = OtpVerifySchema.parse(req.body)
-    const email = body.email.toLowerCase()
-    const rows = await db.select().from(authChallenges).where(eq(authChallenges.email, email))
-    const challenge = rows
-      .filter((c) => !c.consumedAt && c.expiresAt.getTime() >= Date.now())
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0]
-    if (!challenge?.otpHash || challenge.otpHash !== hashToken(body.code)) {
-      return reply.code(400).send({ error: 'invalid_or_expired' })
-    }
-    await db
-      .update(authChallenges)
-      .set({ consumedAt: new Date() })
-      .where(eq(authChallenges.id, challenge.id))
-    const user = await ensureUser(email)
-    await createSession(user.id, reply)
-    await writeAudit({ actorUserId: user.id, action: 'auth.login', meta: { method: 'otp' } })
-    return { ok: true, user: { id: user.id, email: user.email } }
+    const response = await auth.api.signInEmailOTP({
+      body: { email: body.email.toLowerCase(), otp: body.code },
+      asResponse: true,
+    })
+    return applyAuthResponse(reply, response)
   })
 
   app.post('/api/auth/logout', { config: { rateLimit: authSessionLimit } }, async (req, reply) => {
-    const token = req.cookies.bu2_session
-    if (token) {
-      await db
-        .update(sessions)
-        .set({ revokedAt: new Date() })
-        .where(eq(sessions.tokenHash, hashToken(token)))
-    }
-    // Match setCookie attributes exactly so browsers drop bu2_session
-    reply.clearCookie('bu2_session', sessionCookieOpts())
-    return { ok: true }
+    const response = await auth.api.signOut({
+      headers: fromNodeHeaders(req.headers),
+      asResponse: true,
+    })
+    return applyAuthResponse(reply, response)
   })
 
   app.get('/api/auth/me', { config: { rateLimit: authSessionLimit } }, async (req, reply) => {
     const user = await requireUser(req).catch(() => null)
     if (!user) return reply.code(401).send({ error: 'unauthorized' })
-    return { user }
+    const canCreateCompanies = await hasPlatformCapability(user.id, 'companies.create')
+    return {
+      user: {
+        ...user,
+        platformCapabilities: {
+          'companies.create': canCreateCompanies,
+        },
+      },
+    }
   })
 
-  /** Dev/test only — returns last OTP for an email (never enable in production). */
-  app.post('/api/auth/dev/last-otp', { config: { rateLimit: authChallengeLimit } }, async (req, reply) => {
-    const env = loadEnv()
-    if (env.NODE_ENV === 'production') {
-      return reply.code(404).send({ error: 'not_found' })
-    }
-    const body = MagicLinkRequestSchema.parse(req.body)
-    const email = body.email.toLowerCase()
-    const rows = await db.select().from(authChallenges).where(eq(authChallenges.email, email))
-    const challenge = rows
-      .filter((c) => !c.consumedAt && c.expiresAt.getTime() >= Date.now())
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0]
-    if (!challenge) return reply.code(404).send({ error: 'no_challenge' })
-    // OTP itself is hashed — store plaintext otp in meta is avoided; re-issue for tests
-    const otp = randomOtp()
-    await db
-      .update(authChallenges)
-      .set({ otpHash: hashToken(otp) })
-      .where(eq(authChallenges.id, challenge.id))
-    return { code: otp, email }
+  // Catch-all for Better Auth plugin routes (magic-link verify, OTP send, etc.)
+  app.route({
+    method: ['GET', 'POST'],
+    url: '/api/auth/*',
+    config: { rateLimit: authChallengeLimit },
+    async handler(request, reply) {
+      const url = new URL(request.url, `http://${request.headers.host}`)
+      const headers = fromNodeHeaders(request.headers)
+      const init: RequestInit = {
+        method: request.method,
+        headers,
+      }
+      if (request.method !== 'GET' && request.method !== 'HEAD' && request.body != null) {
+        init.body = JSON.stringify(request.body)
+        headers.set('content-type', 'application/json')
+      }
+      const req = new Request(url.toString(), init)
+      const response = await auth.handler(req)
+      return applyAuthResponse(reply, response)
+    },
   })
 }

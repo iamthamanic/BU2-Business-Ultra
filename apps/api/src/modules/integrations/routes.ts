@@ -5,7 +5,6 @@
 import type { FastifyInstance } from 'fastify'
 import {
   BindingPurposeSchema,
-  ConnectAdsApiKeySchema,
   ConnectFinapiSchema,
   ConnectImapSchema,
   ConnectMockSchema,
@@ -17,7 +16,6 @@ import {
   canMutateContent,
 } from '@bu2/shared'
 import {
-  connectAdsApiKeyAccount,
   connectFinapiAccount,
   connectImapAccount,
   connectMockAccount,
@@ -65,7 +63,7 @@ export async function integrationRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m && !user.isSuperadmin) return reply.code(403).send({ error: 'forbidden' })
+    if (!m) return reply.code(403).send({ error: 'forbidden' })
     const providers = PROVIDER_CATALOG.filter((p) => p.id !== 'mock').map((p) => {
       const redirectUri = oauthRedirectUriForProvider(p.id)
       const oauthConfigured =
@@ -103,7 +101,7 @@ export async function integrationRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m && !user.isSuperadmin) return reply.code(403).send({ error: 'forbidden' })
+    if (!m) return reply.code(403).send({ error: 'forbidden' })
     const env = loadEnv()
     const finapi = getFinapiPlatformConfig()
     return {
@@ -125,7 +123,7 @@ export async function integrationRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || (!canManageCredentials(m.role) && !user.isSuperadmin)) {
+    if (!m || !canManageCredentials(m)) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     const body = ConnectImapSchema.safeParse(req.body)
@@ -149,7 +147,7 @@ export async function integrationRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || (!canManageCredentials(m.role) && !user.isSuperadmin)) {
+    if (!m || !canManageCredentials(m)) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     const raw = req.body && typeof req.body === 'object' ? req.body : {}
@@ -170,37 +168,18 @@ export async function integrationRoutes(app: FastifyInstance) {
     }
   })
 
-  app.post('/api/b/:slug/integrations/connections/ads-api-key', async (req, reply) => {
-    const user = await requireUser(req)
-    const { slug } = req.params as { slug: string }
-    const m = await loadMembership(user.id, slug)
-    if (!m || (!canManageCredentials(m.role) && !user.isSuperadmin)) {
-      return reply.code(403).send({ error: 'forbidden' })
-    }
-    const body = ConnectAdsApiKeySchema.safeParse(req.body)
-    if (!body.success) {
-      return reply.code(400).send({ error: 'invalid_body', issues: body.error.issues })
-    }
-    try {
-      const connection = await connectAdsApiKeyAccount({
-        businessId: m.businessId,
-        userId: user.id,
-        provider: body.data.provider,
-        apiKey: body.data.apiKey,
-        displayName: body.data.displayName,
-      })
-      return reply.code(201).send({ connection })
-    } catch (e) {
-      const { status, error } = httpError(e)
-      return reply.code(status).send({ error })
-    }
+  app.post('/api/b/:slug/integrations/connections/ads-api-key', async (_req, reply) => {
+    return reply.code(410).send({
+      error: 'ads_api_key_retired',
+      hint: 'Use OAuth start for chatgpt_ads / reddit_ads / microsoft_ads.',
+    })
   })
 
   app.delete('/api/b/:slug/integrations/connections/:id', async (req, reply) => {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || (!canManageCredentials(m.role) && !user.isSuperadmin)) {
+    if (!m || !canManageCredentials(m)) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     const ok = await revokeConnection(m.businessId, id)
@@ -232,7 +211,7 @@ export async function integrationRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || (!canManageCredentials(m.role) && !user.isSuperadmin)) {
+    if (!m || !canManageCredentials(m)) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     const body = ConnectMockSchema.safeParse(req.body)
@@ -276,7 +255,7 @@ export async function integrationRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || (!canManageCredentials(m.role) && !user.isSuperadmin)) {
+    if (!m || !canManageCredentials(m)) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     const body = CreateModuleBindingSchema.safeParse(req.body)
@@ -297,7 +276,7 @@ export async function integrationRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || (!canManageCredentials(m.role) && !user.isSuperadmin)) {
+    if (!m || !canManageCredentials(m)) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     const body = SetModuleBindingSchema.safeParse(req.body)
@@ -342,7 +321,7 @@ export async function integrationRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id, stream } = req.params as { slug: string; id: string; stream: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || (!canManageCredentials(m.role) && !user.isSuperadmin)) {
+    if (!m || !canManageCredentials(m)) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     const body = UpsertSyncCursorSchema.safeParse({
@@ -391,7 +370,7 @@ export async function integrationRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || (!canManageCredentials(m.role) && !user.isSuperadmin)) {
+    if (!m || !canManageCredentials(m)) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     const customerId = String((req.body as { customerId?: string })?.customerId || '')
@@ -444,7 +423,7 @@ export async function integrationRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || (!canMutateContent(m.role) && !user.isSuperadmin)) {
+    if (!m || !canMutateContent(m)) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     const conn = await getConnectionForBusiness(m.businessId, id)

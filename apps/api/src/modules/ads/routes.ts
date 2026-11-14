@@ -6,10 +6,13 @@ import { adsCampaigns } from '../../db/schema.js'
 import { loadMembership, requireUser } from '../../plugins/auth.js'
 import { writeAudit } from '../../lib/audit.js'
 import { mutateAds, type AdsProvider } from '../../lib/integrations/ads.js'
-import {
-  ADS_PROVIDER_SECRET_GATE,
-  resolveAdsCredential,
-} from '../../lib/integrations/adsCredentials.js'
+import { resolveAdsCredential } from '../../lib/integrations/adsCredentials.js'
+
+const ADS_PROVIDERS = new Set<AdsProvider>(['google_ads', 'meta_ads', 'tiktok_ads', 'chatgpt_ads'])
+
+function isAdsProvider(p: string): p is AdsProvider {
+  return ADS_PROVIDERS.has(p as AdsProvider)
+}
 
 export async function adsRoutes(app: FastifyInstance) {
   app.get('/api/b/:slug/ads', async (req, reply) => {
@@ -28,21 +31,18 @@ export async function adsRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     const body = AdsCampaignDraftSchema.parse(req.body)
-    const provider = body.provider as AdsProvider
-    if (!ADS_PROVIDER_SECRET_GATE[provider]) {
+    if (!isAdsProvider(body.provider)) {
       return reply.code(400).send({ error: 'unknown_provider' })
     }
+    const provider = body.provider
     const cred = await resolveAdsCredential(m.businessId, provider)
     if (!cred) {
       return reply.code(409).send({
-        error: 'provider_key_required',
+        error: 'provider_connection_required',
         gate: body.provider,
-        hint:
-          provider === 'google_ads'
-            ? 'Connect Google Ads under Settings → Connections (OAuth), or set a legacy API secret.'
-            : undefined,
+        hint: 'Connect the ads provider under Settings → Verbindungen (OAuth).',
       })
     }
     const [campaign] = await db
@@ -64,7 +64,7 @@ export async function adsRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     ConfirmMutationSchema.parse(req.body)
     const campaign = (
       await db
@@ -74,11 +74,16 @@ export async function adsRoutes(app: FastifyInstance) {
         .limit(1)
     )[0]
     if (!campaign) return reply.code(404).send({ error: 'not_found' })
-    const provider = campaign.provider as AdsProvider
-    if (!ADS_PROVIDER_SECRET_GATE[provider]) return reply.code(400).send({ error: 'unknown_provider' })
+    if (!isAdsProvider(campaign.provider)) {
+      return reply.code(400).send({ error: 'unknown_provider' })
+    }
+    const provider = campaign.provider
     const cred = await resolveAdsCredential(m.businessId, provider)
     if (!cred) {
-      return reply.code(409).send({ error: 'provider_key_required', gate: campaign.provider })
+      return reply.code(409).send({
+        error: 'provider_connection_required',
+        gate: campaign.provider,
+      })
     }
     const result = await mutateAds(provider, cred.plaintext, {
       name: campaign.name,

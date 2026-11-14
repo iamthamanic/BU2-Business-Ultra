@@ -9,13 +9,8 @@ import { api } from '../../lib/api'
 import { useI18n } from '../../lib/i18n'
 import { ConnProviderIcon } from './connProviderIcons'
 
-const CORE_ADS_KEY = new Set([
-  'tiktok_ads',
-  'chatgpt_ads',
-  'reddit_ads',
-  'pinterest_ads',
-  'microsoft_ads',
-])
+/** Legacy Integration Core ads-key path — paid ads are OAuth now; keep empty. */
+const CORE_ADS_KEY = new Set<string>()
 
 type Props = {
   slug: string

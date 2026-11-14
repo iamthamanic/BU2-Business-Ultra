@@ -7,6 +7,7 @@ import { and, desc, eq, ilike, inArray, isNotNull, isNull, or, sql } from 'drizz
 import { CustomerPatchSchema, CustomerSchema, canMutateContent } from '@bu2/shared'
 import { db } from '../../db/client.js'
 import {
+  contactIdentities,
   customerConsents,
   customerEvents,
   customers,
@@ -162,6 +163,17 @@ export async function registerCustomerCrudRoutes(app: FastifyInstance) {
             .where(
               and(eq(projects.businessId, m.businessId), inArray(projects.id, projectIds)),
             )
+    const identities = await db
+      .select({ kind: contactIdentities.kind, value: contactIdentities.value })
+      .from(contactIdentities)
+      .where(
+        and(eq(contactIdentities.businessId, m.businessId), eq(contactIdentities.customerId, id)),
+      )
+    const hasEmail = identities.some((x) => x.kind === 'email')
+    const hasPhone = identities.some((x) => x.kind === 'phone')
+    const hasWa =
+      hasPhone ||
+      identities.some((x) => x.kind === 'whatsapp' || x.value.startsWith('+'))
     return {
       customer: toCustomer(row, org),
       notes,
@@ -179,9 +191,9 @@ export async function registerCustomerCrudRoutes(app: FastifyInstance) {
       linkedProjects,
       stats,
       channels: {
-        email: { connected: false },
-        whatsapp: { connected: false },
-        phone: { connected: false },
+        email: { connected: hasEmail || Boolean(row.email) },
+        whatsapp: { connected: hasWa },
+        phone: { connected: hasPhone || Boolean(row.phone) },
       },
     }
   })
@@ -190,7 +202,7 @@ export async function registerCustomerCrudRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     const body = CustomerSchema.parse(req.body)
     const street = body.street ?? null
     const postalCode = body.postalCode ?? null
@@ -272,7 +284,7 @@ export async function registerCustomerCrudRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadCustomer(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     const body = CustomerPatchSchema.parse(req.body)
@@ -419,7 +431,7 @@ export async function registerCustomerCrudRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadCustomer(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     const [row] = await db
@@ -435,7 +447,7 @@ export async function registerCustomerCrudRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadCustomer(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     const [row] = await db

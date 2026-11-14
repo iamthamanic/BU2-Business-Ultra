@@ -63,11 +63,15 @@ export function companyRoutes(slug: string) {
     catalog: `${base}/product`,
     marketing: `${base}/marketing`,
     product: `${base}/product`,
-    /** @deprecated Prefer `contacts` — kept for bookmarks; redirects in App. */
-    customer: `${base}/contacts`,
-    customerDetail: (id: string) => `${base}/contacts/${encodeURIComponent(id)}`,
-    contacts: `${base}/contacts`,
-    contactDetail: (id: string) => `${base}/contacts/${encodeURIComponent(id)}`,
+    /** Kunden list (default contacts landing). */
+    customer: `${base}/customer`,
+    customerDetail: (id: string) => `${base}/customer/${encodeURIComponent(id)}`,
+    /** Partner list. */
+    partner: `${base}/partner`,
+    partnerDetail: (id: string) => `${base}/partner/${encodeURIComponent(id)}`,
+    /** @deprecated Prefer `customer` — redirects in App. */
+    contacts: `${base}/customer`,
+    contactDetail: (id: string) => `${base}/customer/${encodeURIComponent(id)}`,
     /** Omnichannel messaging inbox */
     inbox: `${base}/inbox`,
     projects: `${base}/projects`,
@@ -212,6 +216,8 @@ export function mapOldBu2FrontendPath(slug: string, rest: string): string {
     marketing: routes.hub,
     product: routes.product,
     customer: routes.customer,
+    partner: routes.partner,
+    contacts: routes.customer,
     projects: routes.projects,
     inbox: routes.inbox,
     'projects/mine': routes.inbox,

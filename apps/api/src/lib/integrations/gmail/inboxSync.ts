@@ -13,6 +13,7 @@ import {
   syncCursors,
 } from '../../../db/schema.js'
 import { parseCapabilitiesCache, purposeAllowed } from '../core/capabilities.js'
+import { bumpConversationUnread } from '../inbox/unread.js'
 import { getGoogleAccessToken } from '../google/tokens.js'
 import {
   buildReplyRfc822,
@@ -153,6 +154,9 @@ async function insertGmailMessage(opts: {
         messageId: gmailHeader(opts.msg, 'Message-Id') || gmailHeader(opts.msg, 'Message-ID'),
       },
     })
+    if (direction === 'inbound') {
+      await bumpConversationUnread(opts.conversationId, opts.businessId)
+    }
     return true
   } catch (e) {
     const msg = String(e)

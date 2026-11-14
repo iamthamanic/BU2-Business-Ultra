@@ -17,6 +17,7 @@ import {
 } from '../../../db/schema.js'
 import { keyHint, sealSecret } from '../../crypto.js'
 import { parseCapabilitiesCache, purposeAllowed } from '../core/capabilities.js'
+import { bumpConversationUnread } from '../inbox/unread.js'
 import { ensureUnipileAdapterRegistered, unipileAdapter } from './adapter.js'
 import {
   getUnipileConfig,
@@ -169,6 +170,9 @@ async function insertMessage(opts: {
       sentAt: opts.at,
       raw: opts.raw,
     })
+    if (opts.direction === 'inbound') {
+      await bumpConversationUnread(opts.conversationId, opts.businessId)
+    }
     return true
   } catch (e) {
     const msg = String(e)

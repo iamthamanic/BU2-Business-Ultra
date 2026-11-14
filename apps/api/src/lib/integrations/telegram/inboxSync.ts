@@ -2,29 +2,42 @@
  * Telegram inbox sync + reply/outbox — tenant-scoped.
  * Location: apps/api/src/lib/integrations/telegram/inboxSync.ts
  */
-import { and, asc, desc, eq } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import type { InboxReplyInput } from '@bu2/shared'
 import { db } from '../../../db/client.js'
 import {
   connectionCredentials,
   connections,
   contactIdentities,
   conversations,
+  customers,
+  memberships,
   messages,
   moduleBindings,
   outboxJobs,
   syncCursors,
+  users,
 } from '../../../db/schema.js'
+import { loadEnv } from '../../env.js'
 import { keyHint, openSecret, sealSecret } from '../../crypto.js'
 import { purposeAllowed, parseCapabilitiesCache } from '../core/capabilities.js'
+import { composerFormatsForConnection } from '../inbox/composerFormats.js'
+import { bumpConversationUnread, markConversationRead } from '../inbox/unread.js'
 import { ensureTelegramAdapterRegistered, telegramAdapter } from './adapter.js'
 import {
   displayNameFromUser,
   telegramGetUpdates,
+  telegramSendMedia,
   telegramSendMessage,
+  type TelegramMediaKind,
   type TelegramMessage,
   type TelegramUpdate,
 } from './api.js'
+
+const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024
 
 ensureTelegramAdapterRegistered()
 
@@ -263,6 +276,7 @@ async function insertInboundMessage(opts: {
       sentAt: opts.at,
       raw: opts.raw,
     })
+    await bumpConversationUnread(opts.conversationId, opts.businessId)
     return true
   } catch (e) {
     const msg = String(e)
@@ -359,20 +373,54 @@ export async function syncTelegramConnection(businessId: string, connectionId: s
 
 export async function listInboxConversations(businessId: string) {
   const rows = await db
-    .select()
+    .select({
+      id: conversations.id,
+      channel: conversations.channel,
+      connectionId: conversations.connectionId,
+      title: conversations.title,
+      status: conversations.status,
+      lastMessageAt: conversations.lastMessageAt,
+      lastPreview: conversations.lastPreview,
+      contactIdentityId: conversations.contactIdentityId,
+      externalThreadId: conversations.externalThreadId,
+      assigneeUserId: conversations.assigneeUserId,
+      unreadCount: conversations.unreadCount,
+      connectionDisplayName: connections.displayName,
+      connectionProvider: connections.provider,
+      identityKind: contactIdentities.kind,
+      identityValue: contactIdentities.value,
+      identityDisplayName: contactIdentities.displayName,
+      customerId: contactIdentities.customerId,
+      assigneeDisplayName: users.displayName,
+      assigneeEmail: users.email,
+    })
     .from(conversations)
+    .leftJoin(connections, eq(connections.id, conversations.connectionId))
+    .leftJoin(contactIdentities, eq(contactIdentities.id, conversations.contactIdentityId))
+    .leftJoin(users, eq(users.id, conversations.assigneeUserId))
     .where(eq(conversations.businessId, businessId))
     .orderBy(desc(conversations.lastMessageAt), desc(conversations.updatedAt))
   return rows.map((r) => ({
     id: r.id,
     channel: r.channel,
     connectionId: r.connectionId,
+    connectionDisplayName: r.connectionDisplayName,
+    connectionProvider: r.connectionProvider,
     title: r.title,
     status: r.status,
     lastMessageAt: r.lastMessageAt,
     lastPreview: r.lastPreview,
     contactIdentityId: r.contactIdentityId,
     externalThreadId: r.externalThreadId,
+    assigneeUserId: r.assigneeUserId,
+    assigneeDisplayName: r.assigneeDisplayName?.trim() || r.assigneeEmail || null,
+    unreadCount: r.unreadCount ?? 0,
+    isUnread: (r.unreadCount ?? 0) > 0,
+    identityKind: r.identityKind,
+    identityValue: r.identityValue,
+    identityDisplayName: r.identityDisplayName,
+    customerId: r.customerId,
+    isExistingCustomer: Boolean(r.customerId),
   }))
 }
 
@@ -385,9 +433,95 @@ export async function getConversationForBusiness(businessId: string, conversatio
   return rows[0] || null
 }
 
+/** Assign / unassign a conversation to a business member (null clears). */
+export async function assignConversation(opts: {
+  businessId: string
+  conversationId: string
+  assigneeUserId: string | null
+}) {
+  const conv = await getConversationForBusiness(opts.businessId, opts.conversationId)
+  if (!conv) throw Object.assign(new Error('conversation_not_found'), { statusCode: 404 })
+  if (opts.assigneeUserId) {
+    const member = await db
+      .select({ userId: memberships.userId })
+      .from(memberships)
+      .where(
+        and(
+          eq(memberships.businessId, opts.businessId),
+          eq(memberships.userId, opts.assigneeUserId),
+        ),
+      )
+      .limit(1)
+    if (!member[0]) {
+      throw Object.assign(new Error('assignee_not_member'), { statusCode: 400 })
+    }
+  }
+  const [row] = await db
+    .update(conversations)
+    .set({
+      assigneeUserId: opts.assigneeUserId,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(conversations.id, opts.conversationId),
+        eq(conversations.businessId, opts.businessId),
+      ),
+    )
+    .returning()
+  return row!
+}
+
+function viaAccountLabel(conn: {
+  displayName: string | null
+  externalAccountId: string | null
+  provider: string | null
+} | null): string | null {
+  if (!conn) return null
+  if (conn.displayName?.trim()) return conn.displayName.trim()
+  if (conn.externalAccountId?.trim()) return conn.externalAccountId.trim()
+  return conn.provider
+}
+
+function peerLabel(identity: {
+  displayName: string | null
+  value: string
+  kind: string
+} | null): { name: string | null; address: string | null } {
+  if (!identity) return { name: null, address: null }
+  return {
+    name: identity.displayName?.trim() || null,
+    address: identity.value?.trim() || null,
+  }
+}
+
 export async function listConversationMessages(businessId: string, conversationId: string) {
   const conv = await getConversationForBusiness(businessId, conversationId)
   if (!conv) return null
+  const connRows = await db
+    .select({
+      displayName: connections.displayName,
+      provider: connections.provider,
+      externalAccountId: connections.externalAccountId,
+      capabilitiesCache: connections.capabilitiesCache,
+    })
+    .from(connections)
+    .where(eq(connections.id, conv.connectionId))
+    .limit(1)
+  const conn = connRows[0]
+  const viaAccount = viaAccountLabel(conn ?? null)
+  const composerFormats = composerFormatsForConnection({
+    provider: conn?.provider || conv.channel,
+    capabilitiesCache: conn?.capabilitiesCache,
+  })
+
+  const identity = conv.contactIdentityId
+    ? await getIdentityContext(businessId, conv.contactIdentityId)
+    : null
+  const peer = peerLabel(identity)
+
+  await markConversationRead(conversationId, businessId)
+
   const rows = await db
     .select()
     .from(messages)
@@ -395,6 +529,28 @@ export async function listConversationMessages(businessId: string, conversationI
       and(eq(messages.conversationId, conversationId), eq(messages.businessId, businessId)),
     )
     .orderBy(asc(messages.createdAt))
+
+  const actorIds = [
+    ...new Set(
+      rows
+        .map((m) => {
+          const raw = m.raw as Record<string, unknown>
+          return typeof raw?.byUserId === 'string' ? raw.byUserId : null
+        })
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ]
+  const actorNameById = new Map<string, string>()
+  if (actorIds.length) {
+    const actorRows = await db
+      .select({ id: users.id, displayName: users.displayName, email: users.email })
+      .from(users)
+      .where(inArray(users.id, actorIds))
+    for (const u of actorRows) {
+      actorNameById.set(u.id, u.displayName?.trim() || u.email || 'Team')
+    }
+  }
+
   return {
     conversation: {
       id: conv.id,
@@ -402,19 +558,37 @@ export async function listConversationMessages(businessId: string, conversationI
       title: conv.title,
       status: conv.status,
       connectionId: conv.connectionId,
+      connectionDisplayName: conn?.displayName ?? null,
+      connectionProvider: conn?.provider ?? null,
+      connectionExternalAccountId: conn?.externalAccountId ?? null,
       contactIdentityId: conv.contactIdentityId,
       externalThreadId: conv.externalThreadId,
       lastMessageAt: conv.lastMessageAt,
+      assigneeUserId: conv.assigneeUserId,
+      unreadCount: 0,
+      composerFormats,
     },
-    messages: rows.map((m) => ({
-      id: m.id,
-      direction: m.direction,
-      body: m.bodyText,
-      deliveryStatus: m.deliveryStatus,
-      errorDetail: m.errorDetail,
-      sentAt: m.sentAt,
-      createdAt: m.createdAt,
-    })),
+    messages: rows.map((m) => {
+      const raw = m.raw as Record<string, unknown>
+      const byUserId = typeof raw?.byUserId === 'string' ? raw.byUserId : null
+      const actorName =
+        (typeof raw?.actorName === 'string' && raw.actorName.trim()) ||
+        (byUserId ? actorNameById.get(byUserId) : null) ||
+        null
+      return {
+        id: m.id,
+        direction: m.direction,
+        body: m.bodyText,
+        deliveryStatus: m.deliveryStatus,
+        errorDetail: m.errorDetail,
+        sentAt: m.sentAt,
+        createdAt: m.createdAt,
+        actorName: m.direction === 'outbound' ? actorName : peer.name,
+        actorAddress:
+          m.direction === 'outbound' ? viaAccount : peer.address,
+        viaAccount: m.direction === 'outbound' ? viaAccount : null,
+      }
+    }),
   }
 }
 
@@ -427,12 +601,30 @@ export async function getIdentityContext(businessId: string, identityId: string 
     .limit(1)
   const r = rows[0]
   if (!r) return null
+  let customerName: string | null = null
+  let customerKind: string | null = null
+  if (r.customerId) {
+    const cust = (
+      await db
+        .select({
+          displayName: customers.displayName,
+          kind: customers.kind,
+        })
+        .from(customers)
+        .where(and(eq(customers.id, r.customerId), eq(customers.businessId, businessId)))
+        .limit(1)
+    )[0]
+    customerName = cust?.displayName?.trim() || null
+    customerKind = cust?.kind || null
+  }
   return {
     id: r.id,
     kind: r.kind,
     value: r.value,
     displayName: r.displayName,
     customerId: r.customerId,
+    customerName,
+    customerKind,
     confidence: r.confidence,
     confirmedAt: r.confirmedAt,
   }
@@ -458,13 +650,30 @@ async function processTelegramOutboxJob(jobId: string) {
     conversationId?: string
     chatId?: string
     text?: string
+    mediaPath?: string
+    mediaKind?: TelegramMediaKind
+    mediaMime?: string
+    mediaFilename?: string
   }
   try {
     const token = await loadBotToken(job.businessId, job.connectionId)
-    if (!payload.chatId || !payload.text || !payload.messageId) {
+    if (!payload.chatId || !payload.messageId) {
       throw new Error('invalid_payload')
     }
-    const sent = await telegramSendMessage(token, payload.chatId, payload.text)
+    let sent: TelegramMessage
+    if (payload.mediaPath && payload.mediaKind) {
+      const bytes = await readFile(payload.mediaPath)
+      sent = await telegramSendMedia(token, payload.chatId, {
+        kind: payload.mediaKind,
+        bytes,
+        filename: payload.mediaFilename || 'attachment',
+        mime: payload.mediaMime || 'application/octet-stream',
+        caption: payload.text,
+      })
+    } else {
+      if (!payload.text) throw new Error('invalid_payload')
+      sent = await telegramSendMessage(token, payload.chatId, payload.text)
+    }
     const providerMessageId = `tg:${payload.chatId}:${sent.message_id}`
     await db
       .update(messages)
@@ -503,11 +712,55 @@ async function processTelegramOutboxJob(jobId: string) {
   }
 }
 
+function parseDataUrl(dataUrl: string): { mime: string; bytes: Buffer } {
+  const match = /^data:([^;,]+);base64,(.+)$/s.exec(dataUrl)
+  if (!match) {
+    throw Object.assign(new Error('invalid_data_url'), { statusCode: 400 })
+  }
+  const mime = match[1]!.trim().toLowerCase()
+  const bytes = Buffer.from(match[2]!, 'base64')
+  if (!bytes.length) {
+    throw Object.assign(new Error('empty_attachment'), { statusCode: 400 })
+  }
+  if (bytes.length > MAX_ATTACHMENT_BYTES) {
+    throw Object.assign(new Error('attachment_too_large'), { statusCode: 413 })
+  }
+  return { mime, bytes }
+}
+
+function mediaKindFor(
+  format: 'image' | 'file' | 'audio' | 'voice',
+  mime: string,
+): TelegramMediaKind {
+  if (format === 'image' || mime.startsWith('image/')) return 'photo'
+  if (format === 'voice') {
+    // Browser MediaRecorder is often webm; Bot sendVoice wants ogg — use audio then.
+    if (mime.includes('ogg') || mime.includes('opus')) return 'voice'
+    return 'audio'
+  }
+  if (format === 'audio' || mime.startsWith('audio/')) return 'audio'
+  return 'document'
+}
+
+function safeAttachmentFilename(name: string, mime: string): string {
+  const base = name.replace(/[^\w.\-()+ ]+/g, '_').trim().slice(0, 120) || 'attachment'
+  if (base.includes('.')) return base
+  if (mime.includes('png')) return `${base}.png`
+  if (mime.includes('jpeg') || mime.includes('jpg')) return `${base}.jpg`
+  if (mime.includes('webp')) return `${base}.webp`
+  if (mime.includes('ogg')) return `${base}.ogg`
+  if (mime.includes('webm')) return `${base}.webm`
+  if (mime.includes('mpeg') || mime.includes('mp3')) return `${base}.mp3`
+  if (mime.includes('pdf')) return `${base}.pdf`
+  return base
+}
+
 export async function replyInConversation(opts: {
   businessId: string
   conversationId: string
   body: string
   userId: string
+  attachment?: InboxReplyInput['attachment']
 }) {
   const conv = await getConversationForBusiness(opts.businessId, opts.conversationId)
   if (!conv) throw Object.assign(new Error('conversation_not_found'), { statusCode: 404 })
@@ -520,7 +773,20 @@ export async function replyInConversation(opts: {
   const conn = connRows[0]
   if (!conn) throw Object.assign(new Error('connection_not_found'), { statusCode: 404 })
 
+  const bodyText = (opts.body || '').trim()
+  const formats = composerFormatsForConnection({
+    provider: conn.provider,
+    capabilitiesCache: conn.capabilitiesCache,
+  })
+
+  if (opts.attachment && !formats.includes(opts.attachment.format)) {
+    throw Object.assign(new Error('format_not_allowed'), { statusCode: 409 })
+  }
+
   if (conn.provider === 'google') {
+    if (opts.attachment) {
+      throw Object.assign(new Error('media_unsupported_for_provider'), { statusCode: 501 })
+    }
     const sendCap = purposeAllowed(parseCapabilitiesCache(conn.capabilitiesCache), 'send_mail')
     if (!sendCap.allowed) {
       throw Object.assign(new Error(sendCap.reason || 'capability_denied'), { statusCode: 409 })
@@ -531,7 +797,7 @@ export async function replyInConversation(opts: {
       conversationId: conv.id,
       connectionId: conv.connectionId,
       threadId: conv.externalThreadId,
-      body: opts.body,
+      body: bodyText,
       userId: opts.userId,
     })
   }
@@ -542,13 +808,16 @@ export async function replyInConversation(opts: {
   }
 
   if (conn.provider === 'unipile') {
+    if (opts.attachment) {
+      throw Object.assign(new Error('media_unsupported_for_provider'), { statusCode: 501 })
+    }
     const { replyUnipileConversation } = await import('../unipile/inboxSync.js')
     return replyUnipileConversation({
       businessId: opts.businessId,
       conversationId: conv.id,
       connectionId: conv.connectionId,
       chatId: conv.externalThreadId,
-      body: opts.body,
+      body: bodyText,
       userId: opts.userId,
     })
   }
@@ -557,8 +826,36 @@ export async function replyInConversation(opts: {
     throw Object.assign(new Error('provider_reply_unsupported'), { statusCode: 501 })
   }
 
+  if (!bodyText && !opts.attachment) {
+    throw Object.assign(new Error('body_or_attachment_required'), { statusCode: 400 })
+  }
+
   const messageId = randomUUID()
+  let mediaPath: string | undefined
+  let mediaKind: TelegramMediaKind | undefined
+  let mediaMime: string | undefined
+  let mediaFilename: string | undefined
+  let storedPublic: string | undefined
+
+  if (opts.attachment) {
+    const parsed = parseDataUrl(opts.attachment.dataUrl)
+    mediaKind = mediaKindFor(opts.attachment.format, parsed.mime)
+    mediaMime = parsed.mime
+    mediaFilename = safeAttachmentFilename(opts.attachment.filename, parsed.mime)
+    const env = loadEnv()
+    const dir = join(env.UPLOADS_DIR, opts.businessId, 'inbox')
+    await mkdir(dir, { recursive: true })
+    const diskName = `${messageId}-${mediaFilename}`
+    mediaPath = join(dir, diskName)
+    await writeFile(mediaPath, parsed.bytes)
+    storedPublic = `/uploads/${opts.businessId}/inbox/${diskName}`
+  }
+
   const provisionalProviderId = `pending:${messageId}`
+  const displayBody =
+    bodyText ||
+    (mediaFilename ? `📎 ${mediaFilename}` : opts.attachment ? '📎 Anhang' : '')
+
   await db.insert(messages).values({
     id: messageId,
     businessId: opts.businessId,
@@ -566,16 +863,26 @@ export async function replyInConversation(opts: {
     connectionId: conv.connectionId,
     direction: 'outbound',
     providerMessageId: provisionalProviderId,
-    bodyText: opts.body,
+    bodyText: displayBody,
     deliveryStatus: 'pending',
-    raw: { byUserId: opts.userId },
+    raw: {
+      byUserId: opts.userId,
+      attachment: opts.attachment
+        ? {
+            format: opts.attachment.format,
+            filename: mediaFilename,
+            mime: mediaMime,
+            path: storedPublic,
+          }
+        : undefined,
+    },
   })
 
   await db
     .update(conversations)
     .set({
       lastMessageAt: new Date(),
-      lastPreview: previewOf(opts.body),
+      lastPreview: previewOf(displayBody),
       updatedAt: new Date(),
     })
     .where(eq(conversations.id, conv.id))
@@ -590,7 +897,11 @@ export async function replyInConversation(opts: {
         messageId,
         conversationId: conv.id,
         chatId: conv.externalThreadId,
-        text: opts.body,
+        text: bodyText || undefined,
+        mediaPath,
+        mediaKind,
+        mediaMime,
+        mediaFilename,
       },
       status: 'pending',
     })
@@ -633,5 +944,9 @@ export async function listTelegramConnections(businessId: string) {
       status: r.status,
       externalAccountId: r.externalAccountId,
       accountType: r.accountType,
+      composerFormats: composerFormatsForConnection({
+        provider: r.provider,
+        capabilitiesCache: r.capabilitiesCache,
+      }),
     }))
 }

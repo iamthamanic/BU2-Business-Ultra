@@ -323,6 +323,7 @@ export function ProjectDetail() {
               tasks={tasks}
               onOpen={openTask}
               t={t}
+              slug={slug}
               memberById={memberById}
               showFilters
               canWrite={canWrite}

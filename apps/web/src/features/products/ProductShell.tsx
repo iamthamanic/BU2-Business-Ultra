@@ -2,7 +2,7 @@
  * ProductShell — Product department: table/card list + create/edit modal.
  * Location: apps/web/src/features/products/ProductShell.tsx
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import {
   MagnifyingGlass,
@@ -12,17 +12,20 @@ import {
   SquaresFour,
   Table,
 } from '@phosphor-icons/react'
+import { canMutateContent, type OrderStatus } from '@bu2/shared'
 import { ArchiveSegmentToggle } from '../../components/ArchiveSegmentToggle'
-import { ProductModal } from './ProductModal'
+import { FunnelExportMenu } from '../../components/FunnelExportMenu'
+import { FunnelTip } from '../../components/FunnelTip'
 import type { CompanyOutletContext } from '../../components/BusinessShell'
+import type { MessageKey } from '../../i18n/messages'
 import { api } from '../../lib/api'
+import type { FunnelExportPayload } from '../../lib/funnelExport'
 import { useI18n } from '../../lib/i18n'
-import { canMutateContent } from '@bu2/shared'
-import {
-  fmtEur,
-  initials,
-  type BuProduct,
-} from './productTypes'
+import { usePersistedTableColumns, type TableColumnDef } from '../../lib/tableColumns'
+import { OrderCreateModal } from './OrderCreateModal'
+import type { BuProductOrder } from './orderTypes'
+import { ProductModal } from './ProductModal'
+import { fmtEur, initials, type BuProduct } from './productTypes'
 
 type ViewMode = 'cards' | 'table'
 type ArchiveMode = 'active' | 'archived'
@@ -52,8 +55,8 @@ export function ProductShell() {
   const ctx = useOutletContext<CompanyOutletContext | null>()
   const slug = paramSlug || ctx?.slug || ''
   const { t, locale } = useI18n()
-  const role = ctx?.membership?.role
-  const canWrite = role ? canMutateContent(role) : Boolean(ctx?.user?.isSuperadmin)
+  const m = ctx?.membership
+  const canWrite = m ? canMutateContent({ isOwner: m.isOwner, permissions: m.permissions ?? [] }) : false
 
   const [products, setProducts] = useState<BuProduct[]>([])
   const [personas, setPersonas] = useState<{ id: string; name: string; summary?: string | null }[]>(
@@ -67,12 +70,108 @@ export function ProductShell() {
   const [editing, setEditing] = useState<BuProduct | null>(null)
   const [query, setQuery] = useState('')
   const [orderQuery, setOrderQuery] = useState('')
-  const [orderNotice, setOrderNotice] = useState('')
-  /** Placeholder until orders API exists — keeps search UX honest. */
-  const [orders] = useState<Array<{ id: string; title: string; customerName: string }>>([])
+  const [orders, setOrders] = useState<BuProductOrder[]>([])
+  const [ordersLoading, setOrdersLoading] = useState(false)
+  const [orderCreateOpen, setOrderCreateOpen] = useState(false)
+  const [orderCreateProductId, setOrderCreateProductId] = useState<string | null>(null)
+  const [modalInitialTab, setModalInitialTab] = useState<
+    'desc' | 'calc' | 'persona' | 'journey' | 'orderDesign'
+  >('desc')
   const [sortKey, setSortKey] = useState<SortKey>('updated')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const deepProductId = searchParams.get('product')
+  const deepTab = searchParams.get('tab')
+
+  const productCols: (TableColumnDef & { tip: MessageKey; sortable?: SortKey })[] = useMemo(
+    () =>
+      (
+        [
+          {
+            key: 'name',
+            label: t('name'),
+            tip: 'tipProductName' as const,
+            locked: true,
+            sortable: 'name' as const,
+          },
+          {
+            key: 'description',
+            label: t('productDescription'),
+            tip: 'tipProductDesc' as const,
+            sortable: 'description' as const,
+          },
+          {
+            key: 'market',
+            label: t('productMarket'),
+            tip: 'tipProductMarket' as const,
+            sortable: 'market' as const,
+          },
+          {
+            key: 'personas',
+            label: t('productPersonasCol'),
+            tip: 'tipProductPersonas' as const,
+            sortable: 'personas' as const,
+          },
+          {
+            key: 'net',
+            label: t('productNetProceeds'),
+            tip: 'tipProductNet' as const,
+            sortable: 'net' as const,
+          },
+          {
+            key: 'updated',
+            label: t('productUpdated'),
+            tip: 'tipProductUpdated' as const,
+            sortable: 'updated' as const,
+          },
+        ] as const
+      ).map((c) => ({ ...c, description: t(c.tip) })),
+    [t],
+  )
+
+  const orderCols: (TableColumnDef & { tip: MessageKey })[] = useMemo(
+    () =>
+      (
+        [
+          {
+            key: 'orderNumber',
+            label: t('productOrderNumber'),
+            tip: 'tipProductOrderNumber' as const,
+            locked: true,
+          },
+          { key: 'title', label: t('name'), tip: 'tipProductOrderTitle' as const },
+          { key: 'customer', label: t('customer'), tip: 'tipProductOrderCustomer' as const },
+          { key: 'status', label: t('status'), tip: 'tipProductOrderStatus' as const },
+        ] as const
+      ).map((c) => ({ ...c, description: t(c.tip) })),
+    [t],
+  )
+
+  const productPicker = usePersistedTableColumns({
+    slug,
+    tableId: 'products',
+    columns: productCols,
+  })
+  const orderPicker = usePersistedTableColumns({
+    slug,
+    tableId: 'product-orders',
+    columns: orderCols,
+  })
+
+  async function refreshOrders() {
+    if (!slug) return
+    setOrdersLoading(true)
+    try {
+      const q = orderQuery.trim()
+      const qs = q ? `?q=${encodeURIComponent(q)}` : ''
+      const r = await api<{ orders: BuProductOrder[] }>(`/api/b/${slug}/orders${qs}`)
+      setOrders(r.orders || [])
+    } catch (e) {
+      console.error(e)
+      setOrders([])
+    } finally {
+      setOrdersLoading(false)
+    }
+  }
 
   async function refresh() {
     if (!slug) return
@@ -99,8 +198,17 @@ export function ProductShell() {
     refresh()
       .then(async (list) => {
         if (cancelled || !deepProductId || !slug) return
+        const tab =
+          deepTab === 'orderDesign' ||
+          deepTab === 'calc' ||
+          deepTab === 'persona' ||
+          deepTab === 'journey' ||
+          deepTab === 'desc'
+            ? deepTab
+            : 'desc'
         const hit = (list || []).find((p) => p.id === deepProductId)
         if (hit) {
+          setModalInitialTab(tab)
           setEditing(hit)
           setModalOpen(true)
           return
@@ -119,7 +227,13 @@ export function ProductShell() {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug, archive, deepProductId])
+  }, [slug, archive, deepProductId, deepTab])
+
+  useEffect(() => {
+    if (!slug || surface !== 'orders') return
+    void refreshOrders()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug, surface])
 
   const dateFmt = useMemo(
     () =>
@@ -151,10 +265,31 @@ export function ProductShell() {
     const q = orderQuery.trim().toLowerCase()
     if (!q) return orders
     return orders.filter((o) => {
-      const hay = [o.title, o.customerName].join(' ').toLowerCase()
+      const hay = [o.orderNumberLabel, o.title, o.customerName, o.productName, o.status]
+        .join(' ')
+        .toLowerCase()
       return hay.includes(q)
     })
   }, [orders, orderQuery])
+
+  function orderStatusLabel(status: OrderStatus): string {
+    if (status === 'draft') return t('productOrderStatusDraft')
+    if (status === 'done') return t('productOrderStatusDone')
+    return t('productOrderStatusOpen')
+  }
+
+  async function patchOrderStatus(id: string, status: OrderStatus) {
+    if (!slug || !canWrite) return
+    try {
+      const r = await api<{ order: BuProductOrder }>(`/api/b/${slug}/orders/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      })
+      setOrders((prev) => prev.map((o) => (o.id === id ? r.order : o)))
+    } catch (e) {
+      console.error(e)
+    }
+  }
 
   const sorted = useMemo(() => {
     const dir = sortDir === 'asc' ? 1 : -1
@@ -176,31 +311,71 @@ export function ProductShell() {
     setSortDir(key === 'name' || key === 'description' || key === 'market' ? 'asc' : 'desc')
   }
 
-  const tableCols = useMemo(
-    () =>
-      [
-        { key: 'name' as const, label: t('name') },
-        { key: 'description' as const, label: t('productDescription') },
-        { key: 'market' as const, label: t('productMarket') },
-        { key: 'personas' as const, label: t('productPersonasCol') },
-        { key: 'net' as const, label: t('productNetProceeds') },
-        { key: 'updated' as const, label: t('productUpdated') },
-      ] as const,
-    [t],
-  )
+  function getExportPayload(): FunnelExportPayload {
+    const today = new Date().toISOString().slice(0, 10)
+    if (surface === 'orders') {
+      return {
+        kind: 'Custom',
+        channel: 'orders',
+        from: today,
+        to: today,
+        filters: [
+          { label: t('productScopeOrders'), value: t('productScopeOrders') },
+          ...(orderQuery.trim()
+            ? [{ label: t('productOrdersSearch'), value: orderQuery.trim() }]
+            : []),
+        ],
+        kpis: [{ label: t('productScopeOrders'), value: String(filteredOrders.length) }],
+        columns: orderCols.map((c) => ({ key: c.key, label: c.label })),
+        rows: filteredOrders.map((o) => ({
+          orderNumber: o.orderNumberLabel,
+          title: o.title,
+          customer: o.customerName,
+          status: orderStatusLabel(o.status),
+        })),
+      }
+    }
+    return {
+      kind: 'Custom',
+      channel: 'products',
+      from: today,
+      to: today,
+      filters: [
+        {
+          label: t('productArchiveFilter'),
+          value: archive === 'archived' ? t('productFilterArchived') : t('productFilterActive'),
+        },
+        ...(query.trim() ? [{ label: t('productSearch'), value: query.trim() }] : []),
+      ],
+      kpis: [{ label: t('productScopeProducts'), value: String(sorted.length) }],
+      columns: productCols.map((c) => ({ key: c.key, label: c.label })),
+      rows: sorted.map((p) => ({
+        name: p.name,
+        description: p.description || '',
+        market: p.market === 'b2c' ? 'B2C' : 'B2B',
+        personas: p.personaIds?.length || 0,
+        net: fmtEur(p.netRevenueCents),
+        updated: dateFmt.format(new Date(p.updatedAt)),
+      })),
+    }
+  }
 
   function openCreate() {
+    setModalInitialTab('desc')
     setEditing(null)
     setModalOpen(true)
   }
 
-  function openEdit(p: BuProduct) {
+  function openEdit(p: BuProduct, tab: typeof modalInitialTab = 'desc') {
+    setModalInitialTab(tab)
     setEditing(p)
     setModalOpen(true)
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev)
         next.set('product', p.id)
+        if (tab === 'orderDesign') next.set('tab', 'orderDesign')
+        else next.delete('tab')
         return next
       },
       { replace: true },
@@ -210,10 +385,12 @@ export function ProductShell() {
   function closeModal() {
     setModalOpen(false)
     setEditing(null)
+    setModalInitialTab('desc')
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev)
         next.delete('product')
+        next.delete('tab')
         return next
       },
       { replace: true },
@@ -235,9 +412,135 @@ export function ProductShell() {
   }
 
   const onProducts = surface === 'products'
+  const activePicker = onProducts ? productPicker : orderPicker
+  const activeCols = onProducts ? productCols : orderCols
 
-  function openCreateOrder() {
-    setOrderNotice(t('productOrderCreateSoon'))
+  function openCreateOrder(productId?: string | null) {
+    setOrderCreateProductId(productId || null)
+    setOrderCreateOpen(true)
+  }
+
+  function openOrderDesignFromGate(productId: string) {
+    setOrderCreateOpen(false)
+    const hit = products.find((p) => p.id === productId)
+    if (hit) {
+      setSurface('products')
+      openEdit(hit, 'orderDesign')
+      return
+    }
+    void api<{ products: BuProduct[] }>(`/api/b/${slug}/products?archive=0`)
+      .then((r) => {
+        const found = r.products.find((p) => p.id === productId)
+        if (found) {
+          setSurface('products')
+          openEdit(found, 'orderDesign')
+        }
+      })
+      .catch(console.error)
+  }
+
+  function renderProductCells(p: BuProduct): ReactNode {
+    return productPicker.visibleColumns.map((col) => {
+      if (col.key === 'name') {
+        return (
+          <td key={col.key}>
+            <span className="product-table-name">
+              {p.coverPath ? (
+                <img className="product-table-thumb" src={p.coverPath} alt="" />
+              ) : (
+                <span className="product-table-av" aria-hidden>
+                  {initials(p.name)}
+                </span>
+              )}
+              <strong>{p.name}</strong>
+            </span>
+          </td>
+        )
+      }
+      if (col.key === 'description') {
+        return (
+          <td key={col.key} className="product-table-desc">
+            {p.description}
+          </td>
+        )
+      }
+      if (col.key === 'market') {
+        return <td key={col.key}>{p.market === 'b2c' ? 'B2C' : 'B2B'}</td>
+      }
+      if (col.key === 'personas') {
+        return (
+          <td key={col.key} className="num">
+            {p.personaIds?.length || 0}
+          </td>
+        )
+      }
+      if (col.key === 'net') {
+        return (
+          <td key={col.key} className="num kpi">
+            {fmtEur(p.netRevenueCents)}
+          </td>
+        )
+      }
+      if (col.key === 'updated') {
+        return (
+          <td key={col.key} className="num muted">
+            {dateFmt.format(new Date(p.updatedAt))}
+          </td>
+        )
+      }
+      return <td key={col.key}>—</td>
+    })
+  }
+
+  function renderOrderCells(o: BuProductOrder): ReactNode {
+    return orderPicker.visibleColumns.map((col) => {
+      if (col.key === 'orderNumber') {
+        return (
+          <td key={col.key} className="mono muted">
+            {o.orderNumberLabel}
+          </td>
+        )
+      }
+      if (col.key === 'title') {
+        return (
+          <td key={col.key}>
+            <strong>{o.title}</strong>
+          </td>
+        )
+      }
+      if (col.key === 'customer') {
+        return (
+          <td key={col.key} className="muted">
+            {o.customerName || '—'}
+          </td>
+        )
+      }
+      if (col.key === 'status') {
+        return (
+          <td key={col.key} onClick={(e) => e.stopPropagation()}>
+            {canWrite ? (
+              <select
+                className={`input crm-status-select crm-status--${o.status === 'done' ? 'active' : o.status === 'draft' ? 'lead' : 'open'}`}
+                value={o.status}
+                aria-label={t('status')}
+                onChange={(e) => void patchOrderStatus(o.id, e.target.value as OrderStatus)}
+              >
+                <option value="draft">{t('productOrderStatusDraft')}</option>
+                <option value="open">{t('productOrderStatusOpen')}</option>
+                <option value="done">{t('productOrderStatusDone')}</option>
+              </select>
+            ) : (
+              <span
+                className={`crm-status crm-status--${o.status === 'done' ? 'active' : o.status === 'draft' ? 'lead' : 'open'}`}
+              >
+                {orderStatusLabel(o.status)}
+              </span>
+            )}
+          </td>
+        )
+      }
+      return <td key={col.key}>—</td>
+    })
   }
 
   return (
@@ -304,7 +607,7 @@ export function ProductShell() {
               ) : null}
             </>
           ) : canWrite ? (
-            <button type="button" className="btn primary" onClick={openCreateOrder}>
+            <button type="button" className="btn primary" onClick={() => openCreateOrder()}>
               <Plus size={14} weight="bold" aria-hidden />
               {t('productOrderCreate')}
             </button>
@@ -312,30 +615,38 @@ export function ProductShell() {
         </div>
       </header>
 
-      <div className="product-dept-tabs" role="tablist" aria-label={t('product')}>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={onProducts}
-          className={`product-dept-tab${onProducts ? ' is-on' : ''}`}
-          onClick={() => {
-            setSurface('products')
-            setOrderNotice('')
+      <div className="product-dept-tabs-row">
+        <div className="product-dept-tabs" role="tablist" aria-label={t('product')}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={onProducts}
+            className={`product-dept-tab${onProducts ? ' is-on' : ''}`}
+            onClick={() => setSurface('products')}
+          >
+            <Package size={16} weight={onProducts ? 'bold' : 'regular'} aria-hidden />
+            <span>{t('productScopeProducts')}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={!onProducts}
+            className={`product-dept-tab${!onProducts ? ' is-on' : ''}`}
+            onClick={() => setSurface('orders')}
+          >
+            <Receipt size={16} weight={!onProducts ? 'bold' : 'regular'} aria-hidden />
+            <span>{t('productScopeOrders')}</span>
+          </button>
+        </div>
+        <FunnelExportMenu
+          getPayload={getExportPayload}
+          columnPicker={{
+            columns: activeCols,
+            visibleKeys: activePicker.visibleKeys,
+            onChange: activePicker.setVisibleKeys,
+            onReset: activePicker.reset,
           }}
-        >
-          <Package size={16} weight={onProducts ? 'bold' : 'regular'} aria-hidden />
-          <span>{t('productScopeProducts')}</span>
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={!onProducts}
-          className={`product-dept-tab${!onProducts ? ' is-on' : ''}`}
-          onClick={() => setSurface('orders')}
-        >
-          <Receipt size={16} weight={!onProducts ? 'bold' : 'regular'} aria-hidden />
-          <span>{t('productScopeOrders')}</span>
-        </button>
+        />
       </div>
 
       {onProducts ? (
@@ -392,26 +703,44 @@ export function ProductShell() {
             <table className="table funnel-grid-table product-table">
               <thead>
                 <tr>
-                  {tableCols.map((c) => {
-                    const active = sortKey === c.key
+                  {productPicker.visibleColumns.map((c) => {
+                    const meta = productCols.find((x) => x.key === c.key)
+                    const sortable = meta?.sortable
+                    const tip = meta?.tip
+                    const active = sortable != null && sortKey === sortable
                     return (
                       <th
                         key={c.key}
-                        className={`funnel-th-sortable${active ? ' is-sorted' : ''}`}
+                        className={sortable ? `funnel-th-sortable${active ? ' is-sorted' : ''}` : undefined}
                         aria-sort={
-                          active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'
+                          sortable
+                            ? active
+                              ? sortDir === 'asc'
+                                ? 'ascending'
+                                : 'descending'
+                              : 'none'
+                            : undefined
                         }
                       >
-                        <button
-                          type="button"
-                          className="funnel-th-btn"
-                          onClick={() => toggleSort(c.key)}
-                        >
+                        {sortable ? (
+                          <button
+                            type="button"
+                            className="funnel-th-btn"
+                            onClick={() => toggleSort(sortable)}
+                          >
+                            <span>{c.label}</span>
+                            <span className="funnel-th-dir" aria-hidden>
+                              {active ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </button>
+                        ) : (
                           <span>{c.label}</span>
-                          <span className="funnel-th-dir" aria-hidden>
-                            {active ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}
-                          </span>
-                        </button>
+                        )}
+                        {tip ? (
+                          <FunnelTip tip={t(tip)} iconOnly>
+                            {c.label}
+                          </FunnelTip>
+                        ) : null}
                       </th>
                     )
                   })}
@@ -420,37 +749,23 @@ export function ProductShell() {
               <tbody>
                 {sorted.map((p) => (
                   <tr key={p.id} className="product-table-row" onClick={() => openEdit(p)}>
-                    <td>
-                      <span className="product-table-name">
-                        {p.coverPath ? (
-                          <img className="product-table-thumb" src={p.coverPath} alt="" />
-                        ) : (
-                          <span className="product-table-av" aria-hidden>
-                            {initials(p.name)}
-                          </span>
-                        )}
-                        <strong>{p.name}</strong>
-                      </span>
-                    </td>
-                    <td className="product-table-desc">{p.description}</td>
-                    <td>{p.market === 'b2c' ? 'B2C' : 'B2B'}</td>
-                    <td className="num">{p.personaIds?.length || 0}</td>
-                    <td className="num kpi">{fmtEur(p.netRevenueCents)}</td>
-                    <td className="num muted">{dateFmt.format(new Date(p.updatedAt))}</td>
+                    {renderProductCells(p)}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )
+      ) : ordersLoading ? (
+        <p className="muted">{t('loading')}</p>
       ) : orders.length === 0 ? (
         <div className="panel product-empty product-orders-empty">
           <Receipt size={28} weight="regular" aria-hidden />
           <p className="muted" style={{ margin: 0 }}>
-            {orderNotice || t('productOrdersEmpty')}
+            {t('productOrdersEmpty')}
           </p>
           {canWrite ? (
-            <button type="button" className="btn primary" onClick={openCreateOrder}>
+            <button type="button" className="btn primary" onClick={() => openCreateOrder()}>
               <Plus size={14} weight="bold" aria-hidden />
               {t('productOrderCreate')}
             </button>
@@ -467,17 +782,25 @@ export function ProductShell() {
           <table className="table funnel-grid-table product-table">
             <thead>
               <tr>
-                <th>{t('name')}</th>
-                <th>{t('customer')}</th>
+                {orderPicker.visibleColumns.map((c) => {
+                  const tip = orderCols.find((x) => x.key === c.key)?.tip
+                  return (
+                    <th key={c.key}>
+                      <span>{c.label}</span>
+                      {tip ? (
+                        <FunnelTip tip={t(tip)} iconOnly>
+                          {c.label}
+                        </FunnelTip>
+                      ) : null}
+                    </th>
+                  )
+                })}
               </tr>
             </thead>
             <tbody>
               {filteredOrders.map((o) => (
                 <tr key={o.id} className="product-table-row">
-                  <td>
-                    <strong>{o.title}</strong>
-                  </td>
-                  <td className="muted">{o.customerName || '—'}</td>
+                  {renderOrderCells(o)}
                 </tr>
               ))}
             </tbody>
@@ -492,12 +815,28 @@ export function ProductShell() {
         slug={slug}
         canWrite={canWrite}
         personas={personas}
+        initialTab={modalInitialTab}
         onClose={closeModal}
         onSaved={onSaved}
         onArchived={onArchived}
         onPersonaCreated={(p) =>
           setPersonas((prev) => (prev.some((x) => x.id === p.id) ? prev : [p, ...prev]))
         }
+      />
+
+      <OrderCreateModal
+        open={orderCreateOpen}
+        slug={slug}
+        defaultProductId={orderCreateProductId}
+        onClose={() => {
+          setOrderCreateOpen(false)
+          setOrderCreateProductId(null)
+        }}
+        onCreated={(order) => {
+          setOrders((prev) => [order, ...prev.filter((o) => o.id !== order.id)])
+          setSurface('orders')
+        }}
+        onOpenOrderDesign={openOrderDesignFromGate}
       />
     </div>
   )

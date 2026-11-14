@@ -19,7 +19,7 @@ export type SoonProvider = { id: string; label: string }
 
 /** Live / known provider ids shown as connect cards on each surface (multi-membership OK). */
 export const SURFACE_PROVIDERS: Record<ConnSurfaceId, string[]> = {
-  social: ['instagram', 'facebook', 'youtube', 'whatsapp'],
+  social: ['instagram', 'facebook', 'youtube', 'whatsapp', 'linkedin', 'tiktok', 'x', 'pinterest'],
   ads: [
     'google_ads',
     'meta_ads',
@@ -37,12 +37,7 @@ export const SURFACE_PROVIDERS: Record<ConnSurfaceId, string[]> = {
 
 /** Roadmap cards — visible, disabled Verbinden, status “Bald”. */
 export const SURFACE_SOON: Record<ConnSurfaceId, SoonProvider[]> = {
-  social: [
-    { id: 'linkedin', label: 'LinkedIn' },
-    { id: 'x', label: 'X' },
-    { id: 'tiktok', label: 'TikTok' },
-    { id: 'pinterest', label: 'Pinterest' },
-  ],
+  social: [],
   ads: [],
   email: [],
   finance: [
@@ -67,21 +62,22 @@ export const CORE_CONNECT_PROVIDERS = new Set([
   'youtube',
   'google_ads',
   'meta_ads',
+  'linkedin',
+  'tiktok',
+  'tiktok_ads',
+  'x',
+  'pinterest',
+  'pinterest_ads',
+  'chatgpt_ads',
+  'reddit_ads',
+  'microsoft_ads',
 ])
 
 /**
  * API-key providers — Verbinden opens ConnectApiKeyModal → settings_secrets
- * (simplest path until dedicated OAuth apps exist).
+ * (feature gates; paid ads use OAuth).
  */
-export const API_KEY_CONNECT_PROVIDERS = new Set([
-  'tiktok_ads',
-  'chatgpt_ads',
-  'reddit_ads',
-  'pinterest_ads',
-  'microsoft_ads',
-  'brevo',
-  'metricool',
-])
+export const API_KEY_CONNECT_PROVIDERS = new Set(['brevo', 'metricool'])
 
 export const ADS_PROVIDER_LABELS: Record<string, string> = {
   youtube: 'YouTube',

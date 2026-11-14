@@ -67,9 +67,9 @@ Sidebar: Sortanize-Icon wird durch einen Top-Level-Tab **Tools** ersetzt, der de
 ## Implementation Notes
 - Files: `apps/api/drizzle/0019_tools_hub.sql`, `schema/tools.ts` + `identity.ts`, `modules/tools/*`, `features/tools/ToolsPage.tsx`, `BusinessShell`, `App`, shared tool schemas/auth helpers; CheckMap module/feature removed; e2e updated.
 - Unit tests: none added (covered by e2e tools smoke + `pnpm run checks`).
-- Follow-up shipped: Settings → Team toggles `grantToolsUse` / `grantToolsManage` / `grantSeoOpen` via `PATCH .../members/:userId/grants` (editor/viewer only; Owner/Admin implicit).
+- Follow-up superseded (Auth Bundles 2026-11-11): tools/seo rights live in permission bundles (`tools.use` / `tools.manage` / `seo.open`), not legacy grant toggles.
 - Remaining limitations: Scopes stored for policy later — no OAuth/proxy enforcement. Embed & entity deep-links deferred. No Integration Core wiring for custom tool secrets yet.
-- Decisions locked: J/C new-tab; K/G company-context query only; L CheckMap DROP; M use/manage grants.
+- Decisions locked: J/C new-tab; K/G company-context query only; L CheckMap DROP; M use/manage via bundles.
 
 ## Composition Gate
 - HEAD_SHA: local (pre-commit)

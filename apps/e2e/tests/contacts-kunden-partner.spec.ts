@@ -129,13 +129,15 @@ test.describe('contacts kunden/partner @contacts', () => {
     test.skip(!slugMatch, 'no company in session')
     const slug = slugMatch![1]!
 
-    await page.goto(`/co/${slug}/contacts`)
+    await page.goto(`/co/${slug}/customer`)
+    await expect(page).toHaveURL(new RegExp(`/co/${slug}/customer/?$`))
     await expect(page.getByRole('heading', { name: /Kontakte|Contacts/i })).toBeVisible()
     await expect(page.getByRole('tab', { name: /Kunden|Customers/i })).toBeVisible()
     await expect(page.getByRole('tab', { name: /Partner|Partners/i })).toBeVisible()
     await expect(page.getByRole('button', { name: /Kunde anlegen|Create customer/i })).toBeVisible()
 
     await page.getByRole('tab', { name: /Partner|Partners/i }).click()
+    await expect(page).toHaveURL(new RegExp(`/co/${slug}/partner/?$`))
     await expect(page.getByRole('button', { name: /Partner anlegen|Create partner/i })).toBeVisible()
 
     await page.screenshot({

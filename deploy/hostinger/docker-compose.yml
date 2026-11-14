@@ -1,0 +1,74 @@
+# Business Ultra 2 — production on Hostinger VPS (Traefik TLS).
+# Owns https://business-ultra.raccoova.com (old stack keeps hstgr.cloud).
+# Usage on VPS:
+#   cd /docker/business-ultra-v2
+#   docker compose -f deploy/hostinger/docker-compose.yml --env-file .env.prod up -d --build
+
+name: business-ultra-v2
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bu2}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-bu2}
+    volumes:
+      - /srv/persist/business-ultra-v2-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bu2} -d ${POSTGRES_DB:-bu2}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ../../.env.prod
+        required: true
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bu2}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-bu2}
+      API_PORT: "8742"
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-https://business-ultra.raccoova.com}
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-https://business-ultra.raccoova.com}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://business-ultra.raccoova.com}
+      SORTANIZE_URL: http://sortanize:8760
+      UPLOADS_DIR: /data/uploads
+    volumes:
+      - /srv/persist/business-ultra-v2-uploads:/data/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      sortanize:
+        condition: service_started
+    # Not exposed via Traefik — web nginx proxies /api and /uploads
+
+  web:
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+      args:
+        # Same-origin: browser calls /api via nginx → api container
+        VITE_API_URL: ""
+    restart: unless-stopped
+    depends_on:
+      - api
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bu2-web.rule=Host(`business-ultra.raccoova.com`)"
+      - "traefik.http.routers.bu2-web.entrypoints=websecure"
+      - "traefik.http.routers.bu2-web.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.bu2-web.priority=50"
+      - "traefik.http.services.bu2-web.loadbalancer.server.port=80"
+
+  sortanize:
+    build:
+      context: ../../services/sortanize
+    restart: unless-stopped
+    volumes:
+      - /srv/persist/business-ultra-v2-sortanize-tmp:/tmp/sortanize

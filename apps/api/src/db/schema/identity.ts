@@ -1,10 +1,9 @@
 /**
- * Drizzle schema — identity ownership tables.
+ * Drizzle schema — identity, memberships, platform grants, permission bundles.
  * Location: apps/api/src/db/schema/identity.ts
  */
 import {
   boolean,
-  date,
   integer,
   jsonb,
   pgTable,
@@ -16,38 +15,72 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core'
 
+/** BU2 user profile — id aligned with Better Auth `user.id`. */
 export const users = pgTable('users', {
-  id: uuid('id').defaultRandom().primaryKey(),
+  id: uuid('id').primaryKey(),
   email: varchar('email', { length: 320 }).notNull().unique(),
   displayName: varchar('display_name', { length: 160 }),
-  /** bcrypt hash; null until password is set (OTP/magic-link-only users) */
-  passwordHash: text('password_hash'),
+  emailVerified: boolean('email_verified').notNull().default(false),
+  image: text('image'),
+  /** Retained for breakglass infra flags — never grants company content. */
   isSuperadmin: boolean('is_superadmin').notNull().default(false),
   isBreakglassOperator: boolean('is_breakglass_operator').notNull().default(false),
   locale: varchar('locale', { length: 8 }).notNull().default('de'),
+  status: varchar('status', { length: 16 }).notNull().default('active'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
 })
 
-export const sessions = pgTable('sessions', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  tokenHash: text('token_hash').notNull().unique(),
-  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+/** Better Auth core tables (official column names). */
+export const baUser = pgTable('user', {
+  id: uuid('id').primaryKey(),
+  name: text('name').notNull(),
+  email: varchar('email', { length: 320 }).notNull().unique(),
+  emailVerified: boolean('email_verified').notNull().default(false),
+  image: text('image'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
-export const authChallenges = pgTable('auth_challenges', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  email: varchar('email', { length: 320 }).notNull(),
-  tokenHash: text('token_hash').notNull(),
-  otpHash: text('otp_hash'),
+export const baSession = pgTable('session', {
+  id: uuid('id').primaryKey(),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-  consumedAt: timestamp('consumed_at', { withTimezone: true }),
+  token: text('token').notNull().unique(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => baUser.id, { onDelete: 'cascade' }),
+})
+
+export const baAccount = pgTable('account', {
+  id: uuid('id').primaryKey(),
+  accountId: text('account_id').notNull(),
+  providerId: text('provider_id').notNull(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => baUser.id, { onDelete: 'cascade' }),
+  accessToken: text('access_token'),
+  refreshToken: text('refresh_token'),
+  idToken: text('id_token'),
+  accessTokenExpiresAt: timestamp('access_token_expires_at', { withTimezone: true }),
+  refreshTokenExpiresAt: timestamp('refresh_token_expires_at', { withTimezone: true }),
+  scope: text('scope'),
+  password: text('password'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const baVerification = pgTable('verification', {
+  id: uuid('id').primaryKey(),
+  identifier: text('identifier').notNull(),
+  value: text('value').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
 export const businesses = pgTable(
@@ -77,13 +110,67 @@ export const memberships = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    role: varchar('role', { length: 16 }).notNull(),
-    grantSeoOpen: boolean('grant_seo_open').notNull().default(false),
-    grantToolsUse: boolean('grant_tools_use').notNull().default(false),
-    grantToolsManage: boolean('grant_tools_manage').notNull().default(false),
+    isOwner: boolean('is_owner').notNull().default(false),
+    status: varchar('status', { length: 16 }).notNull().default('active'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('memberships_business_user_uidx').on(t.businessId, t.userId)],
+)
+
+export const platformGrants = pgTable(
+  'platform_grants',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    capabilityKey: varchar('capability_key', { length: 100 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdByUserId: uuid('created_by_user_id').references(() => users.id),
+  },
+  (t) => [uniqueIndex('platform_grants_user_cap_uidx').on(t.userId, t.capabilityKey)],
+)
+
+export const permissionBundles = pgTable(
+  'permission_bundles',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    businessId: uuid('business_id')
+      .notNull()
+      .references(() => businesses.id, { onDelete: 'cascade' }),
+    key: varchar('key', { length: 64 }),
+    name: varchar('name', { length: 120 }).notNull(),
+    description: varchar('description', { length: 500 }),
+    isSystem: boolean('is_system').notNull().default(false),
+    version: integer('version').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('permission_bundles_biz_key_uidx').on(t.businessId, t.key)],
+)
+
+export const bundlePermissions = pgTable(
+  'bundle_permissions',
+  {
+    bundleId: uuid('bundle_id')
+      .notNull()
+      .references(() => permissionBundles.id, { onDelete: 'cascade' }),
+    permissionKey: varchar('permission_key', { length: 160 }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.bundleId, t.permissionKey] })],
+)
+
+export const membershipBundles = pgTable(
+  'membership_bundles',
+  {
+    membershipId: uuid('membership_id')
+      .notNull()
+      .references(() => memberships.id, { onDelete: 'cascade' }),
+    bundleId: uuid('bundle_id')
+      .notNull()
+      .references(() => permissionBundles.id, { onDelete: 'cascade' }),
+  },
+  (t) => [primaryKey({ columns: [t.membershipId, t.bundleId] })],
 )
 
 export const invites = pgTable('invites', {
@@ -92,7 +179,7 @@ export const invites = pgTable('invites', {
     .notNull()
     .references(() => businesses.id, { onDelete: 'cascade' }),
   email: varchar('email', { length: 320 }).notNull(),
-  role: varchar('role', { length: 16 }).notNull(),
+  bundleIds: jsonb('bundle_ids').$type<string[]>().notNull().default([]),
   tokenHash: text('token_hash').notNull(),
   invitedByUserId: uuid('invited_by_user_id').references(() => users.id),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
@@ -132,4 +219,3 @@ export const auditLog = pgTable('audit_log', {
   meta: jsonb('meta').$type<Record<string, unknown>>().default({}),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
-

@@ -1,9 +1,14 @@
+/**
+ * AuthN plugin — Better Auth session → req.user; membership via authorize resolver.
+ * Location: apps/api/src/plugins/auth.ts
+ */
 import type { FastifyInstance, FastifyRequest } from 'fastify'
-import { eq, and, isNull } from 'drizzle-orm'
-import type { Role } from '@bu2/shared'
+import { and, eq } from 'drizzle-orm'
+import { fromNodeHeaders } from 'better-auth/node'
 import { db } from '../db/client.js'
-import { businesses, memberships, sessions, users } from '../db/schema.js'
-import { hashToken } from '../lib/crypto.js'
+import { businesses, memberships, users } from '../db/schema.js'
+import { auth } from '../lib/betterAuth.js'
+import { buildMembershipCtx, type MembershipCtx } from '../lib/authorize.js'
 
 export type AuthUser = {
   id: string
@@ -12,17 +17,10 @@ export type AuthUser = {
   isSuperadmin: boolean
   isBreakglassOperator: boolean
   locale: string
-}
-
-export type MembershipCtx = {
-  businessId: string
-  slug: string
-  role: Role
-  grantSeoOpen: boolean
-  grantToolsUse: boolean
-  grantToolsManage: boolean
   status: string
 }
+
+export type { MembershipCtx }
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -31,29 +29,40 @@ declare module 'fastify' {
   }
 }
 
-async function loadUserFromCookie(req: FastifyRequest): Promise<AuthUser | null> {
-  const token = req.cookies.bu2_session
-  if (!token) return null
-  const tokenHash = hashToken(token)
-  const rows = await db
-    .select({
-      expiresAt: sessions.expiresAt,
-      user: users,
+async function loadUserFromSession(req: FastifyRequest): Promise<AuthUser | null> {
+  const session = await auth.api.getSession({
+    headers: fromNodeHeaders(req.headers),
+  })
+  if (!session?.user?.id) return null
+  const rows = await db.select().from(users).where(eq(users.id, session.user.id)).limit(1)
+  const profile = rows[0]
+  if (!profile) {
+    // Sync race: session exists before profile row — create minimal profile
+    await db.insert(users).values({
+      id: session.user.id,
+      email: session.user.email.toLowerCase(),
+      displayName: session.user.name || null,
+      emailVerified: Boolean(session.user.emailVerified),
     })
-    .from(sessions)
-    .innerJoin(users, eq(sessions.userId, users.id))
-    .where(and(eq(sessions.tokenHash, tokenHash), isNull(sessions.revokedAt)))
-    .limit(1)
-  const row = rows[0]
-  if (!row) return null
-  if (row.expiresAt.getTime() < Date.now()) return null
+    return {
+      id: session.user.id,
+      email: session.user.email.toLowerCase(),
+      displayName: session.user.name || null,
+      isSuperadmin: false,
+      isBreakglassOperator: false,
+      locale: 'de',
+      status: 'active',
+    }
+  }
+  if (profile.status !== 'active') return null
   return {
-    id: row.user.id,
-    email: row.user.email,
-    displayName: row.user.displayName,
-    isSuperadmin: row.user.isSuperadmin,
-    isBreakglassOperator: row.user.isBreakglassOperator,
-    locale: row.user.locale,
+    id: profile.id,
+    email: profile.email,
+    displayName: profile.displayName,
+    isSuperadmin: profile.isSuperadmin,
+    isBreakglassOperator: profile.isBreakglassOperator,
+    locale: profile.locale,
+    status: profile.status,
   }
 }
 
@@ -66,49 +75,35 @@ export async function requireUser(req: FastifyRequest): Promise<AuthUser> {
   return req.user
 }
 
-export function requireRole(membership: MembershipCtx, allowed: Role[]): void {
-  if (!allowed.includes(membership.role)) {
-    const err = new Error('Forbidden') as Error & { statusCode: number }
-    err.statusCode = 403
-    throw err
-  }
-}
-
 export async function loadMembership(
   userId: string,
   slug: string,
 ): Promise<MembershipCtx | null> {
   const rows = await db
     .select({
+      membershipId: memberships.id,
       businessId: businesses.id,
       slug: businesses.slug,
-      status: businesses.status,
-      role: memberships.role,
-      grantSeoOpen: memberships.grantSeoOpen,
-      grantToolsUse: memberships.grantToolsUse,
-      grantToolsManage: memberships.grantToolsManage,
+      businessStatus: businesses.status,
+      isOwner: memberships.isOwner,
+      membershipStatus: memberships.status,
     })
     .from(businesses)
-    .innerJoin(memberships, eq(memberships.businessId, businesses.id))
-    .where(and(eq(businesses.slug, slug), eq(memberships.userId, userId)))
+    .innerJoin(
+      memberships,
+      and(eq(memberships.businessId, businesses.id), eq(memberships.userId, userId)),
+    )
+    .where(eq(businesses.slug, slug))
     .limit(1)
   const row = rows[0]
   if (!row) return null
-  return {
-    businessId: row.businessId,
-    slug: row.slug,
-    role: row.role as Role,
-    grantSeoOpen: row.grantSeoOpen,
-    grantToolsUse: row.grantToolsUse,
-    grantToolsManage: row.grantToolsManage,
-    status: row.status,
-  }
+  return buildMembershipCtx(row)
 }
 
 export async function registerAuth(app: FastifyInstance) {
   app.decorateRequest('user', null)
   app.decorateRequest('membership', null)
   app.addHook('preHandler', async (req) => {
-    req.user = await loadUserFromCookie(req)
+    req.user = await loadUserFromSession(req)
   })
 }

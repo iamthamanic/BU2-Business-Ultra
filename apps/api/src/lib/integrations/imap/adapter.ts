@@ -23,7 +23,7 @@ function imapCapabilities(accountType: string): StructuredCapability[] {
       allowed: true,
       scopes: ['imap'],
       accountType,
-      messageFormats: ['text', 'html'],
+      messageFormats: ['text', 'html', 'file'],
       window: { kind: 'none', freeReplyHours: null },
       availability: 'available',
     },
@@ -33,7 +33,7 @@ function imapCapabilities(accountType: string): StructuredCapability[] {
       reason: 'smtp_outbound_not_wired',
       scopes: ['imap'],
       accountType,
-      messageFormats: ['text', 'html'],
+      messageFormats: ['text', 'html', 'file'],
       availability: 'unavailable',
     },
     {

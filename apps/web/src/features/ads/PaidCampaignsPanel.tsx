@@ -4,6 +4,7 @@
  * Location: apps/web/src/features/ads/PaidCampaignsPanel.tsx
  */
 import { useMemo, useState, type ReactNode } from 'react'
+import { useParams } from 'react-router-dom'
 import type { Icon } from '@phosphor-icons/react'
 import {
   ChartLineUp,
@@ -33,6 +34,7 @@ import {
   type DateRangeValue,
 } from '../../lib/dateRange'
 import { type FunnelExportPayload } from '../../lib/funnelExport'
+import { usePersistedTableColumns, type TableColumnDef } from '../../lib/tableColumns'
 
 export type PaidCampaignRow = {
   id: string
@@ -73,6 +75,8 @@ export function PaidCampaignsPanel({
   onWindowChange,
 }: Props) {
   const { t } = useI18n()
+  const { slug: paramSlug } = useParams()
+  const slug = paramSlug || ''
   const [range, setRange] = useState<DateRangeValue>(() => defaultDateRange(initialWindow))
   const [brand, setBrand] = useState('__all__')
   const [postType, setPostType] = useState('__all__')
@@ -111,20 +115,32 @@ export function PaidCampaignsPanel({
     }
   }
 
-  const cols: { key: string; label: string; tip: MessageKey }[] = [
-    { key: 'notes', label: t('colNotes'), tip: 'tipNotes' },
-    { key: 'manual', label: t('colManualAds'), tip: 'tipManualAds' },
-    { key: 'name', label: t('colCampaign'), tip: 'tipCampaign' },
-    { key: 'spend', label: t('colSpend'), tip: 'tipSpend' },
-    { key: 'impr', label: t('colImpr'), tip: 'tipImpr' },
-    { key: 'clicks', label: t('colClicks'), tip: 'tipClicks' },
-    { key: 'ctr', label: t('colCtr'), tip: 'tipCtr' },
-    { key: 'cpc', label: t('colCpc'), tip: 'tipCpc' },
-    { key: 'cvr', label: t('colCvr'), tip: 'tipCvr' },
-    { key: 'cpa', label: t('colCpa'), tip: 'tipCpa' },
-    { key: 'roas', label: t('colRoas'), tip: 'tipRoas' },
-    { key: 'revenue', label: t('colRevenue'), tip: 'tipRevenue' },
-  ]
+  const cols: (TableColumnDef & { tip: MessageKey })[] = useMemo(
+    () =>
+      (
+        [
+          { key: 'notes', label: t('colNotes'), tip: 'tipNotes' as const, locked: true },
+          { key: 'manual', label: t('colManualAds'), tip: 'tipManualAds' as const },
+          { key: 'name', label: t('colCampaign'), tip: 'tipCampaign' as const },
+          { key: 'spend', label: t('colSpend'), tip: 'tipSpend' as const },
+          { key: 'impr', label: t('colImpr'), tip: 'tipImpr' as const },
+          { key: 'clicks', label: t('colClicks'), tip: 'tipClicks' as const },
+          { key: 'ctr', label: t('colCtr'), tip: 'tipCtr' as const },
+          { key: 'cpc', label: t('colCpc'), tip: 'tipCpc' as const },
+          { key: 'cvr', label: t('colCvr'), tip: 'tipCvr' as const },
+          { key: 'cpa', label: t('colCpa'), tip: 'tipCpa' as const },
+          { key: 'roas', label: t('colRoas'), tip: 'tipRoas' as const },
+          { key: 'revenue', label: t('colRevenue'), tip: 'tipRevenue' as const },
+        ] as const
+      ).map((c) => ({ ...c, description: t(c.tip) })),
+    [t],
+  )
+
+  const { visibleKeys, visibleColumns, setVisibleKeys, reset } = usePersistedTableColumns({
+    slug,
+    tableId: 'mkt-paid',
+    columns: cols,
+  })
 
   function getExportPayload(): FunnelExportPayload {
     const cmp = resolveCompareRange(range)
@@ -229,7 +245,15 @@ export function PaidCampaignsPanel({
             placeholder={t('adsSearchPh')}
           />
         </label>
-        <FunnelExportMenu getPayload={getExportPayload} />
+        <FunnelExportMenu
+          getPayload={getExportPayload}
+          columnPicker={{
+            columns: cols,
+            visibleKeys,
+            onChange: setVisibleKeys,
+            onReset: reset,
+          }}
+        />
       </div>
 
       <div className="funnel-kpi-strip paid-kpi-strip" aria-label="KPIs">
@@ -315,46 +339,36 @@ export function PaidCampaignsPanel({
         <table className="table funnel-grid-table funnel-ads-table">
           <thead>
             <tr>
-              {cols.map((c) => (
-                <th key={c.key}>
-                  <FunnelTip tip={t(c.tip)}>{c.label}</FunnelTip>
-                </th>
-              ))}
+              {visibleColumns.map((c) => {
+                const tip = cols.find((x) => x.key === c.key)?.tip
+                return (
+                  <th key={c.key}>
+                    {tip ? <FunnelTip tip={t(tip)}>{c.label}</FunnelTip> : c.label}
+                  </th>
+                )
+              })}
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={cols.length} className="funnel-table-empty muted">
+                <td colSpan={Math.max(visibleColumns.length, 1)} className="funnel-table-empty muted">
                   {emptyContent ?? emptyHint}
                 </td>
               </tr>
             ) : (
               filtered.map((c) => (
                 <tr key={c.id}>
-                  <td>
-                    <span className="badge">{t('notesBadge').replace('{n}', String(c.notesCount ?? 0))}</span>
-                  </td>
-                  <td className="num">
-                    <div className="paid-manual-cell">
-                      <span className="muted">{t('adsConvShort')}</span>
-                      <strong>{c.adsConv != null ? fmtN(c.adsConv) : '—'}</strong>
-                      <span className="muted paid-manual-dash">—</span>
-                    </div>
-                  </td>
-                  <td>
-                    <div className="paid-camp-name">{c.name}</div>
-                    {c.status ? <span className="badge">{c.status}</span> : null}
-                  </td>
-                  <td className="num">{fmtEur(c.spendCents ?? 0)}</td>
-                  <td className="num">{fmtN(c.impressions ?? 0)}</td>
-                  <td className="num">{fmtN(c.clicks ?? 0)}</td>
-                  <td className="num">{fmtPct(c.ctr)}</td>
-                  <td className="num">{fmtEur(c.cpcCents)}</td>
-                  <td className="num">{fmtPct(c.cvr)}</td>
-                  <td className="num">{fmtEur(c.cpaCents)}</td>
-                  <td className="num">{fmtRoas(c.roas)}</td>
-                  <td className="num">{fmtEur(c.revenueCents ?? 0)}</td>
+                  {visibleColumns.map((col) => (
+                    <td
+                      key={col.key}
+                      className={
+                        col.key === 'notes' || col.key === 'name' ? undefined : 'num'
+                      }
+                    >
+                      {paidCell(col.key, c, t)}
+                    </td>
+                  ))}
                 </tr>
               ))
             )}
@@ -380,25 +394,91 @@ function Kpi({
   accent?: boolean
   delta?: number | null
 }) {
+  const [valueOpen, setValueOpen] = useState(false)
   const deltaCls =
     delta == null ? '' : delta > 0 ? 'is-up' : delta < 0 ? 'is-down' : 'is-flat'
   return (
-    <div className={`funnel-kpi${accent ? ' funnel-kpi--accent' : ''}`}>
+    <div
+      className={`funnel-kpi${accent ? ' funnel-kpi--accent' : ''}${valueOpen ? ' is-value-open' : ''}`}
+    >
       <div className="funnel-kpi-head">
         <span className="funnel-kpi-ic" aria-hidden>
-          <Ic size={16} weight="duotone" />
+          <Ic size={13} weight="duotone" />
         </span>
         <div className="funnel-kpi-l muted">{label}</div>
         <FunnelTip tip={tip} iconOnly>
           {label}
         </FunnelTip>
       </div>
-      <div className="funnel-kpi-v">{value}</div>
+      <button
+        type="button"
+        className="funnel-kpi-v"
+        title={value}
+        aria-label={`${label}: ${value}`}
+        aria-expanded={valueOpen}
+        onClick={() => setValueOpen((v) => !v)}
+        onBlur={() => setValueOpen(false)}
+      >
+        <span className="funnel-kpi-v-text">{value}</span>
+        <span className="funnel-kpi-v-full" role="tooltip">
+          {value}
+        </span>
+      </button>
       {delta !== undefined ? (
         <div className={`funnel-kpi-delta ${deltaCls}`.trim()}>{formatPctDelta(delta)}</div>
       ) : null}
     </div>
   )
+}
+
+function paidCell(
+  key: string,
+  c: PaidCampaignRow,
+  t: (k: MessageKey) => string,
+): ReactNode {
+  switch (key) {
+    case 'notes':
+      return (
+        <span className="badge">
+          {t('notesBadge').replace('{n}', String(c.notesCount ?? 0))}
+        </span>
+      )
+    case 'manual':
+      return (
+        <div className="paid-manual-cell">
+          <span className="muted">{t('adsConvShort')}</span>
+          <strong>{c.adsConv != null ? fmtN(c.adsConv) : '—'}</strong>
+          <span className="muted paid-manual-dash">—</span>
+        </div>
+      )
+    case 'name':
+      return (
+        <>
+          <div className="paid-camp-name">{c.name}</div>
+          {c.status ? <span className="badge">{c.status}</span> : null}
+        </>
+      )
+    case 'spend':
+      return fmtEur(c.spendCents)
+    case 'impr':
+      return fmtN(c.impressions)
+    case 'clicks':
+      return fmtN(c.clicks)
+    case 'ctr':
+      return fmtPct(c.ctr)
+    case 'cpc':
+      return fmtEur(c.cpcCents)
+    case 'cvr':
+      return fmtPct(c.cvr)
+    case 'cpa':
+      return fmtEur(c.cpaCents)
+    case 'roas':
+      return fmtRoas(c.roas)
+    case 'revenue':
+      return fmtEur(c.revenueCents)
+    default:
+      return '—'
+  }
 }
 
 function sumCampaigns(rows: PaidCampaignRow[]) {

@@ -36,7 +36,7 @@ export const products = pgTable('products', {
   personaIds: jsonb('persona_ids').$type<string[]>().notNull().default([]),
   personaDraft: jsonb('persona_draft').$type<Record<string, unknown>>().notNull().default({}),
   journeyCanvas: jsonb('journey_canvas')
-    .$type<{ nodes: unknown[]; edges: unknown[] }>()
+    .$type<{ nodes: unknown[]; edges: unknown[]; map?: unknown }>()
     .notNull()
     .default({ nodes: [], edges: [] }),
   archivedAt: timestamp('archived_at', { withTimezone: true }),

@@ -42,7 +42,7 @@ export async function cmbRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     const body = z
       .object({
         name: z.string().min(1),

@@ -1,5 +1,5 @@
 /**
- * FinancePage — Dark-Ops finance hub (empty until connectors supply data).
+ * FinancePage — Dark-Ops finance hub backed by `/finance/snapshot`.
  * Location: apps/web/src/features/finance/FinancePage.tsx
  */
 import { useEffect, useState } from 'react'
@@ -13,9 +13,12 @@ import {
   TrendUp,
 } from '@phosphor-icons/react'
 import { useParams } from 'react-router-dom'
+import type { FinancePeriod } from '@bu2/shared'
 import { MktTab, MktTabs } from '../../components/MktTabs'
+import { api } from '../../lib/api'
 import { companyRoutes } from '../../lib/companyPaths'
 import { useI18n } from '../../lib/i18n'
+import { EMPTY_FINANCE, type FinanceSnapshot } from './financeModel'
 import {
   FinanceAccounts,
   FinanceAnalysis,
@@ -54,7 +57,10 @@ export function FinancePage() {
   const { t } = useI18n()
   const [screen, setScreen] = useState<FinanceScreen>('overview')
   const [txFilter, setTxFilter] = useState<TxFilter>('all')
-  const [period, setPeriod] = useState('current')
+  const [period, setPeriod] = useState<FinancePeriod>('current')
+  const [data, setData] = useState<FinanceSnapshot>(EMPTY_FINANCE)
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const settingsHref = slug ? companyRoutes(slug).settingsFinanceConnections : '#'
 
@@ -63,6 +69,29 @@ export function FinancePage() {
     const id = window.setTimeout(() => setToast(null), 3300)
     return () => window.clearTimeout(id)
   }, [toast])
+
+  useEffect(() => {
+    if (!slug) return
+    let cancelled = false
+    setLoading(true)
+    setLoadError(null)
+    api<{ snapshot: FinanceSnapshot }>(`/api/b/${slug}/finance/snapshot?period=${period}`)
+      .then((res) => {
+        if (cancelled) return
+        setData(res.snapshot)
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return
+        setData(EMPTY_FINANCE)
+        setLoadError(err instanceof Error ? err.message : 'error')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [slug, period])
 
   function go(next: FinanceScreen, opts?: { txFilter?: TxFilter }) {
     if (opts?.txFilter) setTxFilter(opts.txFilter)
@@ -91,7 +120,7 @@ export function FinancePage() {
             className="select"
             aria-label={t('financePeriod')}
             value={period}
-            onChange={(e) => setPeriod(e.target.value)}
+            onChange={(e) => setPeriod(e.target.value as FinancePeriod)}
           >
             <option value="current">{t('financePeriodCurrent')}</option>
             <option value="prev">{t('financePeriodPrev')}</option>
@@ -99,6 +128,13 @@ export function FinancePage() {
           </select>
         </div>
       </header>
+
+      {loadError ? (
+        <p className="muted" role="alert">
+          {t('financeLoadError')}: {loadError}
+        </p>
+      ) : null}
+      {loading ? <p className="muted">{t('loading')}</p> : null}
 
       <MktTabs level="surface" label={t('finance')} className="finance-tabs">
         {TAB_META.map((tab) => (
@@ -114,7 +150,7 @@ export function FinancePage() {
       </MktTabs>
 
       {screen === 'overview' ? (
-        <FinanceOverview go={go} settingsHref={settingsHref} />
+        <FinanceOverview go={go} settingsHref={settingsHref} data={data} />
       ) : null}
       {screen === 'transactions' ? (
         <FinanceTransactions
@@ -123,19 +159,25 @@ export function FinancePage() {
           filter={txFilter}
           setFilter={setTxFilter}
           onToast={showToast}
+          data={data}
+          slug={slug || ''}
         />
       ) : null}
-      {screen === 'analysis' ? <FinanceAnalysis settingsHref={settingsHref} /> : null}
+      {screen === 'analysis' ? (
+        <FinanceAnalysis settingsHref={settingsHref} data={data} />
+      ) : null}
       {screen === 'liquidity' ? (
-        <FinanceLiquidity go={go} settingsHref={settingsHref} />
+        <FinanceLiquidity go={go} settingsHref={settingsHref} data={data} />
       ) : null}
       {screen === 'profitability' ? (
-        <FinanceProfitability go={go} settingsHref={settingsHref} />
+        <FinanceProfitability go={go} settingsHref={settingsHref} data={data} />
       ) : null}
       {screen === 'planning' ? (
-        <FinancePlanning onToast={showToast} settingsHref={settingsHref} />
+        <FinancePlanning onToast={showToast} settingsHref={settingsHref} data={data} />
       ) : null}
-      {screen === 'settings' ? <FinanceAccounts settingsHref={settingsHref} /> : null}
+      {screen === 'settings' ? (
+        <FinanceAccounts settingsHref={settingsHref} data={data} />
+      ) : null}
 
       <p className="finance-footnote finance-page-footnote">{t('financeDisclaimerLive')}</p>
 

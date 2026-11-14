@@ -66,7 +66,7 @@ export function AppShell({
     showAdmin ?? (user.isSuperadmin || user.isBreakglassOperator)
 
   const allowCreate =
-    canCreateCompany ?? (user.isSuperadmin || user.isBreakglassOperator)
+    canCreateCompany ?? Boolean(user.platformCapabilities?.['companies.create'])
 
   return (
     <div className="shell-root">

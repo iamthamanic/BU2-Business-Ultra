@@ -46,7 +46,7 @@ SEO/GEO stay under Marketing in the sidebar; URLs remain `/tools/seo` and `/tool
 | OpenSEO / SEO | `/co/:slug/tools/seo` | same | Marketing dept (nav) |
 | GEO | `/co/:slug/tools/geo` | same page family as SEO | Marketing dept; AI Visibility surface |
 | Catalog / Katalog | _(none)_ | `/co/:slug/product/katalog` | Under Product; `/catalog` + `/katalog` redirect here |
-| Kontakte | — | `/co/:slug/contacts`, `/co/:slug/contacts/:id` | Kunden/Partner tabs; `/customer` redirects |
+| Kontakte | — | `/co/:slug/customer`, `/co/:slug/partner` (+ `/:id`) | Tabs = routes; `/contacts` redirects to `/customer` |
 | Inbox | — | `/co/:slug/inbox` | Omnichannel messaging (Telegram Bot first) |
 | Projekte | — | `/co/:slug/projects`, `/mine`, `/recurring`, `/:id` | Area/custom + tasks/board |
 | Settings / keys | _(in-admin / overlays)_ | `/co/:slug/settings` (+ `#connections`) | Footer |

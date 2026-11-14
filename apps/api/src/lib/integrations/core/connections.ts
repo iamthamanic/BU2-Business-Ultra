@@ -24,7 +24,7 @@ import { parseCapabilitiesCache, purposeAllowed } from './capabilities.js'
 import { ensureMockAdapterRegistered } from './mockAdapter.js'
 import { ensureImapAdapterRegistered } from '../imap/adapter.js'
 import { ensureFinapiAdapterRegistered } from '../finapi/adapter.js'
-import { ensureAdsKeyAdaptersRegistered, isAdsKeyProvider } from '../adsKey/adapter.js'
+import { ensureAdsKeyAdaptersRegistered } from '../adsKey/adapter.js'
 
 ensureMockAdapterRegistered()
 ensureImapAdapterRegistered()
@@ -273,29 +273,15 @@ export async function connectFinapiAccount(opts: {
   })
 }
 
-export async function connectAdsApiKeyAccount(opts: {
+/** @deprecated Paid ads use OAuth — kept to avoid broken imports. */
+export async function connectAdsApiKeyAccount(_opts: {
   businessId: string
   userId: string
   provider: string
   apiKey: string
   displayName?: string
 }): Promise<PublicConnection> {
-  if (!isAdsKeyProvider(opts.provider)) {
-    throw Object.assign(new Error('ads_provider_unsupported'), { statusCode: 400 })
-  }
-  const adapter = getAdapter(opts.provider)
-  if (!adapter) throw Object.assign(new Error('adapter_unavailable'), { statusCode: 501 })
-  const result = await adapter.connect({
-    externalAccountId: 'pending',
-    displayName: opts.displayName,
-    credential: opts.apiKey,
-  })
-  return persistAdapterConnection({
-    businessId: opts.businessId,
-    userId: opts.userId,
-    result,
-    bindInbox: false,
-  })
+  throw Object.assign(new Error('ads_api_key_retired'), { statusCode: 410 })
 }
 
 /** Soft-delete: revoke connection (credentials cascade via FK). */

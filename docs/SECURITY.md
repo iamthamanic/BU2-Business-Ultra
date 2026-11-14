@@ -1,11 +1,11 @@
 <!-- contract-status: binding -->
 <!-- scope: security -->
-<!-- authoritative-sources: AGENTS.md Security Checklist, DECISIONS.md, apps/api/src/plugins/auth.ts, packages/shared roles -->
-<!-- last-confirmed: 2026-11-04 (owner approved) -->
+<!-- authoritative-sources: AGENTS.md Security Checklist, DECISIONS.md, apps/api/src/plugins/auth.ts, packages/shared permissions -->
+<!-- last-confirmed: 2026-11-11 (Auth Bundles epic) -->
 
 # Security — Business Ultra 2
 
-> Binding security contract for multi-tenant BU2 (owner-approved 2026-11-04).
+> Binding security contract for multi-tenant BU2 (owner-approved 2026-11-04; Auth Bundles update 2026-11-11).
 > Agent Secure-by-Default checklist in `AGENTS.md` remains the implementation gate table.
 > Items marked **UNRESOLVED** are gaps to close, not waived controls.
 
@@ -13,30 +13,35 @@
 
 | Topic | Ist / Soll |
 |-------|------------|
-| Primary | Email + password (local seed via `BOOTSTRAP_OWNER_*`) |
-| Secondary / dev | Magic link / OTP (Brevo when keyed; otherwise console in non-prod) |
-| Session | HttpOnly cookie `bu2_session`; server stores token **hash** (`sessions.tokenHash`) |
-| Identity load | `apps/api/src/plugins/auth.ts` — cookie → session → user |
-| Password change | `POST /api/auth/password` with current + new password |
-| Rate limit (P-05) | `@fastify/rate-limit` registered with `global: false`; auth routes set `config.rateLimit` (login/password 20/min, magic/OTP/verify 10/min, me/logout 60/min) |
+| Primary | Better Auth — email + password; open signup **disabled** |
+| Secondary | Magic link + email OTP plugins (Brevo when keyed; otherwise console in non-prod) |
+| Bootstrap | Interactive setup (`pnpm setup` / first-run web) creates first user + `companies.create` + first company |
+| Session | Better Auth session cookie; `apps/api/src/plugins/auth.ts` loads session → BU2 `users` profile |
+| Password change | `POST /api/auth/password` via Better Auth |
+| Rate limit (P-05) | `@fastify/rate-limit` registered with `global: false`; auth routes set `config.rateLimit` |
 
 **Fail closed:** no default session secrets in production env loading (see README / `.env.example`).
 
-## Authorization / roles
+## Authorization / permissions
 
-Roles (`packages/shared`): `owner` | `admin` | `editor` | `viewer`.
+Company AuthZ (`packages/shared/src/permissions.ts` + `apps/api/src/lib/authorize.ts`):
 
-Helpers (examples): `canManageMembers`, `canSendMail`, `canManageCredentials`, `canMutateContent`, `canOpenSeo`.
+- `memberships.is_owner` (multi-owner allowed; last-owner protected) **or** union of assigned permission bundles
+- Platform capability `companies.create` via `platform_grants` (never a company bundle)
+- Deny by default for unknown permission keys
+- Helpers: `canManageMembers`, `canSendMail`, `canManageCredentials`, `canMutateContent`, `canOpenSeo`, `canUseTools`, `hasPermission`
 
 | Rule | Source |
 |------|--------|
-| Invite-only tenancy | DECISIONS |
-| `mail.send` Owner/Admin only | DECISIONS 16A |
+| Invite-only tenancy | DECISIONS Auth Bundles 2026-11-11 |
+| Company create = platform grant | DECISIONS |
 | Last owner cannot leave without transfer | DECISIONS / PRD notes |
-| Superadmin UI / breakglass operator ≠ content superuser | DECISIONS 11A / 17B |
-| OpenSEO `seo.open` grant scoped | DECISIONS precedence |
+| Breakglass operator ≠ content superuser | DECISIONS 11A / 17B |
+| `isSuperadmin` / breakglass must not bypass company membership AuthZ on `/api/b/:slug` | DECISIONS 11A / 17B (enforced in route handlers) |
+| Bundle assign grant-subset (B-07) | Auth Bundles epic |
+| `/api/auth/me` exposes `platformCapabilities['companies.create']` for UI affordances | Auth Bundles |
 
-Route handlers must call `requireUser` / membership load / role helpers — **B-02**.
+Route handlers must call `requireUser` / `loadMembership` / permission helpers — **B-02**. Admin routes (`/api/admin/*`) remain the only surface for operator flags.
 
 ## Tenant / owner isolation
 

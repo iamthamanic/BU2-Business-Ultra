@@ -25,12 +25,14 @@ Source of truth for implementation. Overrides conflicting Cursor user-rules (no 
 | 17B | Superadmin UI |
 | 18A | Postgres + local persist volumes |
 | 19A | Empty start — owner creates first business |
+| 19A-rev | **Superseded 2026-11-11** — setup wizard/CLI creates first user + first business; further companies need `companies.create` |
 | 20A | OpenSEO pin as proposed |
 | 23B | Core acceptance subset |
 | 24B | DE+EN i18n |
 | 27A | No hard deadline |
 | 30 | Secrets via GitHub Secrets; commit `.env.example` names only |
-| Tenancy | Business auth root; Owner/Admin/Editor/Viewer; invite-only; frontend URLs `/co/:slug/...` (legacy parity); API `/api/b/:slug/...` |
+| Tenancy | Business auth root; invite-only self-host; frontend URLs `/co/:slug/...`; API `/api/b/:slug/...` |
+| Auth Bundles (2026-11-11) | **Supersedes** fixed Owner/Admin/Editor/Viewer + `grant*` flags and empty-start-only create. **AuthN:** Better Auth (password + magic link + email OTP); open signup disabled. **AuthZ:** `memberships.is_owner` (multi-owner, last-owner protected) OR additive permission bundles; single server `authorize()`; deny-by-default. **Platform:** `companies.create` via `platform_grants` (not a company bundle). **Bootstrap:** interactive setup (CLI + first-run web) creates first user + grant + first company — no global content superuser. **Hard cut:** no dual role ACL. MCP/SaaS public registration later. Inventory: `.qa/design/auth-bundles-inventory.md` |
 | Mobile | Icon-rail overlay, NO bottom nav |
 | Marketing | Metricool-first scheduler SoR; master draft + target variants |
 | Catalog | Catalog SoR; CMB internal simulation |
@@ -45,7 +47,8 @@ Source of truth for implementation. Overrides conflicting Cursor user-rules (no 
 | Inbox build order | 01 Connection Core → 02 Telegram Bot E2E → **02b Telegram User via Unipile** → 03 Gmail/Outlook → 04 CRM/team → 05 Meta → 06 long-tail/automations |
 | Gmail launch | Restricted scopes; OAuth verification / assessment in public release plan (OK for local/dev) |
 | Arch-sharpen (2026-11-05) | **Stay modular monolith**; sharpen for navigability — API modules = `routes` + `service`; Drizzle schema split by ownership with stable `db/schema` barrel; web `features/` names match API modules (`customers`, `products`); `components/` = shared-only. **Anti-goals:** no microservices; no SagaTree `#94` `domains/` + eradicated-`components/` frontend; no HTTP/URL/table renames as part of structure-only refactors. Detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
-| Contacts (2026-11-08) | Nav **Kontakte** with tabs Kunden/Partner; SoR table `contacts` (renamed from `customers`, IDs kept); dual roles `isCustomer`/`isPartner`; numbers `K-` / `P-` from 100100; partner free-text category; role removal keeps history (future billing may block); API `/customers` kept + `/contacts` list alias; UI `/contacts` with `/customer` redirect |
+| Contacts (2026-11-08) | Nav **Kontakte** with tabs Kunden/Partner; SoR table `contacts` (renamed from `customers`, IDs kept); dual roles `isCustomer`/`isPartner`; numbers `K-` / `P-` from 100100; partner free-text category; role removal keeps history (future billing may block); API `/customers` kept + `/contacts` list alias; UI routes `/customer` + `/partner` (`/contacts` → `/customer`) |
+| Orders numbering (2026-11-08) | Auftragsnummer `A-` + 6 digits from 100100 (shared `formatOrderNumber`); demo orders until orders API |
 
 ## Precedence notes (from PRD S-058)
 

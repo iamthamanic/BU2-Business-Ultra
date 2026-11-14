@@ -51,11 +51,14 @@ export function HomePage({ user, onLogout }: { user: AuthUser; onLogout: () => v
 
   const landing = loadState === 'ready' ? pickLandingSlug(list) : null
 
+  const canCreateCompany = Boolean(user.platformCapabilities?.['companies.create'])
+
   useEffect(() => {
     if (loadState !== 'ready') return
     if (landing) return
+    if (!canCreateCompany) return
     setModalOpen(true)
-  }, [loadState, landing])
+  }, [loadState, landing, canCreateCompany])
 
   useEffect(() => {
     if (landing) writeLastCompany(landing)
@@ -66,7 +69,13 @@ export function HomePage({ user, onLogout }: { user: AuthUser; onLogout: () => v
   }
 
   return (
-    <AppShell user={user} railItems={[]} subtitle={<span>{t('businesses')}</span>} onLogout={onLogout}>
+    <AppShell
+      user={user}
+      railItems={[]}
+      subtitle={<span>{t('businesses')}</span>}
+      onLogout={onLogout}
+      canCreateCompany={canCreateCompany}
+    >
       <div className="home-layout">
         <section className="panel home-list-panel" aria-labelledby="biz-heading">
           <div className="home-panel-head">
@@ -101,10 +110,16 @@ export function HomePage({ user, onLogout }: { user: AuthUser; onLogout: () => v
             <div className="state-block empty-state">
               <Buildings size={28} weight="regular" aria-hidden />
               <p className="muted">{t('emptyStart')}</p>
-              <button type="button" className="btn primary" onClick={() => setModalOpen(true)}>
-                <Plus size={16} weight="bold" aria-hidden />
-                {t('createCompanyBtn')}
-              </button>
+              {canCreateCompany ? (
+                <button type="button" className="btn primary" onClick={() => setModalOpen(true)}>
+                  <Plus size={16} weight="bold" aria-hidden />
+                  {t('createCompanyBtn')}
+                </button>
+              ) : (
+                <p className="muted" role="status">
+                  {t('createCompanyDenied')}
+                </p>
+              )}
             </div>
           )}
         </section>

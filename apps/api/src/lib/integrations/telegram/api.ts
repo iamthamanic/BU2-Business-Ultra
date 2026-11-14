@@ -88,6 +88,62 @@ export async function telegramSendMessage(
   })
 }
 
+export type TelegramMediaKind = 'photo' | 'document' | 'audio' | 'voice'
+
+async function callApiMultipart<T>(
+  token: string,
+  method: string,
+  form: FormData,
+): Promise<T> {
+  const url = `${API_BASE}/bot${token}/${method}`
+  const res = await fetch(url, { method: 'POST', body: form })
+  const json = (await res.json()) as ApiOk<T> | ApiFail
+  if (!json.ok) {
+    const err = new Error(json.description || `telegram_${method}_failed`)
+    ;(err as Error & { statusCode?: number }).statusCode = 502
+    throw err
+  }
+  return json.result
+}
+
+/** Send local file bytes as photo / document / audio / voice. */
+export async function telegramSendMedia(
+  token: string,
+  chatId: string | number,
+  opts: {
+    kind: TelegramMediaKind
+    bytes: Buffer
+    filename: string
+    mime: string
+    caption?: string
+  },
+): Promise<TelegramMessage> {
+  const form = new FormData()
+  form.append('chat_id', String(chatId))
+  if (opts.caption?.trim()) form.append('caption', opts.caption.trim().slice(0, 1024))
+  const blob = new Blob([new Uint8Array(opts.bytes)], {
+    type: opts.mime || 'application/octet-stream',
+  })
+  const field =
+    opts.kind === 'photo'
+      ? 'photo'
+      : opts.kind === 'audio'
+        ? 'audio'
+        : opts.kind === 'voice'
+          ? 'voice'
+          : 'document'
+  const method =
+    opts.kind === 'photo'
+      ? 'sendPhoto'
+      : opts.kind === 'audio'
+        ? 'sendAudio'
+        : opts.kind === 'voice'
+          ? 'sendVoice'
+          : 'sendDocument'
+  form.append(field, blob, opts.filename)
+  return callApiMultipart<TelegramMessage>(token, method, form)
+}
+
 export function displayNameFromUser(u?: TelegramUser | null, chat?: TelegramChat | null): string {
   if (u) {
     const parts = [u.first_name, u.last_name].filter(Boolean).join(' ').trim()

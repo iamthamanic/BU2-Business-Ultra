@@ -1,94 +1,18 @@
 /**
- * Finance view model — empty until bank/bookkeeping connectors provide data.
+ * Finance view model — helpers + empty snapshot aligned with `@bu2/shared`.
  * Location: apps/web/src/features/finance/financeModel.ts
  */
+import type { FinanceSnapshot, FinanceTxClient } from '@bu2/shared'
 
-export type FinanceTx = {
-  id: string
-  date: string
-  name: string
-  desc: string
-  category: string
-  project: string
-  status: 'Bezahlt' | 'Überfällig' | 'Geplant'
-  kind: 'income' | 'expense'
-  source: string
-  amount: number
-  recurring: boolean
-}
+export type { FinanceSnapshot }
+export type FinanceTx = FinanceTxClient
 
-export type FinanceAlert = {
-  id: string
-  tone: 'red' | 'warn' | 'blue'
-  title: string
-  detail: string
-  go: 'transactions' | 'analysis' | 'settings'
-}
+export type FinanceAlert = FinanceSnapshot['alerts'][number]
+export type FinanceCategoryBar = FinanceSnapshot['analysis']['categories'][number]
+export type FinanceFlow = FinanceSnapshot['liquidityFlows'][number]
+export type FinanceRecurring = FinanceSnapshot['recurring'][number]
 
-export type FinanceCategoryBar = {
-  name: string
-  amount: number
-  pct: number
-  color: string
-}
-
-export type FinanceFlow = {
-  date: string
-  title: string
-  detail: string
-  amount: number
-}
-
-export type FinanceRecurring = {
-  name: string
-  detail: string
-  amount: number
-}
-
-/** Snapshot used by all Finance tabs — zeros / empty until a live source exists. */
-export type FinanceSnapshot = {
-  freeAvailable: number | null
-  balance: number | null
-  obligations: number | null
-  reserves: number | null
-  liquidityOutlook: number | null
-  reserveProgress: { current: number; target: number } | null
-  nextPayment: string | null
-  openIncoming: number | null
-  revenue: number | null
-  costs: number | null
-  result: number | null
-  revenueDeltaPct: number | null
-  topCostShare: string | null
-  alerts: FinanceAlert[]
-  transactions: FinanceTx[]
-  recurring: FinanceRecurring[]
-  analysis: {
-    cost: number[]
-    revenue: number[]
-    result: number[]
-    categories: FinanceCategoryBar[]
-    marginPct: number | null
-    topDriverPct: number | null
-    topDriverName: string | null
-  }
-  liquidityFlows: FinanceFlow[]
-  liquidityMinByHorizon: Record<30 | 60 | 90, number | null>
-  taxReserve: number | null
-  opsBuffer: { current: number; target: number } | null
-  profitability: {
-    customers: [string, number, number][]
-    products: [string, number, number][]
-    projects: [string, number, number][]
-    directCosts: number | null
-    contribution: number | null
-    breakEven: number | null
-  }
-  /** Base cash for planning scenarios when no live balance exists. */
-  planningBaseBalance: number
-  planningMonthlyDrift: number
-}
-
+/** Empty snapshot until `/finance/snapshot` returns hasData. */
 export const EMPTY_FINANCE: FinanceSnapshot = {
   freeAvailable: null,
   balance: null,
@@ -129,6 +53,9 @@ export const EMPTY_FINANCE: FinanceSnapshot = {
   },
   planningBaseBalance: 0,
   planningMonthlyDrift: 0,
+  accounts: [],
+  period: 'current',
+  hasData: false,
 }
 
 export function formatEur(n: number, fraction = 0): string {

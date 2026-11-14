@@ -77,10 +77,12 @@ export function MarketingShell() {
   }
 
   const tabs = ctx?.membership ? ctx.membership.tabs : null
-  const role = ctx?.membership?.role ?? (ctx?.user.isSuperadmin ? 'owner' : 'viewer')
-  const grantSeo = ctx?.membership?.grantSeoOpen ?? false
+  const membershipAuthz = ctx?.membership
+    ? { isOwner: ctx.membership.isOwner, permissions: ctx.membership.permissions ?? [] }
+    : { isOwner: false, permissions: [] as string[] }
   const showSeo =
-    canOpenSeo(role, grantSeo) && (canSeeNavTab(tabs, 'seo') || canSeeNavTab(tabs, 'geo') || tabs == null)
+    canOpenSeo(membershipAuthz) &&
+    (canSeeNavTab(tabs, 'seo') || canSeeNavTab(tabs, 'geo') || tabs == null)
 
   const organicTabs = ORGANIC_TABS.filter((ch) => {
     if (ch === 'website') return showSeo

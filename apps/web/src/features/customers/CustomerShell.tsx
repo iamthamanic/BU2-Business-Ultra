@@ -2,8 +2,8 @@
  * CustomerShell — Kontakte list (Kunden / Partner tabs), Dark-Ops chrome.
  * Location: apps/web/src/features/customers/CustomerShell.tsx
  */
-import { useEffect, useMemo, useState } from 'react'
-import { Outlet, useNavigate, useOutletContext, useParams } from 'react-router-dom'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Outlet, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import {
   ArrowRight,
   Handshake,
@@ -11,14 +11,19 @@ import {
   Plus,
   SealCheck,
   UserPlus,
+  UsersThree,
 } from '@phosphor-icons/react'
 import { canMutateContent } from '@bu2/shared'
 import type { CompanyOutletContext } from '../../components/BusinessShell'
+import { FunnelExportMenu } from '../../components/FunnelExportMenu'
+import { FunnelTip } from '../../components/FunnelTip'
 import { MktTab, MktTabs } from '../../components/MktTabs'
 import { api } from '../../lib/api'
 import { useI18n } from '../../lib/i18n'
 import type { MessageKey } from '../../i18n/messages'
 import { companyRoutes } from '../../lib/companyPaths'
+import type { FunnelExportPayload } from '../../lib/funnelExport'
+import { usePersistedTableColumns, type TableColumnDef } from '../../lib/tableColumns'
 import { ArchiveSegmentToggle } from '../../components/ArchiveSegmentToggle'
 import { CrmEmptyPreview } from '../../components/CrmEmptyPreview'
 import { CrmMultiCheckFilter } from '../../components/CrmMultiCheckFilter'
@@ -35,16 +40,8 @@ type ContactTab = 'customer' | 'partner'
 type SortKey = 'name' | 'status' | 'email' | 'phone' | 'tags'
 type TFn = (k: MessageKey) => string
 
-const TAB_STORAGE_KEY = 'bu2.contacts.tab'
-
-function readStoredTab(): ContactTab {
-  try {
-    const v = localStorage.getItem(TAB_STORAGE_KEY)
-    if (v === 'partner' || v === 'customer') return v
-  } catch {
-    /* ignore */
-  }
-  return 'customer'
+function tabFromPath(pathname: string): ContactTab {
+  return /\/partner(?:\/|$)/.test(pathname) ? 'partner' : 'customer'
 }
 
 function initials(name: string) {
@@ -68,17 +65,26 @@ function sortValue(c: BuCustomer, key: SortKey, tab: ContactTab): string {
   return (c.tags || []).join(', ').toLowerCase()
 }
 
+function contactStatusText(c: BuCustomer, tab: ContactTab, t: TFn): string {
+  if (tab === 'partner') {
+    return c.partnerStatus === 'inactive' ? t('partnerStatusInactive') : t('partnerStatusActive')
+  }
+  return statusLabel(c.relationStatus, t)
+}
+
 export function CustomerShell() {
   const { slug: paramSlug, id } = useParams()
   const ctx = useOutletContext<CompanyOutletContext | null>()
   const slug = paramSlug || ctx?.slug || ''
   const { t } = useI18n()
   const navigate = useNavigate()
-  const role = ctx?.membership?.role
-  const canWrite = role ? canMutateContent(role) : Boolean(ctx?.user?.isSuperadmin)
+  const location = useLocation()
+  const m = ctx?.membership
+  const canWrite = m ? canMutateContent({ isOwner: m.isOwner, permissions: m.permissions ?? [] }) : false
   const routes = companyRoutes(slug)
+  const tab = tabFromPath(location.pathname)
+  const listBase = tab === 'partner' ? routes.partner : routes.customer
 
-  const [tab, setTab] = useState<ContactTab>(() => readStoredTab())
   const [customers, setCustomers] = useState<BuCustomer[]>([])
   const [labelColors, setLabelColors] = useState<Record<string, string | null>>({})
   const [labelCatalog, setLabelCatalog] = useState<{ name: string; color: string | null }[]>([])
@@ -91,12 +97,7 @@ export function CustomerShell() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
   function selectTab(next: ContactTab) {
-    setTab(next)
-    try {
-      localStorage.setItem(TAB_STORAGE_KEY, next)
-    } catch {
-      /* ignore */
-    }
+    navigate(next === 'partner' ? routes.partner : routes.customer)
   }
 
   async function refresh() {
@@ -170,17 +171,73 @@ export function CustomerShell() {
     setSortDir('asc')
   }
 
-  const tableCols = useMemo(
+  const cols: (TableColumnDef & { tip: MessageKey; sortable: SortKey })[] = useMemo(
     () =>
-      [
-        { key: 'name' as const, label: t('name') },
-        { key: 'status' as const, label: t('customerStatus') },
-        { key: 'email' as const, label: t('email') },
-        { key: 'phone' as const, label: t('customerPhone') },
-        { key: 'tags' as const, label: t('customerTags') },
-      ] as const,
+      (
+        [
+          { key: 'name', label: t('name'), tip: 'tipContactName' as const, locked: true, sortable: 'name' as const },
+          {
+            key: 'status',
+            label: t('customerStatus'),
+            tip: 'tipContactStatus' as const,
+            sortable: 'status' as const,
+          },
+          { key: 'email', label: t('email'), tip: 'tipContactEmail' as const, sortable: 'email' as const },
+          {
+            key: 'phone',
+            label: t('customerPhone'),
+            tip: 'tipContactPhone' as const,
+            sortable: 'phone' as const,
+          },
+          {
+            key: 'tags',
+            label: t('customerTags'),
+            tip: 'tipContactTags' as const,
+            sortable: 'tags' as const,
+          },
+        ] as const
+      ).map((c) => ({ ...c, description: t(c.tip) })),
     [t],
   )
+
+  const { visibleKeys, visibleColumns, setVisibleKeys, reset } = usePersistedTableColumns({
+    slug,
+    tableId: 'contacts',
+    columns: cols,
+  })
+
+  function getExportPayload(): FunnelExportPayload {
+    const today = new Date().toISOString().slice(0, 10)
+    return {
+      kind: 'Custom',
+      channel: tab === 'partner' ? 'partners' : 'customers',
+      from: today,
+      to: today,
+      filters: [
+        {
+          label: t('contacts'),
+          value: tab === 'partner' ? t('contactTabPartners') : t('contactTabCustomers'),
+        },
+        {
+          label: t('archived'),
+          value: archive === 'archived' ? t('archived') : t('active'),
+        },
+        ...(selectedLabels.length
+          ? [{ label: t('customerFilterLabels'), value: selectedLabels.join(', ') }]
+          : []),
+        ...(query.trim() ? [{ label: t('contactSearch'), value: query.trim() }] : []),
+      ],
+      kpis: [{ label: t('contacts'), value: String(sorted.length) }],
+      columns: cols.map((c) => ({ key: c.key, label: c.label })),
+      rows: sorted.map((c) => ({
+        name: c.displayName,
+        status: contactStatusText(c, tab, t),
+        email: c.email || '',
+        phone: c.phone || '',
+        tags: (c.tags || []).join(', '),
+      })),
+    }
+  }
 
   if (id) {
     const outlet: CustomerOutletContext = {
@@ -194,29 +251,50 @@ export function CustomerShell() {
   }
 
   const showGhost = sorted.length === 0 && !loading
+  const colSpan = Math.max(visibleColumns.length, 1) + 1
 
   function renderSortableHead() {
     return (
       <thead>
         <tr>
-          {tableCols.map((col) => {
-            const active = sortKey === col.key
+          {visibleColumns.map((col) => {
+            const meta = cols.find((c) => c.key === col.key)
+            const sortable = meta?.sortable
+            const tip = meta?.tip
+            const active = sortable != null && sortKey === sortable
             return (
               <th
                 key={col.key}
                 className={`funnel-th-sortable${active ? ' is-sorted' : ''}`}
-                aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                aria-sort={
+                  sortable
+                    ? active
+                      ? sortDir === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                    : undefined
+                }
               >
-                <button
-                  type="button"
-                  className="funnel-th-btn"
-                  onClick={() => toggleSort(col.key)}
-                >
+                {sortable ? (
+                  <button
+                    type="button"
+                    className="funnel-th-btn"
+                    onClick={() => toggleSort(sortable)}
+                  >
+                    <span>{col.label}</span>
+                    <span className="funnel-th-dir" aria-hidden>
+                      {active ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}
+                    </span>
+                  </button>
+                ) : (
                   <span>{col.label}</span>
-                  <span className="funnel-th-dir" aria-hidden>
-                    {active ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}
-                  </span>
-                </button>
+                )}
+                {tip ? (
+                  <FunnelTip tip={t(tip)} iconOnly>
+                    {col.label}
+                  </FunnelTip>
+                ) : null}
               </th>
             )
           })}
@@ -226,6 +304,100 @@ export function CustomerShell() {
         </tr>
       </thead>
     )
+  }
+
+  function renderCells(c: BuCustomer): ReactNode {
+    return visibleColumns.map((col) => {
+      if (col.key === 'name') {
+        return (
+          <td key={col.key}>
+            <span className="product-table-name">
+              <span className="product-table-av" aria-hidden>
+                {initials(c.displayName)}
+              </span>
+              <span>
+                <strong>{c.displayName}</strong>
+                <div className="muted" style={{ fontSize: 12 }}>
+                  {c.kind === 'org' ? t('customerKindOrg') : t('customerKindPerson')}
+                  {tab === 'partner' && c.partnerCategory ? ` · ${c.partnerCategory}` : ''}
+                  {tab === 'customer' && c.customerNumberLabel
+                    ? ` · ${c.customerNumberLabel}`
+                    : ''}
+                  {tab === 'partner' && c.partnerNumberLabel ? ` · ${c.partnerNumberLabel}` : ''}
+                </div>
+              </span>
+            </span>
+          </td>
+        )
+      }
+      if (col.key === 'status') {
+        return (
+          <td key={col.key}>
+            {tab === 'partner' ? (
+              <span
+                className={`crm-status crm-status--${c.partnerStatus === 'inactive' ? 'archived' : 'active'}`}
+              >
+                {c.partnerStatus === 'inactive'
+                  ? t('partnerStatusInactive')
+                  : t('partnerStatusActive')}
+              </span>
+            ) : (
+              <span className={`crm-status crm-status--${c.relationStatus}`}>
+                {statusIcon(c.relationStatus)}
+                {statusLabel(c.relationStatus, t)}
+              </span>
+            )}
+          </td>
+        )
+      }
+      if (col.key === 'email') {
+        return (
+          <td key={col.key} className="muted">
+            {c.email || '—'}
+          </td>
+        )
+      }
+      if (col.key === 'phone') {
+        return (
+          <td key={col.key} className="muted">
+            {c.phone || '—'}
+          </td>
+        )
+      }
+      if (col.key === 'tags') {
+        return (
+          <td key={col.key}>
+            {(c.tags || []).length ? (
+              <span className="crm-tag-row">
+                {c.tags.slice(0, 4).map((tag) => {
+                  const color = labelColors[tag] || null
+                  return (
+                    <span
+                      key={tag}
+                      className="crm-tag"
+                      style={
+                        color
+                          ? {
+                              borderColor: `color-mix(in srgb, ${color} 45%, var(--border))`,
+                              background: `color-mix(in srgb, ${color} 16%, var(--panel2))`,
+                              color,
+                            }
+                          : undefined
+                      }
+                    >
+                      {tag}
+                    </span>
+                  )
+                })}
+              </span>
+            ) : (
+              <span className="muted">—</span>
+            )}
+          </td>
+        )
+      }
+      return <td key={col.key}>—</td>
+    })
   }
 
   return (
@@ -279,18 +451,31 @@ export function CustomerShell() {
         </div>
       </header>
 
-      <MktTabs level="l2" label={t('contacts')} className="contacts-role-tabs">
-        <MktTab
-          active={tab === 'customer'}
-          label={t('contactTabCustomers')}
-          onClick={() => selectTab('customer')}
+      <div className="contacts-role-tabs-row">
+        <MktTabs level="l2" label={t('contacts')} className="contacts-role-tabs">
+          <MktTab
+            active={tab === 'customer'}
+            label={t('contactTabCustomers')}
+            icon={UsersThree}
+            onClick={() => selectTab('customer')}
+          />
+          <MktTab
+            active={tab === 'partner'}
+            label={t('contactTabPartners')}
+            icon={Handshake}
+            onClick={() => selectTab('partner')}
+          />
+        </MktTabs>
+        <FunnelExportMenu
+          getPayload={getExportPayload}
+          columnPicker={{
+            columns: cols,
+            visibleKeys,
+            onChange: setVisibleKeys,
+            onReset: reset,
+          }}
         />
-        <MktTab
-          active={tab === 'partner'}
-          label={t('contactTabPartners')}
-          onClick={() => selectTab('partner')}
-        />
-      </MktTabs>
+      </div>
 
       {showGhost ? (
         <CrmEmptyPreview
@@ -310,7 +495,7 @@ export function CustomerShell() {
             <tbody>
               {[0, 1, 2, 3, 4, 5].map((i) => (
                 <tr key={i} className="crm-empty-row" aria-hidden>
-                  <td colSpan={6}>&nbsp;</td>
+                  <td colSpan={colSpan}>&nbsp;</td>
                 </tr>
               ))}
             </tbody>
@@ -325,76 +510,9 @@ export function CustomerShell() {
                 <tr
                   key={c.id}
                   className="product-table-row"
-                  onClick={() => navigate(`${routes.contacts}/${c.id}`)}
+                  onClick={() => navigate(`${listBase}/${c.id}`)}
                 >
-                  <td>
-                    <span className="product-table-name">
-                      <span className="product-table-av" aria-hidden>
-                        {initials(c.displayName)}
-                      </span>
-                      <span>
-                        <strong>{c.displayName}</strong>
-                        <div className="muted" style={{ fontSize: 12 }}>
-                          {c.kind === 'org' ? t('customerKindOrg') : t('customerKindPerson')}
-                          {tab === 'partner' && c.partnerCategory
-                            ? ` · ${c.partnerCategory}`
-                            : ''}
-                          {tab === 'customer' && c.customerNumberLabel
-                            ? ` · ${c.customerNumberLabel}`
-                            : ''}
-                          {tab === 'partner' && c.partnerNumberLabel
-                            ? ` · ${c.partnerNumberLabel}`
-                            : ''}
-                        </div>
-                      </span>
-                    </span>
-                  </td>
-                  <td>
-                    {tab === 'partner' ? (
-                      <span
-                        className={`crm-status crm-status--${c.partnerStatus === 'inactive' ? 'archived' : 'active'}`}
-                      >
-                        {c.partnerStatus === 'inactive'
-                          ? t('partnerStatusInactive')
-                          : t('partnerStatusActive')}
-                      </span>
-                    ) : (
-                      <span className={`crm-status crm-status--${c.relationStatus}`}>
-                        {statusIcon(c.relationStatus)}
-                        {statusLabel(c.relationStatus, t)}
-                      </span>
-                    )}
-                  </td>
-                  <td className="muted">{c.email || '—'}</td>
-                  <td className="muted">{c.phone || '—'}</td>
-                  <td>
-                    {(c.tags || []).length ? (
-                      <span className="crm-tag-row">
-                        {c.tags.slice(0, 4).map((tag) => {
-                          const color = labelColors[tag] || null
-                          return (
-                            <span
-                              key={tag}
-                              className="crm-tag"
-                              style={
-                                color
-                                  ? {
-                                      borderColor: `color-mix(in srgb, ${color} 45%, var(--border))`,
-                                      background: `color-mix(in srgb, ${color} 16%, var(--panel2))`,
-                                      color,
-                                    }
-                                  : undefined
-                              }
-                            >
-                              {tag}
-                            </span>
-                          )
-                        })}
-                      </span>
-                    ) : (
-                      <span className="muted">—</span>
-                    )}
-                  </td>
+                  {renderCells(c)}
                   <td className="crm-col-open">
                     <span className="crm-row-open" aria-hidden>
                       <ArrowRight size={14} weight="bold" />
@@ -419,7 +537,7 @@ export function CustomerShell() {
             body: JSON.stringify(body),
           })
           await refresh()
-          navigate(`${routes.contacts}/${r.customer.id}`)
+          navigate(`${listBase}/${r.customer.id}`)
         }}
       />
     </div>

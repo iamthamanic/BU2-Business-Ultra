@@ -3,6 +3,12 @@
  * Location: apps/api/src/modules/customers/service.ts
  */
 import { and, desc, eq, sql } from 'drizzle-orm'
+import {
+  CUSTOMER_NUMBER_START,
+  PARTNER_NUMBER_START,
+  formatCustomerNumber,
+  formatPartnerNumber,
+} from '@bu2/shared'
 import { db } from '../../db/client.js'
 import {
   customerEvents,
@@ -13,15 +19,11 @@ import {
   users,
 } from '../../db/schema.js'
 
-export const CUSTOMER_NUMBER_START = 100100
-export const PARTNER_NUMBER_START = 100100
-
-export function formatCustomerNumber(n: number): string {
-  return `K-${String(n).padStart(6, '0')}`
-}
-
-export function formatPartnerNumber(n: number): string {
-  return `P-${String(n).padStart(6, '0')}`
+export {
+  CUSTOMER_NUMBER_START,
+  PARTNER_NUMBER_START,
+  formatCustomerNumber,
+  formatPartnerNumber,
 }
 
 export async function allocateCustomerNumber(businessId: string): Promise<number> {

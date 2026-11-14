@@ -1,24 +1,38 @@
+/**
+ * Business / membership / invite routes (platform create + owner + bundles).
+ * Location: apps/api/src/modules/business/routes.ts
+ */
 import type { FastifyInstance } from 'fastify'
 import { and, eq } from 'drizzle-orm'
-import { z } from 'zod'
 import {
   CreateBusinessSchema,
   InviteSchema,
   UpdateBusinessSchema,
   canManageMembers,
   resolveEntitledTabs,
-  type Role,
 } from '@bu2/shared'
 import { db } from '../../db/client.js'
-import { businesses, invites, memberships, socialDrafts, users } from '../../db/schema.js'
+import {
+  businesses,
+  invites,
+  membershipBundles,
+  memberships,
+  socialDrafts,
+  users,
+} from '../../db/schema.js'
 import { hashToken, randomToken } from '../../lib/crypto.js'
 import { writeAudit } from '../../lib/audit.js'
-import { loadMembership, requireRole, requireUser } from '../../plugins/auth.js'
+import {
+  assertCanCreateCompany,
+  countActiveOwners,
+  seedSystemBundles,
+} from '../../lib/authorize.js'
+import { loadMembership, requireUser } from '../../plugins/auth.js'
 import { seedDefaultAreaProjects } from '../projects/defaultAreas.js'
 import { listBusinessesForUser } from './service.js'
 
 export async function businessRoutes(app: FastifyInstance) {
-  app.get('/api/businesses', async (req, reply) => {
+  app.get('/api/businesses', async (req) => {
     const user = await requireUser(req)
     const rows = await listBusinessesForUser(user.id)
     return { businesses: rows }
@@ -26,21 +40,10 @@ export async function businessRoutes(app: FastifyInstance) {
 
   app.post('/api/businesses', async (req, reply) => {
     const user = await requireUser(req)
-    // Superadmin, existing owner, or zero-membership bootstrap (create-first) may create.
-    const owned = await db
-      .select({ id: memberships.id })
-      .from(memberships)
-      .where(and(eq(memberships.userId, user.id), eq(memberships.role, 'owner')))
-      .limit(1)
-    if (!owned[0] && !user.isSuperadmin) {
-      const anyMembership = await db
-        .select({ id: memberships.id })
-        .from(memberships)
-        .where(eq(memberships.userId, user.id))
-        .limit(1)
-      if (anyMembership[0]) {
-        return reply.code(403).send({ error: 'owner_required_to_create_business' })
-      }
+    try {
+      await assertCanCreateCompany(user.id)
+    } catch {
+      return reply.code(403).send({ error: 'platform_grant_required' })
     }
     const body = CreateBusinessSchema.parse(req.body)
     const [biz] = await db
@@ -51,17 +54,20 @@ export async function businessRoutes(app: FastifyInstance) {
         createdByUserId: user.id,
       })
       .returning()
+    if (!biz) return reply.code(500).send({ error: 'create_failed' })
     await db.insert(memberships).values({
-      businessId: biz!.id,
+      businessId: biz.id,
       userId: user.id,
-      role: 'owner',
+      isOwner: true,
+      status: 'active',
     })
-    await seedDefaultAreaProjects(biz!.id, user.id)
+    await seedSystemBundles(biz.id)
+    await seedDefaultAreaProjects(biz.id, user.id)
     await writeAudit({
-      businessId: biz!.id,
+      businessId: biz.id,
       actorUserId: user.id,
       action: 'business.created',
-      resourceRef: biz!.slug,
+      resourceRef: biz.slug,
     })
     return { business: biz }
   })
@@ -70,17 +76,15 @@ export async function businessRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m && !user.isSuperadmin) return reply.code(404).send({ error: 'not_found' })
+    // No content superuser: superadmin without membership cannot see company data
+    if (!m) return reply.code(404).send({ error: 'not_found' })
     const rows = await db.select().from(businesses).where(eq(businesses.slug, slug)).limit(1)
     const biz = rows[0]
     if (!biz) return reply.code(404).send({ error: 'not_found' })
-    // Legacy ME.tabs parity: owner/admin unrestricted (null); others get stub entitlements
-    const membership = m
-      ? {
-          ...m,
-          tabs: user.isSuperadmin ? null : resolveEntitledTabs(m.role as Role),
-        }
-      : null
+    const membership = {
+      ...m,
+      tabs: resolveEntitledTabs(m),
+    }
     return { business: biz, membership }
   })
 
@@ -88,7 +92,7 @@ export async function businessRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canManageMembers(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canManageMembers(m)) return reply.code(403).send({ error: 'forbidden' })
     const body = UpdateBusinessSchema.parse(req.body)
     const name = body.name.trim().replace(/\s+/g, ' ')
     if (!name) return reply.code(400).send({ error: 'invalid_name' })
@@ -112,7 +116,7 @@ export async function businessRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canManageMembers(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canManageMembers(m)) return reply.code(403).send({ error: 'forbidden' })
     const body = InviteSchema.parse(req.body)
     const token = randomToken(24)
     const [inv] = await db
@@ -120,28 +124,22 @@ export async function businessRoutes(app: FastifyInstance) {
       .values({
         businessId: m.businessId,
         email: body.email.toLowerCase(),
-        role: body.role,
+        bundleIds: body.bundleIds,
         tokenHash: hashToken(token),
         invitedByUserId: user.id,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       })
       .returning()
-    // Ensure user shell exists for invitee so magic-link works
-    const existing = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, body.email.toLowerCase()))
-      .limit(1)
-    if (!existing[0]) {
-      await db.insert(users).values({ email: body.email.toLowerCase() })
-    }
     await writeAudit({
       businessId: m.businessId,
       actorUserId: user.id,
       action: 'invite.created',
       resourceRef: body.email,
     })
-    return { invite: { id: inv!.id, email: inv!.email, role: inv!.role }, acceptToken: token }
+    return {
+      invite: { id: inv!.id, email: inv!.email, bundleIds: inv!.bundleIds },
+      acceptToken: token,
+    }
   })
 
   app.post('/api/invites/accept', async (req, reply) => {
@@ -157,11 +155,23 @@ export async function businessRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'invalid_invite' })
     }
     if (inv.email !== user.email) return reply.code(403).send({ error: 'email_mismatch' })
-    await db.insert(memberships).values({
-      businessId: inv.businessId,
-      userId: user.id,
-      role: inv.role,
-    })
+    const [mem] = await db
+      .insert(memberships)
+      .values({
+        businessId: inv.businessId,
+        userId: user.id,
+        isOwner: false,
+        status: 'active',
+      })
+      .returning()
+    if (mem && inv.bundleIds?.length) {
+      await db.insert(membershipBundles).values(
+        inv.bundleIds.map((bundleId) => ({
+          membershipId: mem.id,
+          bundleId,
+        })),
+      )
+    }
     await db.update(invites).set({ acceptedAt: new Date() }).where(eq(invites.id, inv.id))
     await writeAudit({
       businessId: inv.businessId,
@@ -175,9 +185,7 @@ export async function businessRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
-    requireRole(m, ['owner'])
-    // Archive preflight: block if scheduled remote posts remain
+    if (!m?.isOwner) return reply.code(403).send({ error: 'forbidden' })
     const drafts = await db
       .select()
       .from(socialDrafts)
@@ -210,8 +218,7 @@ export async function businessRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
-    requireRole(m, ['owner'])
+    if (!m?.isOwner) return reply.code(403).send({ error: 'forbidden' })
     await db
       .update(businesses)
       .set({ status: 'active', archivedAt: null, updatedAt: new Date() })
@@ -224,13 +231,11 @@ export async function businessRoutes(app: FastifyInstance) {
     return { ok: true }
   })
 
-  /** Permanent delete — owner must send confirmSlug matching the company slug. */
   app.delete('/api/b/:slug', async (req, reply) => {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
-    requireRole(m, ['owner'])
+    if (!m?.isOwner) return reply.code(403).send({ error: 'forbidden' })
     const body = (req.body ?? {}) as { confirmSlug?: string }
     if (!body.confirmSlug || body.confirmSlug !== slug) {
       return reply.code(400).send({ error: 'confirm_slug_mismatch' })
@@ -246,31 +251,47 @@ export async function businessRoutes(app: FastifyInstance) {
     return { ok: true }
   })
 
-  app.post('/api/b/:slug/transfer-owner', async (req, reply) => {
+  app.post('/api/b/:slug/owners', async (req, reply) => {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
-    requireRole(m, ['owner'])
-    const { newOwnerUserId } = (req.body as { newOwnerUserId: string })
-    if (!newOwnerUserId) return reply.code(400).send({ error: 'newOwnerUserId_required' })
+    if (!m?.isOwner) return reply.code(403).send({ error: 'forbidden' })
+    const { userId } = req.body as { userId: string }
+    if (!userId) return reply.code(400).send({ error: 'userId_required' })
     const target = (
       await db
         .select()
         .from(memberships)
-        .where(and(eq(memberships.businessId, m.businessId), eq(memberships.userId, newOwnerUserId)))
+        .where(and(eq(memberships.businessId, m.businessId), eq(memberships.userId, userId)))
         .limit(1)
     )[0]
     if (!target) return reply.code(400).send({ error: 'target_must_be_member' })
-    await db.update(memberships).set({ role: 'owner' }).where(eq(memberships.id, target.id))
-    await db.update(memberships).set({ role: 'admin' }).where(eq(memberships.id, (
-      await db.select().from(memberships).where(and(eq(memberships.businessId, m.businessId), eq(memberships.userId, user.id))).limit(1)
-    )[0]!.id))
+    await db.update(memberships).set({ isOwner: true }).where(eq(memberships.id, target.id))
     await writeAudit({
       businessId: m.businessId,
       actorUserId: user.id,
-      action: 'business.owner_transferred',
-      resourceRef: newOwnerUserId,
+      action: 'business.owner_added',
+      resourceRef: userId,
+    })
+    return { ok: true }
+  })
+
+  app.delete('/api/b/:slug/owners/:userId', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug, userId } = req.params as { slug: string; userId: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m?.isOwner) return reply.code(403).send({ error: 'forbidden' })
+    const owners = await countActiveOwners(m.businessId)
+    if (owners <= 1) return reply.code(409).send({ error: 'last_owner_cannot_leave' })
+    await db
+      .update(memberships)
+      .set({ isOwner: false })
+      .where(and(eq(memberships.businessId, m.businessId), eq(memberships.userId, userId)))
+    await writeAudit({
+      businessId: m.businessId,
+      actorUserId: user.id,
+      action: 'business.owner_removed',
+      resourceRef: userId,
     })
     return { ok: true }
   })
@@ -279,14 +300,18 @@ export async function businessRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, userId } = req.params as { slug: string; userId: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canManageMembers(m.role)) return reply.code(403).send({ error: 'forbidden' })
-    const owners = await db
-      .select()
-      .from(memberships)
-      .where(and(eq(memberships.businessId, m.businessId), eq(memberships.role, 'owner')))
-    const victim = owners.find((o) => o.userId === userId)
-    if (victim && owners.length <= 1) {
-      return reply.code(409).send({ error: 'last_owner_cannot_leave' })
+    if (!m || !canManageMembers(m)) return reply.code(403).send({ error: 'forbidden' })
+    const target = (
+      await db
+        .select()
+        .from(memberships)
+        .where(and(eq(memberships.businessId, m.businessId), eq(memberships.userId, userId)))
+        .limit(1)
+    )[0]
+    if (!target) return reply.code(404).send({ error: 'not_found' })
+    if (target.isOwner) {
+      const owners = await countActiveOwners(m.businessId)
+      if (owners <= 1) return reply.code(409).send({ error: 'last_owner_cannot_leave' })
     }
     await db
       .delete(memberships)
@@ -300,60 +325,6 @@ export async function businessRoutes(app: FastifyInstance) {
     return { ok: true }
   })
 
-  /** Update Tools (and optional SEO) grants for a member. Owner/admin only; no-op meaning for owner/admin targets. */
-  app.patch('/api/b/:slug/members/:userId/grants', async (req, reply) => {
-    const user = await requireUser(req)
-    const { slug, userId } = req.params as { slug: string; userId: string }
-    const m = await loadMembership(user.id, slug)
-    if (!m || !canManageMembers(m.role)) return reply.code(403).send({ error: 'forbidden' })
-    const body = z
-      .object({
-        grantToolsUse: z.boolean().optional(),
-        grantToolsManage: z.boolean().optional(),
-        grantSeoOpen: z.boolean().optional(),
-      })
-      .refine((b) => b.grantToolsUse !== undefined || b.grantToolsManage !== undefined || b.grantSeoOpen !== undefined, {
-        message: 'at_least_one_grant',
-      })
-      .parse(req.body)
-
-    const target = (
-      await db
-        .select()
-        .from(memberships)
-        .where(and(eq(memberships.businessId, m.businessId), eq(memberships.userId, userId)))
-        .limit(1)
-    )[0]
-    if (!target) return reply.code(404).send({ error: 'not_found' })
-    if (target.role === 'owner' || target.role === 'admin') {
-      return reply.code(400).send({ error: 'grants_n_a_for_role' })
-    }
-
-    const patch: {
-      grantToolsUse?: boolean
-      grantToolsManage?: boolean
-      grantSeoOpen?: boolean
-    } = {}
-    if (body.grantToolsUse !== undefined) patch.grantToolsUse = body.grantToolsUse
-    if (body.grantToolsManage !== undefined) patch.grantToolsManage = body.grantToolsManage
-    if (body.grantSeoOpen !== undefined) patch.grantSeoOpen = body.grantSeoOpen
-    // Manage implies use for storage clarity
-    if (patch.grantToolsManage === true) patch.grantToolsUse = true
-
-    await db
-      .update(memberships)
-      .set(patch)
-      .where(and(eq(memberships.businessId, m.businessId), eq(memberships.userId, userId)))
-    await writeAudit({
-      businessId: m.businessId,
-      actorUserId: user.id,
-      action: 'membership.grants_updated',
-      resourceRef: userId,
-      meta: patch,
-    })
-    return { ok: true, grants: patch }
-  })
-
   app.get('/api/b/:slug/members', async (req, reply) => {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
@@ -362,10 +333,8 @@ export async function businessRoutes(app: FastifyInstance) {
     const rows = await db
       .select({
         id: memberships.id,
-        role: memberships.role,
-        grantSeoOpen: memberships.grantSeoOpen,
-        grantToolsUse: memberships.grantToolsUse,
-        grantToolsManage: memberships.grantToolsManage,
+        isOwner: memberships.isOwner,
+        status: memberships.status,
         email: users.email,
         displayName: users.displayName,
         userId: users.id,
@@ -373,6 +342,15 @@ export async function businessRoutes(app: FastifyInstance) {
       .from(memberships)
       .innerJoin(users, eq(users.id, memberships.userId))
       .where(eq(memberships.businessId, m.businessId))
-    return { members: rows }
+
+    const withBundles = []
+    for (const row of rows) {
+      const links = await db
+        .select({ bundleId: membershipBundles.bundleId })
+        .from(membershipBundles)
+        .where(eq(membershipBundles.membershipId, row.id))
+      withBundles.push({ ...row, bundleIds: links.map((l) => l.bundleId) })
+    }
+    return { members: withBundles }
   })
 }

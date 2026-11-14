@@ -66,7 +66,7 @@ export async function productRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     if (m.status === 'archived') return reply.code(409).send({ error: 'business_archived' })
     const body = ProductSchema.parse(req.body)
     const [row] = await db
@@ -100,7 +100,7 @@ export async function productRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     const body = ProductPatchSchema.parse(req.body)
     const [row] = await db
       .update(products)
@@ -135,7 +135,7 @@ export async function productRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     const body = z.object({ archived: z.boolean() }).parse(req.body ?? { archived: true })
     const [row] = await db
       .update(products)
@@ -153,7 +153,7 @@ export async function productRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     const body = z.object({ dataUrl: z.string().startsWith('data:image/') }).parse(req.body)
     const match = /^data:(image\/[a-zA-Z0-9+.-]+);base64,(.+)$/.exec(body.dataUrl)
     if (!match) return reply.code(400).send({ error: 'invalid_data_url' })

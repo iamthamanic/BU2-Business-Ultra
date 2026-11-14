@@ -3,7 +3,7 @@
  * Location: apps/api/src/modules/projects/service.ts
  */
 import { and, asc, desc, eq, inArray, isNull, lte } from 'drizzle-orm'
-import { canAccessProjectTeam, type Role } from '@bu2/shared'
+import { canAccessProjectTeam, type MembershipAuthz } from '@bu2/shared'
 import { db } from '../../db/client.js'
 import {
   projectEvents,
@@ -57,9 +57,9 @@ export function toProject(row: typeof projects.$inferSelect) {
 export function assertProjectAccess(
   row: typeof projects.$inferSelect,
   userId: string,
-  role: Role,
+  membership: MembershipAuthz,
 ): boolean {
-  return canAccessProjectTeam(role, userId, {
+  return canAccessProjectTeam(membership, userId, {
     ownerUserId: row.ownerUserId,
     memberUserIds: Array.isArray(row.memberUserIds) ? row.memberUserIds : [],
   })
@@ -69,12 +69,12 @@ export async function assertTaskProjectAccess(
   businessId: string,
   projectId: string | null,
   userId: string,
-  role: Role,
+  membership: MembershipAuthz,
 ): Promise<boolean> {
   if (!projectId) return true
   const p = await loadProject(businessId, projectId)
   if (!p) return false
-  return assertProjectAccess(p, userId, role)
+  return assertProjectAccess(p, userId, membership)
 }
 
 export function toAttachment(row: typeof taskAttachments.$inferSelect, businessId: string) {

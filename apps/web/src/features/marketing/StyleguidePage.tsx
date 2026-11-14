@@ -112,7 +112,12 @@ export function StyleguidePage() {
 
   const canEdit =
     Boolean(ctx?.user.isSuperadmin) ||
-    (ctx?.membership ? canMutateContent(ctx.membership.role) : false)
+    (ctx?.membership
+      ? canMutateContent({
+          isOwner: ctx.membership.isOwner,
+          permissions: ctx.membership.permissions ?? [],
+        })
+      : false)
 
   const year = useMemo(() => new Date().getFullYear(), [])
   const brandName = company?.name || 'Business Ultra'
