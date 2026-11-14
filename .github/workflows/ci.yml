@@ -42,10 +42,21 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install
+      - run: pnpm install --frozen-lockfile
+      # P-01 / SC-04: Critical must be clean. Residual High (zod@3 memory DoS) tracked in #20 — Zod 4 uplift.
+      - name: dependency audit (critical+)
+        run: pnpm audit --audit-level=critical
+      - name: assert no @fastify/static
+        run: |
+          if pnpm why @fastify/static 2>/dev/null | rg -q '@fastify/static@[0-9]'; then
+            echo 'FAIL: @fastify/static must not be a dependency (private media is authenticated)'
+            exit 1
+          fi
+          echo 'ok: @fastify/static absent'
       - run: pnpm --filter @bu2/shared build
       - run: pnpm --filter @bu2/finance-calc build
       - run: pnpm --filter @bu2/finance-calc test
+      - run: pnpm --filter @bu2/api test
       - run: pnpm --filter @bu2/api db:migrate
       - run: pnpm --filter @bu2/api db:seed
       - run: pnpm typecheck

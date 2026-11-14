@@ -1,9 +1,9 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import cookie from '@fastify/cookie'
+import helmet from '@fastify/helmet'
 import multipart from '@fastify/multipart'
 import rateLimit from '@fastify/rate-limit'
-import fastifyStatic from '@fastify/static'
 import { mkdirSync, existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { loadEnv } from './lib/env.js'
@@ -30,6 +30,7 @@ import { integrationRoutes } from './modules/integrations/routes.js'
 import { oauthIntegrationRoutes } from './modules/integrations/oauthRoutes.js'
 import { inboxRoutes } from './modules/inbox/routes.js'
 import { financeRoutes } from './modules/finance/routes.js'
+import { mediaRoutes } from './modules/media/routes.js'
 import './lib/integrations/core/mockAdapter.js'
 import { ensureFinapiAdapterRegistered } from './lib/integrations/finapi/adapter.js'
 import { ensureTelegramAdapterRegistered } from './lib/integrations/telegram/adapter.js'
@@ -47,24 +48,24 @@ async function main() {
     trustProxy: true,
   })
 
+  await app.register(helmet, {
+    // SPA + API: CSP left to reverse proxy for HTML; API JSON responses still get baseline headers.
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: 'same-site' },
+  })
   await app.register(cors, {
     origin: env.CORS_ORIGIN.split(',').map((s) => s.trim()),
     credentials: true,
   })
   await app.register(cookie, { secret: env.SESSION_SECRET })
-  // Opt-in only — auth routes set config.rateLimit (P-05). Other routes stay unlimited.
+  // Global baseline (B-06); auth/OAuth routes override with stricter config.rateLimit.
   await app.register(rateLimit, {
-    global: false,
-    max: 60,
+    global: true,
+    max: 300,
     timeWindow: '1 minute',
   })
   // Logos + YouTube Planen uploads (Shorts/videos); keep fail-closed on size in route too.
   await app.register(multipart, { limits: { fileSize: 256 * 1024 * 1024 } })
-  await app.register(fastifyStatic, {
-    root: uploadsDir,
-    prefix: '/uploads/',
-    decorateReply: false,
-  })
 
   await registerAuth(app)
   // Mock adapter self-registers on import (connections.ts / mockAdapter.ts side effect).
@@ -99,12 +100,16 @@ async function main() {
   await sortanizeRoutes(app)
   await openseoRoutes(app)
   await adminRoutes(app)
+  await mediaRoutes(app)
 
   app.setErrorHandler((err, _req, reply) => {
     const e = err as Error & { statusCode?: number; issues?: unknown }
     const status = e.statusCode ?? 500
-    if (status >= 500) app.log.error(e)
-    else app.log.info(e)
+    if (status >= 500) {
+      app.log.error(e)
+      return reply.code(status).send({ error: 'internal_error' })
+    }
+    app.log.info(e)
     reply.code(status).send({
       error: e.message || 'error',
       ...(e.issues ? { issues: e.issues } : {}),

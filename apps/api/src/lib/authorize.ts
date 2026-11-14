@@ -118,6 +118,57 @@ export function assertGrantSubset(actor: MembershipCtx, keys: readonly string[])
   }
 }
 
+/** Load permission keys for bundles that belong to the given business. */
+export async function loadBundlePermissionKeys(
+  businessId: string,
+  bundleIds: readonly string[],
+): Promise<{ keys: string[]; invalidBundleIds: string[] }> {
+  const invalidBundleIds: string[] = []
+  const keySet = new Set<string>()
+  for (const bundleId of bundleIds) {
+    const b = (
+      await db
+        .select({ id: permissionBundles.id })
+        .from(permissionBundles)
+        .where(
+          and(eq(permissionBundles.id, bundleId), eq(permissionBundles.businessId, businessId)),
+        )
+        .limit(1)
+    )[0]
+    if (!b) {
+      invalidBundleIds.push(bundleId)
+      continue
+    }
+    const rows = await db
+      .select({ key: bundlePermissions.permissionKey })
+      .from(bundlePermissions)
+      .where(eq(bundlePermissions.bundleId, bundleId))
+    for (const r of rows) {
+      if (KNOWN.has(r.key)) keySet.add(r.key)
+    }
+  }
+  return { keys: [...keySet], invalidBundleIds }
+}
+
+/**
+ * Validate invite/assign bundle IDs: must belong to tenant and effective keys ⊆ actor grants.
+ * Throws with statusCode 400 (invalid_bundle) or 403 (grant escalation).
+ */
+export async function assertBundlesAssignable(
+  actor: MembershipCtx,
+  businessId: string,
+  bundleIds: readonly string[],
+): Promise<void> {
+  if (!bundleIds.length) return
+  const { keys, invalidBundleIds } = await loadBundlePermissionKeys(businessId, bundleIds)
+  if (invalidBundleIds.length) {
+    const err = new Error('invalid_bundle') as Error & { statusCode: number }
+    err.statusCode = 400
+    throw err
+  }
+  assertGrantSubset(actor, keys)
+}
+
 export async function countActiveOwners(businessId: string): Promise<number> {
   const rows = await db
     .select({ id: memberships.id })

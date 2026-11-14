@@ -23,11 +23,12 @@ import {
 import { hashToken, randomToken } from '../../lib/crypto.js'
 import { writeAudit } from '../../lib/audit.js'
 import {
+  assertBundlesAssignable,
   assertCanCreateCompany,
   countActiveOwners,
   seedSystemBundles,
 } from '../../lib/authorize.js'
-import { loadMembership, requireUser } from '../../plugins/auth.js'
+import { loadMembership, loadMembershipByBusinessId, requireUser } from '../../plugins/auth.js'
 import { seedDefaultAreaProjects } from '../projects/defaultAreas.js'
 import { listBusinessesForUser } from './service.js'
 
@@ -118,6 +119,12 @@ export async function businessRoutes(app: FastifyInstance) {
     const m = await loadMembership(user.id, slug)
     if (!m || !canManageMembers(m)) return reply.code(403).send({ error: 'forbidden' })
     const body = InviteSchema.parse(req.body)
+    try {
+      await assertBundlesAssignable(m, m.businessId, body.bundleIds)
+    } catch (err) {
+      const e = err as Error & { statusCode?: number }
+      return reply.code(e.statusCode ?? 403).send({ error: e.message || 'forbidden' })
+    }
     const token = randomToken(24)
     const [inv] = await db
       .insert(invites)
@@ -155,6 +162,25 @@ export async function businessRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'invalid_invite' })
     }
     if (inv.email !== user.email) return reply.code(403).send({ error: 'email_mismatch' })
+
+    // Re-check inviter can still grant these bundles (B-07 — no stale escalation).
+    if (!inv.invitedByUserId) {
+      return reply.code(403).send({ error: 'invite_grants_revoked' })
+    }
+    const inviter = await loadMembershipByBusinessId(inv.invitedByUserId, inv.businessId)
+    if (!inviter || !canManageMembers(inviter)) {
+      return reply.code(403).send({ error: 'invite_grants_revoked' })
+    }
+    const bundleIds = inv.bundleIds ?? []
+    try {
+      await assertBundlesAssignable(inviter, inv.businessId, bundleIds)
+    } catch (err) {
+      const e = err as Error & { statusCode?: number }
+      return reply
+        .code(e.statusCode ?? 403)
+        .send({ error: e.message === 'invalid_bundle' ? 'invalid_bundle' : 'invite_grants_revoked' })
+    }
+
     const [mem] = await db
       .insert(memberships)
       .values({
@@ -164,9 +190,9 @@ export async function businessRoutes(app: FastifyInstance) {
         status: 'active',
       })
       .returning()
-    if (mem && inv.bundleIds?.length) {
+    if (mem && bundleIds.length) {
       await db.insert(membershipBundles).values(
-        inv.bundleIds.map((bundleId) => ({
+        bundleIds.map((bundleId) => ({
           membershipId: mem.id,
           bundleId,
         })),

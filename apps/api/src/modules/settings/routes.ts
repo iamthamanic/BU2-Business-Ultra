@@ -207,7 +207,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     const filename = `logo-${randomToken(8)}.${ext}`
     const storagePath = join(dir, filename)
     await writeFile(storagePath, buf)
-    const publicPath = `/uploads/${m.businessId}/logo/${filename}`
+    const publicPath = `/api/media/${m.businessId}/logo/${filename}`
     await db
       .update(businesses)
       .set({ logoPath: publicPath, updatedAt: new Date() })

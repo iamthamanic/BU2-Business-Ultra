@@ -172,7 +172,7 @@ export async function productRoutes(app: FastifyInstance) {
     await mkdir(dir, { recursive: true })
     const filename = `cover-${id.slice(0, 8)}-${randomToken(6)}.${ext}`
     await writeFile(join(dir, filename), buf)
-    const publicPath = `/uploads/${m.businessId}/products/${filename}`
+    const publicPath = `/api/media/${m.businessId}/products/${filename}`
     const [row] = await db
       .update(products)
       .set({ coverPath: publicPath, updatedAt: new Date() })
