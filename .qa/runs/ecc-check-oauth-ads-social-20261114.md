@@ -1,22 +1,21 @@
 # ECC Check — oauth-ads-social
 
 - Date: 2026-11-14
-- HEAD: WORKTREE (base 1b3353dac620de1e80277d95b16aa429d691985c)
+- HEAD: b18e7cdc55f6e36ad9e7815ad4c899bbb17bffd5
 - Verdict: **READY**
 
 ## Phase A (@test-gate)
 
 - Depth: standard
 - Result: **PASS**
-- `pnpm run checks` exit 0
-- oauth vitest 11/11 PASS
-- typedStrict: no `any`/@ts-ignore on oauth/social touch paths
-- secureByDefault RGs: B-10 clean on oauth paths; Meta/IG me no longer query-token
+- `pnpm run checks` exit 0 (prior); api typecheck after Bugbot fixes exit 0
+- typedStrict: no `any`/@ts-ignore on oauth/finance touch paths
+- secureByDefault: finance.read/write on all finance routes; OAuth credential replace transactional
 
 ## Phase B (verify-ticket)
 
-- Acceptance: no dedicated oauth-ads-social acceptance file; `connection-core.md` related
-- Result: **SKIPPED** (no matching acceptance slug for this WARN-fix slice) — documented
+- Acceptance: related `finance-screens.md` / `connection-core.md` / `auth-bundles-phase1.md`
+- Result: **PASS** — Bugbot finance AuthZ + atomic credentials addressed; scope stays Intent
 
 ## Phase B2 (composition-gate)
 
@@ -26,8 +25,8 @@
 ## Phase C (review)
 
 - Verdict: **ACCEPT**
-- WARN fixes: PKCE cookie store, OAuth rate limits, Meta/IG Bearer, ads secrets 410, tenant allowlist, redirect-uris auth, Reddit/LinkedIn PKCE
-- Bugbot: **SKIPPED** — no outbox/worker claim loop in this slice (social publish stub only; sync is request-scoped)
+- Bugbot prior CHANGES_REQUESTED: **resolved** (finance permissions + transactional replace/reconnect)
+- Optional follow-ups deferred: `persistAdapterConnection` full-tx, CMB AuthZ, route AuthZ tests
 
 ## Phase D (AgentShield)
 
@@ -41,14 +40,12 @@
 
 ## Phase E (UI)
 
-- `connectionSurfaces.ts` taxonomy only (OAuth set membership)
-- `@verify-ui`: **SKIPPED** — no layout/viewport change requiring browser proof
+- `@verify-ui`: **SKIPPED** — Bugbot fix slice is API-only (no layout/viewport change)
 
 ## Phase E2 (memory-live-doc)
 
-- Result: **skipped** — `.project-memory/checkpoint.json` absent; bootstrap deferred (docs updated in INTEGRATIONS.md)
-- needs-review: n/a
+- Result: **skipped** — `.project-memory/checkpoint.json` absent
 
 ## Ship
 
-Ready for: `@commit-pr-safe` or `@commit-push-safe` (on explicit user request)
+Ready for: `@pr-merge-safe` review → user confirms merge

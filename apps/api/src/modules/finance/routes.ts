@@ -91,6 +91,7 @@ export async function financeRoutes(app: FastifyInstance) {
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
     if (!m || !hasPermission(m, 'finance.write')) return reply.code(403).send({ error: 'forbidden' })
+    if (m.status === 'archived') return reply.code(409).send({ error: 'business_archived' })
     const account = await archiveAccount(m.businessId, id)
     if (!account) return reply.code(404).send({ error: 'not_found' })
     await writeAudit({
@@ -164,6 +165,7 @@ export async function financeRoutes(app: FastifyInstance) {
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
     if (!m || !hasPermission(m, 'finance.write')) return reply.code(403).send({ error: 'forbidden' })
+    if (m.status === 'archived') return reply.code(409).send({ error: 'business_archived' })
     const ok = await deleteTransaction(m.businessId, id)
     if (!ok) return reply.code(404).send({ error: 'not_found' })
     await writeAudit({

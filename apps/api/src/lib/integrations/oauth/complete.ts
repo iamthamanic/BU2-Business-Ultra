@@ -169,29 +169,29 @@ export function tokensToConnectResult(
   }
 }
 
+type TxOrDb = Pick<typeof db, 'delete' | 'insert' | 'update'>
+
 async function replaceCredentials(
+  executor: TxOrDb,
   connectionId: string,
   result: AdapterConnectResult,
   expiresAt: Date | null,
 ): Promise<void> {
-  // Atomic replace — avoid empty credentials if an insert fails mid-loop.
-  await db.transaction(async (tx) => {
-    await tx
-      .delete(connectionCredentials)
-      .where(eq(connectionCredentials.connectionId, connectionId))
-    for (const cred of result.credentials) {
-      const sealed = sealSecret(cred.plaintext)
-      await tx.insert(connectionCredentials).values({
-        connectionId,
-        kind: cred.kind,
-        ciphertext: sealed.ciphertext,
-        iv: sealed.iv,
-        tag: sealed.tag,
-        keyHint: keyHint(cred.plaintext),
-        expiresAt: cred.kind === 'access' ? expiresAt : null,
-      })
-    }
-  })
+  await executor
+    .delete(connectionCredentials)
+    .where(eq(connectionCredentials.connectionId, connectionId))
+  for (const cred of result.credentials) {
+    const sealed = sealSecret(cred.plaintext)
+    await executor.insert(connectionCredentials).values({
+      connectionId,
+      kind: cred.kind,
+      ciphertext: sealed.ciphertext,
+      iv: sealed.iv,
+      tag: sealed.tag,
+      keyHint: keyHint(cred.plaintext),
+      expiresAt: cred.kind === 'access' ? expiresAt : null,
+    })
+  }
 }
 
 /**
@@ -218,24 +218,29 @@ export async function persistOAuthConnection(opts: {
     )
     .limit(1)
 
-  if (existing[0]) {
-    const updated = await db
-      .update(connections)
-      .set({
-        displayName: result.displayName,
-        status: 'active',
-        accountType: result.accountType,
-        authMethod: result.authMethod,
-        health: result.health,
-        capabilitiesCache: result.capabilities,
-        updatedAt: new Date(),
-      })
-      .where(eq(connections.id, existing[0].id))
-      .returning()
+  const prior = existing[0]
+  if (prior) {
+    // Keep connection metadata + credential swap in one transaction.
+    const row = await db.transaction(async (tx) => {
+      const updated = await tx
+        .update(connections)
+        .set({
+          displayName: result.displayName,
+          status: 'active',
+          accountType: result.accountType,
+          authMethod: result.authMethod,
+          health: result.health,
+          capabilitiesCache: result.capabilities,
+          updatedAt: new Date(),
+        })
+        .where(eq(connections.id, prior.id))
+        .returning()
 
-    const row = updated[0]
-    if (!row) throw new Error('update_failed')
-    await replaceCredentials(row.id, result, opts.tokens.expiresAt)
+      const next = updated[0]
+      if (!next) throw new Error('update_failed')
+      await replaceCredentials(tx, next.id, result, opts.tokens.expiresAt)
+      return next
+    })
 
     return {
       id: row.id,
