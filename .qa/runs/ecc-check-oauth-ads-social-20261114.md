@@ -1,7 +1,7 @@
 # ECC Check — oauth-ads-social
 
 - Date: 2026-11-14
-- HEAD: 6eda3be0568fb423d0d6dff88bff9385806f365e
+- HEAD: c3f6ea39cbe8c65247ba7025b58548adceb21b87
 - Verdict: **READY**
 
 ## Phase A (@test-gate)
