@@ -15,12 +15,13 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "echo 'shared: lint ok'",
-    "test": "echo 'shared: no unit tests'"
+    "test": "vitest run"
   },
   "dependencies": {
     "zod": "^3.24.1"
   },
   "devDependencies": {
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^3.2.6"
   }
 }
