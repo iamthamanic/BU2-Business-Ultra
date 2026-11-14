@@ -57,6 +57,8 @@ export const conversations = pgTable(
     contactIdentityId: uuid('contact_identity_id').references(() => contactIdentities.id, {
       onDelete: 'set null',
     }),
+    /** Inbound messages since last open; cleared when a member opens the thread. */
+    unreadCount: integer('unread_count').notNull().default(0),
     lastMessageAt: timestamp('last_message_at', { withTimezone: true }),
     lastPreview: varchar('last_preview', { length: 280 }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

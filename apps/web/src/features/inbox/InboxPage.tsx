@@ -1,19 +1,36 @@
 /**
  * InboxPage — omnichannel messaging inbox (Telegram Bot E2E first).
- * Three-pane Dark-Ops: list · thread · identity context.
+ * Two-pane Dark-Ops: list · thread (CRM link lives in thread header).
  * Empty: finished chrome + FunnelConnectHint (no top panel, no fake rows).
  * Location: apps/web/src/features/inbox/InboxPage.tsx
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useOutletContext, useParams } from 'react-router-dom'
-import { ArrowsClockwise, PaperPlaneTilt, PlugsConnected } from '@phosphor-icons/react'
+import {
+  ArrowSquareOut,
+  ArrowsClockwise,
+  Buildings,
+  DotsThreeVertical,
+  MagnifyingGlass,
+  PaperPlaneTilt,
+  PlugsConnected,
+  User,
+  X,
+} from '@phosphor-icons/react'
 import { canMutateContent } from '@bu2/shared'
 import type { CompanyOutletContext } from '../../components/BusinessShell'
 import { MktTab, MktTabs } from '../../components/MktTabs'
 import { api } from '../../lib/api'
 import { useI18n } from '../../lib/i18n'
 import { companyRoutes } from '../../lib/companyPaths'
+import { ConnBrandLogo } from '../settings/connBrandLogos'
 import { FunnelConnectHint } from '../marketing/FunnelConnectHint'
+import { EmailComposerModal } from './EmailComposerModal'
+import { InboxAssignModal } from './InboxAssignModal'
+import { InboxChannelFilter } from './InboxChannelFilter'
+import { InboxComposerBar, type ComposerAttachment } from './InboxComposerBar'
+import { inboxChannelLabelKey, inboxLogoId } from './inboxChannel'
+import type { InboxMessageFormat } from '@bu2/shared'
 
 type InboxConnection = {
   id: string
@@ -27,11 +44,28 @@ type Conversation = {
   id: string
   channel: string
   connectionId?: string
+  connectionDisplayName?: string | null
+  connectionProvider?: string | null
   title: string | null
   status: string
   lastMessageAt: string | null
   lastPreview: string | null
   contactIdentityId: string | null
+  identityKind?: string | null
+  identityValue?: string | null
+  identityDisplayName?: string | null
+  customerId?: string | null
+  isExistingCustomer?: boolean
+  assigneeUserId?: string | null
+  assigneeDisplayName?: string | null
+  unreadCount?: number
+  isUnread?: boolean
+}
+
+type TeamMember = {
+  userId: string
+  displayName: string | null
+  email: string
 }
 
 type InboxMessage = {
@@ -42,6 +76,9 @@ type InboxMessage = {
   errorDetail: string | null
   sentAt: string | null
   createdAt: string
+  actorName?: string | null
+  actorAddress?: string | null
+  viaAccount?: string | null
 }
 
 type Identity = {
@@ -50,6 +87,8 @@ type Identity = {
   value: string
   displayName: string | null
   customerId: string | null
+  customerName?: string | null
+  customerKind?: string | null
   confidence: string
 } | null
 
@@ -59,37 +98,56 @@ export function InboxPage() {
   const { slug: paramSlug } = useParams()
   const ctx = useOutletContext<CompanyOutletContext | null>()
   const slug = paramSlug || ctx?.slug || ''
-  const role = ctx?.membership?.role
-  const canWrite = role ? canMutateContent(role) : Boolean(ctx?.user?.isSuperadmin)
+  const m = ctx?.membership
+  const meId = ctx?.user?.id || null
+  const canWrite = m
+    ? canMutateContent({ isOwner: Boolean(m.isOwner), permissions: m.permissions ?? [] })
+    : false
   const { t } = useI18n()
   const routes = companyRoutes(slug)
 
   const [connections, setConnections] = useState<InboxConnection[]>([])
   const [conversations, setConversations] = useState<Conversation[]>([])
+  const [members, setMembers] = useState<TeamMember[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [messages, setMessages] = useState<InboxMessage[]>([])
   const [identity, setIdentity] = useState<Identity>(null)
   const [threadTitle, setThreadTitle] = useState<string | null>(null)
   const [threadChannel, setThreadChannel] = useState<string | null>(null)
+  const [threadAccount, setThreadAccount] = useState<string | null>(null)
+  const [threadAssigneeId, setThreadAssigneeId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [threadLoading, setThreadLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
   const [reply, setReply] = useState('')
+  const [emailHtmlDraft, setEmailHtmlDraft] = useState('')
+  const [emailModalOpen, setEmailModalOpen] = useState(false)
+  const [companyName, setCompanyName] = useState('')
   const [sending, setSending] = useState(false)
+  const [assigning, setAssigning] = useState(false)
   const [filter, setFilter] = useState<ListFilter>('all')
+  const [listQuery, setListQuery] = useState('')
+  const [enabledSourceIds, setEnabledSourceIds] = useState<string[]>([])
+  const seenSourceIdsRef = useRef<Set<string>>(new Set())
+  const [composerFormats, setComposerFormats] = useState<InboxMessageFormat[]>(['text'])
+  const [threadMenuOpen, setThreadMenuOpen] = useState(false)
+  const [assignModalOpen, setAssignModalOpen] = useState(false)
+  const threadMenuRef = useRef<HTMLDivElement>(null)
 
   async function refreshList() {
     if (!slug) return
     setLoading(true)
     setError(null)
     try {
-      const [c, conv] = await Promise.all([
+      const [c, conv, mem] = await Promise.all([
         api<{ connections: InboxConnection[] }>(`/api/b/${slug}/inbox/connections`),
         api<{ conversations: Conversation[] }>(`/api/b/${slug}/inbox/conversations`),
+        api<{ members: TeamMember[] }>(`/api/b/${slug}/members`).catch(() => ({ members: [] })),
       ])
       setConnections(c.connections || [])
       setConversations(conv.conversations || [])
+      setMembers(mem.members || [])
     } catch (e) {
       setError(String((e as Error).message || e))
     } finally {
@@ -104,7 +162,15 @@ export function InboxPage() {
     setError(null)
     try {
       const data = await api<{
-        conversation: { title: string | null; channel?: string }
+        conversation: {
+          title: string | null
+          channel?: string
+          connectionDisplayName?: string | null
+          connectionProvider?: string | null
+          connectionExternalAccountId?: string | null
+          assigneeUserId?: string | null
+          composerFormats?: InboxMessageFormat[]
+        }
         messages: InboxMessage[]
         identity: Identity
       }>(`/api/b/${slug}/inbox/conversations/${id}`)
@@ -113,6 +179,28 @@ export function InboxPage() {
       setThreadTitle(data.conversation?.title || null)
       const fromList = conversations.find((c) => c.id === id)
       setThreadChannel(data.conversation?.channel || fromList?.channel || null)
+      const accountLabel =
+        data.conversation?.connectionDisplayName ||
+        fromList?.connectionDisplayName ||
+        data.conversation?.connectionExternalAccountId ||
+        data.conversation?.connectionProvider ||
+        fromList?.connectionProvider ||
+        null
+      setThreadAccount(accountLabel)
+      setThreadAssigneeId(
+        data.conversation?.assigneeUserId ?? fromList?.assigneeUserId ?? null,
+      )
+      setComposerFormats(
+        data.conversation?.composerFormats?.length
+          ? data.conversation.composerFormats
+          : ['text'],
+      )
+      // Opening marks read server-side — clear unread in local list.
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === id ? { ...c, unreadCount: 0, isUnread: false } : c,
+        ),
+      )
     } catch (e) {
       setError(String((e as Error).message || e))
     } finally {
@@ -120,42 +208,107 @@ export function InboxPage() {
     }
   }
 
+  async function patchAssignee(assigneeUserId: string | null) {
+    if (!slug || !selectedId) return
+    setAssigning(true)
+    setError(null)
+    try {
+      await api(`/api/b/${slug}/inbox/conversations/${selectedId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ assigneeUserId }),
+      })
+      setThreadAssigneeId(assigneeUserId)
+      const member = members.find((m) => m.userId === assigneeUserId)
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === selectedId
+            ? {
+                ...c,
+                assigneeUserId,
+                assigneeDisplayName: member
+                  ? member.displayName || member.email
+                  : null,
+              }
+            : c,
+        ),
+      )
+    } catch (e) {
+      setError(String((e as Error).message || e))
+    } finally {
+      setAssigning(false)
+    }
+  }
+
+  function mapInboxError(code: string): string {
+    switch (code) {
+      case 'gmail_api_disabled':
+        return t('inboxErr_gmail_api_disabled')
+      case 'gmail_insufficient_scopes':
+        return t('inboxErr_gmail_insufficient_scopes')
+      case 'gmail_api_403':
+        return t('inboxErr_gmail_api_403')
+      case 'gmail_token_expired':
+        return t('inboxErr_gmail_token_expired')
+      case 'media_unsupported_for_provider':
+        return t('inboxErr_media_unsupported')
+      case 'attachment_too_large':
+        return t('inboxErr_attachment_too_large')
+      case 'format_not_allowed':
+        return t('inboxErr_format_not_allowed')
+      default:
+        return code
+    }
+  }
+
   async function syncAll() {
-    if (!slug || !connections.length) return
+    if (!slug) return
     setSyncing(true)
     setError(null)
     try {
-      for (const c of connections) {
-        if (c.provider === 'telegram') {
-          await api(`/api/b/${slug}/inbox/telegram/connections/${c.id}/sync`, { method: 'POST' })
-        } else if (c.provider === 'unipile') {
-          await api(`/api/b/${slug}/inbox/unipile/connections/${c.id}/sync`, { method: 'POST' })
-        }
+      const summary = await api<{
+        results: Array<{ ok: boolean; error?: string; skipped?: boolean }>
+        synced: number
+        failed: number
+      }>(`/api/b/${slug}/inbox/sync`, { method: 'POST' })
+      const firstFail = summary.results.find((r) => !r.ok && r.error)
+      if (firstFail?.error) {
+        setError(mapInboxError(firstFail.error))
+      } else if (summary.synced === 0 && summary.results.every((r) => r.skipped)) {
+        setError(t('inboxErr_no_syncable'))
       }
       await refreshList()
       if (selectedId) await openThread(selectedId)
     } catch (e) {
-      setError(String((e as Error).message || e))
+      const code =
+        e && typeof e === 'object' && 'message' in e ? String((e as Error).message) : String(e)
+      setError(mapInboxError(code))
     } finally {
       setSyncing(false)
     }
   }
 
-  async function sendReply(ev: React.FormEvent) {
-    ev.preventDefault()
-    if (!slug || !selectedId || !reply.trim()) return
+  async function sendReplyBody(body: string, attachment?: ComposerAttachment) {
+    if (!slug || !selectedId) return
+    if (!body.trim() && !attachment) return
     setSending(true)
     setError(null)
     try {
       await api(`/api/b/${slug}/inbox/conversations/${selectedId}/reply`, {
         method: 'POST',
-        body: JSON.stringify({ body: reply.trim() }),
+        body: JSON.stringify({
+          body: body.trim().slice(0, 4000),
+          attachment: attachment || undefined,
+        }),
       })
       setReply('')
+      setEmailHtmlDraft('')
+      setEmailModalOpen(false)
       await openThread(selectedId)
       await refreshList()
     } catch (e) {
-      setError(String((e as Error).message || e))
+      const code =
+        e && typeof e === 'object' && 'message' in e ? String((e as Error).message) : String(e)
+      setError(mapInboxError(code))
     } finally {
       setSending(false)
     }
@@ -166,15 +319,72 @@ export function InboxPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug])
 
-  const filtered = useMemo(() => {
-    return conversations.filter((c) => {
-      if (filter === 'open') return c.status === 'open' || c.status === 'active'
-      if (filter === 'archived') return c.status === 'archived' || c.status === 'closed'
-      if (filter === 'assigned') return false
-      if (filter === 'unread') return false
-      return true
+  useEffect(() => {
+    if (!threadMenuOpen) return
+    function onDoc(e: MouseEvent) {
+      if (!threadMenuRef.current?.contains(e.target as Node)) setThreadMenuOpen(false)
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setThreadMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDoc)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [threadMenuOpen])
+
+  useEffect(() => {
+    if (!slug) return
+    api<{ business: { name: string } }>(`/api/b/${slug}`)
+      .then((r) => setCompanyName(r.business?.name || ''))
+      .catch(() => setCompanyName(''))
+  }, [slug])
+
+  useEffect(() => {
+    const ids = connections.map((c) => c.id)
+    setEnabledSourceIds((prev) => {
+      const next = new Set(prev.filter((id) => ids.includes(id)))
+      for (const id of ids) {
+        if (!seenSourceIdsRef.current.has(id)) next.add(id)
+      }
+      seenSourceIdsRef.current = new Set(ids)
+      return ids.filter((id) => next.has(id))
     })
-  }, [conversations, filter])
+  }, [connections])
+
+  const enabledSourceSet = useMemo(() => new Set(enabledSourceIds), [enabledSourceIds])
+
+  const filtered = useMemo(() => {
+    const needle = listQuery.trim().toLowerCase()
+    const sourceFilterActive = connections.length > 0
+    return conversations.filter((c) => {
+      if (sourceFilterActive) {
+        if (enabledSourceSet.size === 0) return false
+        if (c.connectionId && !enabledSourceSet.has(c.connectionId)) return false
+      }
+      if (filter === 'open' && !(c.status === 'open' || c.status === 'active')) return false
+      if (filter === 'archived' && !(c.status === 'archived' || c.status === 'closed')) return false
+      if (filter === 'assigned' && !(meId && c.assigneeUserId === meId)) return false
+      if (filter === 'unread' && !((c.unreadCount ?? 0) > 0 || c.isUnread)) return false
+      if (!needle) return true
+      const hay = [
+        c.title,
+        c.lastPreview,
+        c.identityDisplayName,
+        c.identityValue,
+        c.connectionDisplayName,
+        c.connectionProvider,
+        c.channel,
+        c.assigneeDisplayName,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return hay.includes(needle)
+    })
+  }, [conversations, filter, meId, listQuery, connections.length, enabledSourceSet])
 
   const emptyList = !loading && filtered.length === 0
   const hasConnection = connections.length > 0
@@ -182,6 +392,35 @@ export function InboxPage() {
   const showPreviewChrome = !loading && !hasConnection
 
   const openCount = conversations.filter((c) => c.status === 'open' || c.status === 'active').length
+  const assignedCount = conversations.filter((c) => meId && c.assigneeUserId === meId).length
+  const unreadCount = conversations.filter((c) => (c.unreadCount ?? 0) > 0 || c.isUnread).length
+
+  const threadTitleNorm = (threadTitle || '').trim().toLowerCase()
+  const identityName = identity?.displayName?.trim() || null
+  const identityValue = identity?.value?.trim() || null
+  const senderNameUseful = Boolean(
+    identityName &&
+      identityName.toLowerCase() !== threadTitleNorm &&
+      !threadTitleNorm.startsWith(identityName.toLowerCase()) &&
+      (!identityValue || identityName.toLowerCase() !== identityValue.toLowerCase()),
+  )
+  const senderEmail = identityValue
+  const senderLabel = senderNameUseful
+    ? `${identityName} · ${identityValue}`
+    : identityValue || identityName
+  const ingressLabel = [
+    threadChannel ? t(inboxChannelLabelKey(threadChannel)) : null,
+    threadAccount,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+  const isEmailChannel =
+    (threadChannel || '').toLowerCase() === 'email' ||
+    (identity?.kind || '').toLowerCase() === 'email'
+  const assigneeName =
+    members.find((m) => m.userId === threadAssigneeId)?.displayName ||
+    members.find((m) => m.userId === threadAssigneeId)?.email ||
+    null
 
   return (
     <div className="stack mkt-shell product-shell crm-shell inbox-shell">
@@ -195,21 +434,48 @@ export function InboxPage() {
             {t('inboxMsgLede')}
           </p>
         </div>
-        <div className="product-page-actions">
-          {hasConnection ? (
-            <button
-              type="button"
-              className="btn"
-              disabled={syncing || !canWrite}
-              onClick={() => syncAll().catch(console.error)}
-            >
-              <ArrowsClockwise size={14} weight="bold" aria-hidden />
-              {syncing ? t('inboxSyncing') : t('inboxSync')}
-            </button>
-          ) : null}
-          <Link className="btn" to={routes.settingsConnections}>
-            <PlugsConnected size={14} weight="bold" aria-hidden />
-            {t('connConnectAccount')}
+        <div className="product-page-actions inbox-page-actions">
+          <label className="inbox-search">
+            <MagnifyingGlass size={14} weight="regular" aria-hidden />
+            <input
+              className="input inbox-search-input"
+              type="search"
+              value={listQuery}
+              onChange={(e) => setListQuery(e.target.value)}
+              placeholder={t('inboxSearchPh')}
+              aria-label={t('inboxSearchPh')}
+            />
+          </label>
+          <InboxChannelFilter
+            connections={connections}
+            enabledIds={enabledSourceIds}
+            onChange={setEnabledSourceIds}
+            label={t('inboxSources')}
+            emptyLabel={t('inboxNoSources')}
+            allLabel={t('inboxSourceAll')}
+          />
+          <button
+            type="button"
+            className="btn icon-btn"
+            disabled={syncing || !canWrite}
+            aria-label={syncing ? t('inboxSyncing') : t('inboxSync')}
+            title={syncing ? t('inboxSyncing') : t('inboxSync')}
+            onClick={() => syncAll().catch(console.error)}
+          >
+            <ArrowsClockwise
+              size={16}
+              weight="bold"
+              aria-hidden
+              className={syncing ? 'inbox-sync-spin' : undefined}
+            />
+          </button>
+          <Link
+            className="btn icon-btn"
+            to={routes.settingsConnections}
+            aria-label={t('connConnectAccount')}
+            title={t('connConnectAccount')}
+          >
+            <PlugsConnected size={16} weight="bold" aria-hidden />
           </Link>
         </div>
       </header>
@@ -239,12 +505,12 @@ export function InboxPage() {
             />
             <MktTab
               active={filter === 'assigned'}
-              label={t('inboxFilterAssigned')}
+              label={`${t('inboxFilterAssigned')} ${assignedCount}`}
               onClick={() => setFilter('assigned')}
             />
             <MktTab
               active={filter === 'unread'}
-              label={t('inboxFilterUnread')}
+              label={`${t('inboxFilterUnread')} ${unreadCount}`}
               onClick={() => setFilter('unread')}
             />
             <MktTab
@@ -268,30 +534,93 @@ export function InboxPage() {
 
           {emptyList && hasConnection ? (
             <p className="muted inbox-empty">
-              {filter === 'assigned' || filter === 'unread'
-                ? t('inboxFilterStubEmpty')
-                : t('inboxEmpty')}
+              {enabledSourceIds.length === 0
+                ? t('inboxSourcesFilteredEmpty')
+                : filter === 'assigned'
+                  ? t('inboxFilterAssignedEmpty')
+                  : filter === 'unread'
+                    ? t('inboxFilterUnreadEmpty')
+                    : t('inboxEmpty')}
             </p>
           ) : null}
 
           <ul className="inbox-conv-list">
-            {filtered.map((c) => (
-              <li key={c.id}>
-                <button
-                  type="button"
-                  className={`inbox-conv${selectedId === c.id ? ' is-active' : ''}`}
-                  onClick={() => openThread(c.id).catch(console.error)}
-                >
-                  <span className="inbox-conv-top">
-                    <span className="inbox-conv-title">{c.title || t('inboxUnknown')}</span>
-                    <span className="inbox-channel-badge" data-ch={c.channel}>
-                      {c.channel}
+            {filtered.map((c) => {
+              const chLabel = t(inboxChannelLabelKey(c.channel))
+              const logoId = inboxLogoId(c.channel, c.connectionProvider)
+              const isEmail =
+                (c.channel || '').toLowerCase() === 'email' ||
+                (c.identityKind || '').toLowerCase() === 'email'
+              const when = fmtListWhen(c.lastMessageAt, t('inboxYesterday'))
+              const senderName = c.identityDisplayName?.trim() || null
+              const senderEmail = c.identityValue?.trim() || null
+              const senderTitleUseful =
+                senderName &&
+                senderName.toLowerCase() !== (c.title || '').trim().toLowerCase() &&
+                !((c.title || '').trim().toLowerCase().startsWith(senderName.toLowerCase()))
+              const senderLine = [senderTitleUseful ? senderName : null, senderEmail]
+                .filter(Boolean)
+                .join(' · ')
+              return (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    className={`inbox-conv${selectedId === c.id ? ' is-active' : ''}`}
+                    onClick={() => openThread(c.id).catch(console.error)}
+                    aria-label={`${c.title || t('inboxUnknown')} · ${chLabel}${when ? ` · ${when}` : ''}`}
+                  >
+                    <span className="inbox-conv-row">
+                      <span className="inbox-conv-icon" title={chLabel} data-ch={c.channel}>
+                        <ConnBrandLogo id={logoId} size="sm" />
+                      </span>
+                      <span className="inbox-conv-body">
+                        <span className="inbox-conv-top">
+                          <span className="inbox-conv-title">
+                            {(c.unreadCount ?? 0) > 0 || c.isUnread ? (
+                              <span className="inbox-unread-dot" aria-hidden />
+                            ) : null}
+                            <span className="inbox-conv-v">{c.title || t('inboxUnknown')}</span>
+                          </span>
+                          <span className="inbox-conv-top-end">
+                            {(c.unreadCount ?? 0) > 0 ? (
+                              <span className="inbox-unread-count">{c.unreadCount}</span>
+                            ) : null}
+                            {when ? (
+                              <time
+                                className="inbox-conv-time muted"
+                                dateTime={c.lastMessageAt || undefined}
+                              >
+                                {when}
+                              </time>
+                            ) : null}
+                          </span>
+                        </span>
+                        <span className="inbox-conv-sub muted">
+                          {isEmail && senderLine ? (
+                            <>
+                              <span className="inbox-conv-from">{senderLine}</span>
+                              <span className="inbox-conv-meta-sep" aria-hidden>
+                                ·
+                              </span>
+                            </>
+                          ) : null}
+                          <span className="inbox-conv-channel">{chLabel}</span>
+                          <span className="inbox-conv-meta-sep" aria-hidden>
+                            ·
+                          </span>
+                          <span className="inbox-conv-account">
+                            {c.connectionDisplayName || c.connectionProvider || '—'}
+                          </span>
+                        </span>
+                        {c.lastPreview ? (
+                          <span className="inbox-conv-preview muted">{c.lastPreview}</span>
+                        ) : null}
+                      </span>
                     </span>
-                  </span>
-                  <span className="inbox-conv-preview muted">{c.lastPreview || '—'}</span>
-                </button>
-              </li>
-            ))}
+                  </button>
+                </li>
+              )
+            })}
           </ul>
         </aside>
 
@@ -333,102 +662,338 @@ export function InboxPage() {
           ) : (
             <>
               <header className="inbox-thread-head">
-                <h2 className="inbox-thread-title">{threadTitle || t('inboxUnknown')}</h2>
-                {threadChannel ? (
-                  <p className="inbox-reply-via">
-                    {t('inboxReplyVia')}: <strong>{threadChannel}</strong>
-                  </p>
-                ) : null}
+                <div className="inbox-thread-head-main">
+                  <div className="inbox-thread-title-row">
+                    {threadChannel ? (
+                      <span
+                        className="inbox-thread-channel-icon"
+                        title={t(inboxChannelLabelKey(threadChannel))}
+                      >
+                        <ConnBrandLogo
+                          id={inboxLogoId(
+                            threadChannel,
+                            conversations.find((c) => c.id === selectedId)?.connectionProvider,
+                          )}
+                          size="sm"
+                        />
+                      </span>
+                    ) : null}
+                    <div className="inbox-thread-title-stack">
+                      <dl className="inbox-thread-fields">
+                        <div className="inbox-thread-field inbox-thread-field--subject">
+                          <dt>{t('inboxHeaderSubject')}</dt>
+                          <dd>
+                            <h2 className="inbox-thread-title">
+                              {threadTitle || t('inboxUnknown')}
+                            </h2>
+                          </dd>
+                        </div>
+                        {senderEmail || senderLabel ? (
+                          <div className="inbox-thread-field">
+                            <dt>{t('inboxHeaderFrom')}</dt>
+                            <dd title={senderEmail || senderLabel || undefined}>
+                              {senderEmail || senderLabel}
+                            </dd>
+                          </div>
+                        ) : null}
+                        {ingressLabel ? (
+                          <div className="inbox-thread-field">
+                            <dt>{t('inboxHeaderIngress')}</dt>
+                            <dd title={ingressLabel}>{ingressLabel}</dd>
+                          </div>
+                        ) : null}
+                      </dl>
+                    </div>
+                  </div>
+                </div>
+                <div className="inbox-thread-head-actions">
+                  <div className="inbox-thread-actions-stack">
+                    {identity?.customerId ? (
+                      <Link
+                        className="inbox-crm-row"
+                        to={routes.customerDetail(identity.customerId)}
+                        title={t('inboxOpenCustomer')}
+                      >
+                        <span className="inbox-crm-kind" data-kind={identity.customerKind || 'person'}>
+                          {(identity.customerKind || 'person') === 'org' ? (
+                            <Buildings size={13} weight="bold" aria-hidden />
+                          ) : (
+                            <User size={13} weight="bold" aria-hidden />
+                          )}
+                        </span>
+                        <span className="inbox-crm-meta">
+                          <span className="inbox-crm-name">
+                            {identity.customerName ||
+                              identity.displayName ||
+                              identity.value ||
+                              t('inboxUnknown')}
+                          </span>
+                          <span className="badge inbox-crm-kind-badge">
+                            {(identity.customerKind || 'person') === 'org'
+                              ? t('customerKindOrg')
+                              : t('customerKindPerson')}
+                          </span>
+                        </span>
+                        <ArrowSquareOut
+                          className="inbox-crm-open"
+                          size={14}
+                          weight="bold"
+                          aria-hidden
+                        />
+                      </Link>
+                    ) : identity ? (
+                      <span
+                        className="inbox-customer-pill inbox-customer-pill--ghost"
+                        title={t('inboxNoCustomerYet')}
+                      >
+                        {t('inboxNoCustomerShort')}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="inbox-thread-actions-end">
+                    <button
+                      type="button"
+                      className="btn icon-btn inbox-thread-close"
+                      aria-label={t('inboxCloseThread')}
+                      title={t('inboxCloseThread')}
+                      onClick={() => {
+                        setSelectedId(null)
+                        setMessages([])
+                        setIdentity(null)
+                        setThreadTitle(null)
+                        setThreadChannel(null)
+                        setThreadAccount(null)
+                        setThreadAssigneeId(null)
+                        setComposerFormats(['text'])
+                        setThreadMenuOpen(false)
+                        setAssignModalOpen(false)
+                        setEmailModalOpen(false)
+                        setReply('')
+                        setEmailHtmlDraft('')
+                      }}
+                    >
+                      <X size={14} weight="bold" aria-hidden />
+                    </button>
+                    {canWrite ? (
+                      <div
+                        ref={threadMenuRef}
+                        className={`inbox-thread-menu${threadMenuOpen ? ' is-open' : ''}`}
+                      >
+                        <button
+                          type="button"
+                          className="btn icon-btn"
+                          aria-label={t('inboxThreadMore')}
+                          title={t('inboxThreadMore')}
+                          aria-haspopup="menu"
+                          aria-expanded={threadMenuOpen}
+                          onClick={() => setThreadMenuOpen((v) => !v)}
+                        >
+                          <DotsThreeVertical size={16} weight="bold" aria-hidden />
+                        </button>
+                        {threadMenuOpen ? (
+                          <div className="inbox-thread-menu-panel" role="menu">
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className="inbox-thread-menu-item"
+                              disabled={assigning}
+                              onClick={() => {
+                                setThreadMenuOpen(false)
+                                setAssignModalOpen(true)
+                              }}
+                            >
+                              {t('inboxAssignAction')}
+                              {assigneeName ? (
+                                <span className="muted inbox-thread-menu-meta">{assigneeName}</span>
+                              ) : null}
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
               </header>
               <div className="inbox-messages">
-                {messages.map((m) => (
-                  <div
-                    key={m.id}
-                    className={`inbox-bubble inbox-bubble-${m.direction}`}
-                    data-status={m.deliveryStatus}
-                  >
-                    <p className="inbox-bubble-body">{m.body}</p>
-                    <span className="inbox-bubble-meta muted">
-                      {m.direction === 'outbound'
-                        ? m.deliveryStatus === 'failed'
-                          ? `${t('inboxFailed')}${m.errorDetail ? `: ${m.errorDetail}` : ''}`
-                          : m.deliveryStatus === 'pending'
-                            ? t('inboxPending')
-                            : t('inboxSent')
-                        : t('inboxReceived')}
-                    </span>
-                  </div>
-                ))}
+                {messages.map((m) => {
+                  const who =
+                    m.direction === 'outbound'
+                      ? [m.viaAccount || m.actorAddress || threadAccount, m.actorName]
+                          .filter(Boolean)
+                          .join(' · ')
+                      : senderEmail ||
+                        m.actorAddress ||
+                        [m.actorName, m.actorAddress].filter(Boolean).join(' · ') ||
+                        senderLabel ||
+                        '—'
+                  const when = fmtMessageWhen(m.sentAt || m.createdAt)
+                  const statusLabel =
+                    m.direction === 'outbound'
+                      ? m.deliveryStatus === 'failed'
+                        ? `${t('inboxFailed')}${m.errorDetail ? `: ${m.errorDetail}` : ''}`
+                        : m.deliveryStatus === 'pending'
+                          ? t('inboxPending')
+                          : t('inboxSent')
+                      : t('inboxReceived')
+                  return (
+                    <div
+                      key={m.id}
+                      className={`inbox-bubble inbox-bubble-${m.direction}`}
+                      data-status={m.deliveryStatus}
+                    >
+                      {who ? <span className="inbox-bubble-actor">{who}</span> : null}
+                      <p className="inbox-bubble-body">{m.body}</p>
+                      <span className="inbox-bubble-meta muted">
+                        {statusLabel}
+                        {when ? ` · ${when}` : ''}
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
               {canWrite ? (
-                <form className="inbox-composer" onSubmit={sendReply}>
-                  <textarea
-                    className="input inbox-composer-input"
-                    rows={3}
-                    value={reply}
-                    onChange={(e) => setReply(e.target.value)}
+                isEmailChannel ? (
+                  <form className="inbox-composer" onSubmit={(e) => e.preventDefault()}>
+                    <button
+                      type="button"
+                      className="input inbox-composer-input inbox-composer-trigger"
+                      onClick={() => setEmailModalOpen(true)}
+                      onFocus={() => setEmailModalOpen(true)}
+                    >
+                      {reply.trim() ||
+                        emailPlainPreview(emailHtmlDraft) ||
+                        t('inboxEmailOpenComposer')}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn primary"
+                      disabled={sending}
+                      onClick={() => setEmailModalOpen(true)}
+                    >
+                      <PaperPlaneTilt size={14} weight="bold" aria-hidden />
+                      {sending ? t('loading') : t('inboxEmailOpenComposerShort')}
+                    </button>
+                  </form>
+                ) : (
+                  <InboxComposerBar
+                    formats={composerFormats}
+                    reply={reply}
+                    onReplyChange={setReply}
                     placeholder={
                       threadChannel
                         ? `${t('inboxReplyPh')} (${threadChannel})`
                         : t('inboxReplyPh')
                     }
-                    required
+                    sending={sending}
+                    sendLabel={t('inboxSend')}
+                    attachLabel={t('inboxAttach')}
+                    voiceLabel={t('inboxVoice')}
+                    voiceStopLabel={t('inboxVoiceStop')}
+                    pendingLabel={t('inboxAttachClear')}
+                    onSend={({ body, attachment }) => {
+                      void sendReplyBody(body, attachment)
+                    }}
                   />
-                  <button
-                    type="submit"
-                    className="btn primary"
-                    disabled={sending || !reply.trim()}
-                  >
-                    <PaperPlaneTilt size={14} weight="bold" aria-hidden />
-                    {sending ? t('loading') : t('inboxSend')}
-                  </button>
-                </form>
+                )
               ) : null}
             </>
           )}
         </section>
-
-        <aside className="inbox-context" aria-label={t('inboxContext')}>
-          <h3 className="inbox-context-title">{t('inboxContext')}</h3>
-          {showPreviewChrome ? (
-            <div className="inbox-context-card inbox-context-card--preview">
-              <div className="inbox-skel-line inbox-skel-line--title" aria-hidden />
-              <div className="inbox-skel-line inbox-skel-line--meta" aria-hidden />
-              <div className="inbox-skel-line inbox-skel-line--short" aria-hidden />
-              <p className="muted" style={{ marginTop: 10, fontSize: 13 }}>
-                {t('inboxContextEmpty')}
-              </p>
-            </div>
-          ) : !selectedId ? (
-            <p className="muted">{t('inboxContextEmpty')}</p>
-          ) : identity ? (
-            <div className="inbox-context-card">
-              <p className="inbox-context-name">{identity.displayName || identity.value}</p>
-              <p className="muted" style={{ fontSize: 13 }}>
-                {identity.kind}: {identity.value}
-              </p>
-              <p className="muted" style={{ fontSize: 12 }}>
-                {t('inboxConfidence')}: {identity.confidence}
-              </p>
-              {identity.customerId ? (
-                <Link
-                  className="btn"
-                  style={{ marginTop: 10 }}
-                  to={routes.customerDetail(identity.customerId)}
-                >
-                  {t('inboxOpenCustomer')}
-                </Link>
-              ) : (
-                <p className="muted" style={{ marginTop: 10, fontSize: 13 }}>
-                  {t('inboxNoCustomerYet')}
-                </p>
-              )}
-            </div>
-          ) : (
-            <p className="muted">{t('inboxContextEmpty')}</p>
-          )}
-        </aside>
       </div>
+
+      <EmailComposerModal
+        open={emailModalOpen}
+        busy={sending}
+        error={error}
+        context={{
+          subject: threadTitle || t('inboxUnknown'),
+          toEmail: senderEmail,
+          toName: senderNameUseful ? identityName : null,
+          fromAccount: threadAccount,
+          companyName: companyName || slug,
+          assigneeName,
+        }}
+        history={messages.map((m) => ({
+          id: m.id,
+          direction: m.direction,
+          body: m.body,
+          when: fmtMessageWhen(m.sentAt || m.createdAt),
+          // Same actor label as thread bubbles — email/address before subject-like names.
+          who:
+            m.direction === 'outbound'
+              ? [m.viaAccount || m.actorAddress || threadAccount, m.actorName]
+                  .filter(Boolean)
+                  .join(' · ') || t('inboxSend')
+              : senderEmail ||
+                m.actorAddress ||
+                [m.actorName, m.actorAddress].filter(Boolean).join(' · ') ||
+                senderLabel ||
+                t('inboxUnknown'),
+        }))}
+        initialHtml={emailHtmlDraft}
+        onClose={() => setEmailModalOpen(false)}
+        onSend={(plain, html) => {
+          setEmailHtmlDraft(html)
+          setReply(plain)
+          void sendReplyBody(plain)
+        }}
+      />
+
+      <InboxAssignModal
+        open={assignModalOpen}
+        busy={assigning}
+        title={t('inboxAssignAction')}
+        noneLabel={t('inboxAssigneeNone')}
+        cancelLabel={t('cancel')}
+        members={members}
+        selectedId={threadAssigneeId}
+        onClose={() => setAssignModalOpen(false)}
+        onAssign={(userId) => {
+          void patchAssignee(userId).then(() => setAssignModalOpen(false))
+        }}
+      />
     </div>
   )
+}
+
+function fmtMessageWhen(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (!Number.isFinite(d.getTime())) return ''
+  return d.toLocaleString('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function fmtListWhen(iso: string | null | undefined, yesterdayLabel: string): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (!Number.isFinite(d.getTime())) return ''
+  const now = new Date()
+  const time = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+  if (d.toDateString() === now.toDateString()) return time
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  if (d.toDateString() === yesterday.toDateString()) return `${yesterdayLabel} ${time}`
+  return d.toLocaleString('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function emailPlainPreview(html: string): string {
+  if (!html) return ''
+  return html
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<\/p>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }

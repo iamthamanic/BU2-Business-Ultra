@@ -37,6 +37,8 @@ type Props = {
   slug: string
   canWrite: boolean
   personas: PersonaRow[]
+  /** Open on a specific tab (e.g. orderDesign from create-order gate). */
+  initialTab?: Tab
   onClose: () => void
   onSaved: (p: BuProduct) => void
   onArchived?: (p: BuProduct) => void
@@ -50,6 +52,7 @@ export function ProductModal({
   slug,
   canWrite,
   personas,
+  initialTab = 'desc',
   onClose,
   onSaved,
   onArchived,
@@ -64,10 +67,10 @@ export function ProductModal({
 
   useEffect(() => {
     if (!open) return
-    setTab('desc')
+    setTab(initialTab)
     setErr('')
     setDraft(product ? draftFromProduct(product) : emptyDraft())
-  }, [open, product])
+  }, [open, product, initialTab])
 
   useEffect(() => {
     if (!open) return
@@ -231,7 +234,11 @@ export function ProductModal({
             />
           ) : null}
           {tab === 'orderDesign' ? (
-            <ProductOrderDesignTab readOnly={!canWrite} />
+            <ProductOrderDesignTab
+              slug={slug}
+              productId={product?.id ?? null}
+              readOnly={!canWrite}
+            />
           ) : null}
         </div>
 

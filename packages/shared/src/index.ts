@@ -1,7 +1,39 @@
 import { z } from 'zod'
+import { type MembershipAuthz, hasPermission } from './permissions.js'
 
-export const RoleSchema = z.enum(['owner', 'admin', 'editor', 'viewer'])
-export type Role = z.infer<typeof RoleSchema>
+export {
+  CUSTOMER_NUMBER_START,
+  PARTNER_NUMBER_START,
+  ORDER_NUMBER_START,
+  formatCustomerNumber,
+  formatPartnerNumber,
+  formatOrderNumber,
+} from './numbering.js'
+
+export {
+  PERMISSION_KEYS,
+  type PermissionKey,
+  PermissionKeySchema,
+  type MembershipAuthz,
+  hasPermission,
+  hasAnyPermission,
+  SYSTEM_BUNDLE_TEMPLATES,
+  canManageMembers,
+  canSendMail,
+  canManageCredentials,
+  canMutateContent,
+  canOpenSeo,
+  canUseTools,
+  canManageTools,
+  PLATFORM_CAPABILITIES,
+  type PlatformCapability,
+  BootstrapSetupSchema,
+  type BootstrapSetupInput,
+  InviteSchema,
+  BundleCreateSchema,
+  BundleUpdateSchema,
+  MembershipBundlesAssignSchema,
+} from './permissions.js'
 
 export const LocaleSchema = z.enum(['de', 'en'])
 export type Locale = z.infer<typeof LocaleSchema>
@@ -13,6 +45,9 @@ export const SecretProviderSchema = z.enum([
   'meta_ads',
   'tiktok_ads',
   'chatgpt_ads',
+  'reddit_ads',
+  'pinterest_ads',
+  'microsoft_ads',
 ])
 export type SecretProvider = z.infer<typeof SecretProviderSchema>
 
@@ -32,11 +67,6 @@ export const CreateBusinessSchema = z.object({
 
 export const UpdateBusinessSchema = z.object({
   name: z.string().min(1).max(120),
-})
-
-export const InviteSchema = z.object({
-  email: z.string().email(),
-  role: z.enum(['admin', 'editor', 'viewer']),
 })
 
 export const MagicLinkRequestSchema = z.object({
@@ -152,6 +182,57 @@ export const ProductSchema = z.object({
 
 export const ProductPatchSchema = ProductSchema.partial()
 
+/** Order template block types for Auftragsgestaltung. */
+export const OrderTemplateBlockTypeSchema = z.enum(['text', 'heading', 'divider'])
+export const OrderTemplateBlockSchema = z.object({
+  id: z.string().min(1).max(64),
+  type: OrderTemplateBlockTypeSchema,
+  body: z.string().max(8000).default(''),
+})
+export type OrderTemplateBlock = z.infer<typeof OrderTemplateBlockSchema>
+
+export const OrderTemplateSnapshotSchema = z.object({
+  title: z.string().max(200),
+  blocks: z.array(OrderTemplateBlockSchema).max(50),
+})
+export type OrderTemplateSnapshot = z.infer<typeof OrderTemplateSnapshotSchema>
+
+export const OrderTemplatePutSchema = z.object({
+  title: z.string().max(200),
+  blocks: z.array(OrderTemplateBlockSchema).max(50),
+})
+export type OrderTemplatePutInput = z.infer<typeof OrderTemplatePutSchema>
+
+export const OrderStatusSchema = z.enum(['draft', 'open', 'done'])
+export type OrderStatus = z.infer<typeof OrderStatusSchema>
+
+export const OrderCreateSchema = z.object({
+  productId: z.string().uuid(),
+  customerId: z.string().uuid(),
+  title: z.string().min(1).max(200).optional(),
+  amountCents: z.number().int().nonnegative().optional(),
+  notes: z.string().max(4000).nullable().optional(),
+})
+export type OrderCreateInput = z.infer<typeof OrderCreateSchema>
+
+export const OrderPatchSchema = z.object({
+  status: OrderStatusSchema.optional(),
+  title: z.string().min(1).max(200).optional(),
+  amountCents: z.number().int().nonnegative().optional(),
+  notes: z.string().max(4000).nullable().optional(),
+})
+export type OrderPatchInput = z.infer<typeof OrderPatchSchema>
+
+/** Template is ready to spawn orders: non-empty title + ≥1 block. */
+export function isOrderTemplateReady(t: {
+  title?: string | null
+  blocks?: unknown
+}): boolean {
+  const title = (t.title || '').trim()
+  const blocks = Array.isArray(t.blocks) ? t.blocks : []
+  return title.length > 0 && blocks.length > 0
+}
+
 export const SocialNetworkSchema = z.enum([
   'facebook',
   'instagram',
@@ -261,7 +342,17 @@ export const CustomerAddressSchema = z.object({
   country: z.string().max(120).nullable().optional(),
 })
 
-/** CRM customer fields (shared by create + patch). */
+/** Suggested partner categories (UI chips; free text still allowed). */
+export const PARTNER_CATEGORY_SUGGESTIONS = [
+  'Dienstleister',
+  'Lieferant',
+  'Subunternehmer',
+  'Kooperationspartner',
+  'Behörde',
+  'Sonstige',
+] as const
+
+/** CRM contact fields (shared by create + patch). Table: contacts. */
 const CustomerFieldsSchema = z.object({
   kind: z.enum(['person', 'org']).default('person'),
   displayName: z.string().max(200).optional(),
@@ -280,7 +371,13 @@ const CustomerFieldsSchema = z.object({
   billingPostalCode: z.string().max(32).nullable().optional(),
   billingCity: z.string().max(120).nullable().optional(),
   billingCountry: z.string().max(120).nullable().optional(),
+  /** Customer lifecycle — ignored for partner-only KPI filters. */
   relationStatus: z.enum(['lead', 'prospect', 'customer']).default('lead'),
+  /** Dual roles — at least one required on create. Defaults preserve legacy customer create. */
+  isCustomer: z.boolean().default(true),
+  isPartner: z.boolean().default(false),
+  partnerCategory: z.string().max(80).nullable().optional(),
+  partnerStatus: z.enum(['active', 'inactive']).default('active'),
   /** ISO date YYYY-MM-DD */
   birthDate: z
     .string()
@@ -292,8 +389,15 @@ const CustomerFieldsSchema = z.object({
   tags: z.array(z.string().max(40)).max(40).default([]),
 })
 
-/** CRM customer create. */
-export const CustomerSchema = CustomerFieldsSchema.superRefine((v, ctx) => {
+function refineContactName(
+  v: {
+    kind?: string
+    displayName?: string | null
+    firstName?: string | null
+    lastName?: string | null
+  },
+  ctx: z.RefinementCtx,
+) {
   const dn = (v.displayName || '').trim()
   const fn = (v.firstName || '').trim()
   const ln = (v.lastName || '').trim()
@@ -306,16 +410,40 @@ export const CustomerSchema = CustomerFieldsSchema.superRefine((v, ctx) => {
   if (!dn && !fn && !ln) {
     ctx.addIssue({ code: 'custom', message: 'name_required', path: ['firstName'] })
   }
+}
+
+/** CRM contact create (legacy route name: customers). */
+export const CustomerSchema = CustomerFieldsSchema.superRefine((v, ctx) => {
+  refineContactName(v, ctx)
+  if (!v.isCustomer && !v.isPartner) {
+    ctx.addIssue({ code: 'custom', message: 'role_required', path: ['isCustomer'] })
+  }
 })
 export type CustomerInput = z.infer<typeof CustomerSchema>
-export const CustomerPatchSchema = CustomerFieldsSchema.partial()
+export const CustomerPatchSchema = CustomerFieldsSchema.partial().superRefine((v, ctx) => {
+  if (v.isCustomer === false && v.isPartner === false) {
+    ctx.addIssue({ code: 'custom', message: 'role_required', path: ['isCustomer'] })
+  }
+})
 export type CustomerPatchInput = z.infer<typeof CustomerPatchSchema>
 
-/** CRM customer row as returned by API (persisted + labels). */
+/** Alias — contacts are the SoR; API still speaks "customer" for compat. */
+export const ContactSchema = CustomerSchema
+export const ContactPatchSchema = CustomerPatchSchema
+export type ContactInput = CustomerInput
+export type ContactPatchInput = CustomerPatchInput
+
+/** CRM contact row as returned by API. */
 export const CustomerDtoSchema = CustomerFieldsSchema.extend({
   id: z.string().uuid(),
-  customerNumber: z.number().int().optional(),
-  customerNumberLabel: z.string().optional(),
+  customerNumber: z.number().int().nullable().optional(),
+  customerNumberLabel: z.string().nullable().optional(),
+  partnerNumber: z.number().int().nullable().optional(),
+  partnerNumberLabel: z.string().nullable().optional(),
+  isCustomer: z.boolean(),
+  isPartner: z.boolean(),
+  partnerCategory: z.string().nullable().optional(),
+  partnerStatus: z.string(),
   displayName: z.string(),
   email: z.string().nullable(),
   phone: z.string().nullable(),
@@ -344,6 +472,7 @@ export const CustomerDtoSchema = CustomerFieldsSchema.extend({
     .optional(),
 })
 export type CustomerDto = z.infer<typeof CustomerDtoSchema>
+export type ContactDto = CustomerDto
 
 export const CustomerNoteDtoSchema = z.object({
   id: z.string().uuid(),
@@ -470,11 +599,11 @@ export type ProjectDto = z.infer<typeof ProjectDtoSchema>
 
 /** Team-only project access: owner/admin always; else ownerUserId or memberUserIds. */
 export function canAccessProjectTeam(
-  role: Role,
+  membership: MembershipAuthz,
   userId: string,
   project: { ownerUserId?: string | null; memberUserIds?: string[] | null },
 ): boolean {
-  if (role === 'owner' || role === 'admin') return true
+  if (membership.isOwner || hasPermission(membership, 'projects.write')) return true
   if (project.ownerUserId === userId) return true
   const members = Array.isArray(project.memberUserIds) ? project.memberUserIds : []
   return members.includes(userId)
@@ -652,19 +781,19 @@ export const STUB_MEMBER_NAV_TABS: NavTabKey[] = [
   'cmb',
   'tools',
   'personas',
-  // seo/geo gated via grantSeoOpen; tools use also gated via grantTools*; settings owner/admin only in shell
+  // seo/geo → seo.open; tools → tools.use / tools.manage; settings → settings.manage (bundles / owner)
 ]
 
 /**
- * Resolve nav tabs for a membership role.
- * - owner/admin → null (see all)
- * - editor/viewer → stub list (or explicit `stored` when agency rights land)
+ * Resolve nav tabs for a membership.
+ * - owner → null (see all)
+ * - others → stub list (or explicit `stored` when agency rights land)
  */
 export function resolveEntitledTabs(
-  role: Role,
+  membership: MembershipAuthz,
   stored?: string[] | null,
 ): string[] | null {
-  if (role === 'owner' || role === 'admin') return null
+  if (membership.isOwner) return null
   if (stored && stored.length) return stored
   return [...STUB_MEMBER_NAV_TABS]
 }
@@ -672,40 +801,6 @@ export function resolveEntitledTabs(
 export function canSeeNavTab(tabs: string[] | null | undefined, tabKey: string): boolean {
   if (tabs == null) return true
   return tabs.includes(tabKey)
-}
-
-export function canManageMembers(role: Role): boolean {
-  return role === 'owner' || role === 'admin'
-}
-
-export function canSendMail(role: Role): boolean {
-  return role === 'owner' || role === 'admin'
-}
-
-export function canManageCredentials(role: Role): boolean {
-  return role === 'owner' || role === 'admin'
-}
-
-export function canMutateContent(role: Role): boolean {
-  return role === 'owner' || role === 'admin' || role === 'editor'
-}
-
-export function canOpenSeo(role: Role, grantSeoOpen: boolean): boolean {
-  if (role === 'owner' || role === 'admin') return true
-  if (role === 'editor' && grantSeoOpen) return true
-  return false
-}
-
-/** Open / list Tools hub (first-party + installed). Owner/admin always. */
-export function canUseTools(role: Role, grantToolsUse: boolean, grantToolsManage = false): boolean {
-  if (role === 'owner' || role === 'admin') return true
-  return grantToolsUse || grantToolsManage
-}
-
-/** Install / configure / uninstall custom tools. Owner/admin always. */
-export function canManageTools(role: Role, grantToolsManage: boolean): boolean {
-  if (role === 'owner' || role === 'admin') return true
-  return grantToolsManage
 }
 
 /** BU2 resources that custom tools may request (visual scope matrix). */
@@ -784,8 +879,22 @@ export type FunnelSurfaceDef = {
 export const FUNNEL_SURFACES: FunnelSurfaceDef[] = [
   { key: 'organic.instagram', label: 'Instagram', group: 'Organic', direct: 'Meta Connector' },
   { key: 'organic.facebook', label: 'Facebook', group: 'Organic', direct: 'Meta Connector' },
-  { key: 'organic.tiktok', label: 'TikTok', group: 'Organic', direct: 'TikTok Connector' },
-  { key: 'organic.linkedin', label: 'LinkedIn', group: 'Organic', direct: 'LinkedIn Connector' },
+  {
+    key: 'organic.tiktok',
+    label: 'TikTok',
+    group: 'Organic',
+    direct: 'TikTok Connector',
+    directProvider: 'tiktok',
+    directReady: true,
+  },
+  {
+    key: 'organic.linkedin',
+    label: 'LinkedIn',
+    group: 'Organic',
+    direct: 'LinkedIn Connector',
+    directProvider: 'linkedin',
+    directReady: true,
+  },
   {
     key: 'organic.youtube',
     label: 'YouTube',
@@ -886,6 +995,12 @@ export const IntegrationProviderSchema = z.enum([
   'google',
   'youtube',
   'google_ads',
+  'meta_ads',
+  'tiktok_ads',
+  'chatgpt_ads',
+  'reddit_ads',
+  'pinterest_ads',
+  'microsoft_ads',
   'microsoft',
   'imap',
   'whatsapp',
@@ -895,6 +1010,13 @@ export const IntegrationProviderSchema = z.enum([
   'meta',
   'telegram',
   'unipile',
+  /** Open-banking aggregator (DE) — credentials-first; sync later. */
+  'finapi',
+  /** Organic social — platform OAuth client in env (same model as Google/Meta). */
+  'linkedin',
+  'tiktok',
+  'x',
+  'pinterest',
 ])
 export type IntegrationProvider = z.infer<typeof IntegrationProviderSchema>
 
@@ -925,6 +1047,7 @@ export const IntegrationModuleSchema = z.enum([
   'crm',
   'projects',
   'calendar',
+  'finance',
 ])
 export type IntegrationModule = z.infer<typeof IntegrationModuleSchema>
 
@@ -1011,16 +1134,46 @@ export const ConnectImapSchema = z.object({
 })
 export type ConnectImapInput = z.infer<typeof ConnectImapSchema>
 
+/**
+ * finAPI connect — platform client id/secret come from env (`FINAPI_*`).
+ * Body only carries optional display label; bank Web Form is the next slice.
+ */
+export const ConnectFinapiSchema = z.object({
+  displayName: z.string().min(1).max(160).optional(),
+})
+export type ConnectFinapiInput = z.infer<typeof ConnectFinapiSchema>
+
 export const OAuthProviderParamSchema = z.enum([
   'google',
   'youtube',
   'google_ads',
+  'meta_ads',
   'microsoft',
+  'microsoft_ads',
   'whatsapp',
   'instagram',
   'facebook',
+  'linkedin',
+  'tiktok',
+  'tiktok_ads',
+  'x',
+  'pinterest',
+  'pinterest_ads',
+  'reddit_ads',
+  'chatgpt_ads',
 ])
 export type OAuthProviderParam = z.infer<typeof OAuthProviderParamSchema>
+
+/**
+ * @deprecated Paid ads use OAuth (`chatgpt_ads` / `reddit_ads` / `microsoft_ads`).
+ * Kept for typecompat; route returns 410.
+ */
+export const ConnectAdsApiKeySchema = z.object({
+  provider: z.enum(['chatgpt_ads', 'reddit_ads', 'microsoft_ads']),
+  apiKey: z.string().min(8).max(2000),
+  displayName: z.string().min(1).max(160).optional(),
+})
+export type ConnectAdsApiKeyInput = z.infer<typeof ConnectAdsApiKeySchema>
 
 /** Link personal Telegram via Unipile (existing account_id or after QR finalize). */
 export const LinkUnipileTelegramSchema = z.object({
@@ -1040,6 +1193,7 @@ export const InboxChannelSchema = z.enum([
   'telegram_user',
   'email',
   'whatsapp',
+  'instagram',
   'mock',
 ])
 export type InboxChannel = z.infer<typeof InboxChannelSchema>
@@ -1053,10 +1207,82 @@ export type MessageDirection = z.infer<typeof MessageDirectionSchema>
 export const DeliveryStatusSchema = z.enum(['pending', 'sent', 'failed', 'received'])
 export type DeliveryStatus = z.infer<typeof DeliveryStatusSchema>
 
-export const InboxReplySchema = z.object({
-  body: z.string().min(1).max(4000),
+/** Composer / capability messageFormats for inbox send. */
+export const InboxMessageFormatSchema = z.enum([
+  'text',
+  'html',
+  'image',
+  'file',
+  'audio',
+  'voice',
+])
+export type InboxMessageFormat = z.infer<typeof InboxMessageFormatSchema>
+
+/**
+ * Provider defaults when capabilitiesCache is stale or incomplete.
+ * Media send may still be 501 until the adapter wires it.
+ */
+export const INBOX_COMPOSER_FORMATS_BY_PROVIDER: Record<string, InboxMessageFormat[]> = {
+  telegram: ['text', 'image', 'file', 'audio', 'voice'],
+  unipile: ['text', 'image', 'file', 'audio', 'voice'],
+  google: ['text', 'html', 'file'],
+  microsoft: ['text', 'html', 'file'],
+  imap: ['text', 'html', 'file'],
+  whatsapp: ['text', 'image', 'file', 'audio', 'voice'],
+  instagram: ['text', 'image'],
+  facebook: ['text', 'image', 'file'],
+  meta: ['text', 'image', 'file'],
+}
+
+export function inboxComposerFormatsForProvider(
+  provider: string | null | undefined,
+  cachedFormats?: string[] | null,
+): InboxMessageFormat[] {
+  const defaults = INBOX_COMPOSER_FORMATS_BY_PROVIDER[(provider || '').toLowerCase()] || ['text']
+  const fromCache = (cachedFormats || []).filter((f): f is InboxMessageFormat =>
+    InboxMessageFormatSchema.safeParse(f).success,
+  )
+  if (fromCache.length === 0) return [...defaults]
+  const merged = new Set<InboxMessageFormat>([...fromCache, ...defaults])
+  // Keep stable order from defaults, then extras
+  const ordered: InboxMessageFormat[] = []
+  for (const f of defaults) {
+    if (merged.has(f)) ordered.push(f)
+  }
+  for (const f of fromCache) {
+    if (!ordered.includes(f)) ordered.push(f)
+  }
+  return ordered
+}
+
+export const InboxReplyAttachmentSchema = z.object({
+  format: z.enum(['image', 'file', 'audio', 'voice']),
+  filename: z.string().min(1).max(200),
+  /** data:<mime>;base64,… — max enforced in API route (~4 MiB decoded). */
+  dataUrl: z.string().startsWith('data:').max(7_000_000),
 })
+
+export const InboxReplySchema = z
+  .object({
+    body: z.string().max(4000).default(''),
+    attachment: InboxReplyAttachmentSchema.optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (!val.body.trim() && !val.attachment) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'body_or_attachment_required',
+        path: ['body'],
+      })
+    }
+  })
 export type InboxReplyInput = z.infer<typeof InboxReplySchema>
+
+/** Patch conversation assignee (null = unassign). */
+export const InboxConversationPatchSchema = z.object({
+  assigneeUserId: z.string().uuid().nullable(),
+})
+export type InboxConversationPatchInput = z.infer<typeof InboxConversationPatchSchema>
 
 export const ContactIdentityKindSchema = z.enum([
   'telegram_user',
@@ -1066,3 +1292,175 @@ export const ContactIdentityKindSchema = z.enum([
   'other',
 ])
 export type ContactIdentityKind = z.infer<typeof ContactIdentityKindSchema>
+
+/* ─── Finance SoR ───────────────────────────────────────────── */
+
+export const FinanceTxKindSchema = z.enum(['income', 'expense'])
+export type FinanceTxKind = z.infer<typeof FinanceTxKindSchema>
+
+export const FinanceTxStatusSchema = z.enum(['paid', 'overdue', 'planned'])
+export type FinanceTxStatus = z.infer<typeof FinanceTxStatusSchema>
+
+/** UI-facing German status labels (snapshot contract). */
+export const FinanceTxStatusLabelSchema = z.enum(['Bezahlt', 'Überfällig', 'Geplant'])
+export type FinanceTxStatusLabel = z.infer<typeof FinanceTxStatusLabelSchema>
+
+export const FinancePeriodSchema = z.enum(['current', 'prev', '90d'])
+export type FinancePeriod = z.infer<typeof FinancePeriodSchema>
+
+export const FinanceAccountCreateSchema = z.object({
+  name: z.string().min(1).max(160),
+  iban: z.string().min(15).max(34).optional().nullable(),
+  bankName: z.string().min(1).max(120).optional().nullable(),
+  currency: z.string().length(3).default('EUR'),
+  balanceCents: z.number().int().default(0),
+  connectionId: z.string().uuid().optional().nullable(),
+  source: z.enum(['manual', 'finapi', 'demo', 'import']).default('manual'),
+})
+export type FinanceAccountCreateInput = z.infer<typeof FinanceAccountCreateSchema>
+
+export const FinanceAccountPatchSchema = FinanceAccountCreateSchema.partial()
+export type FinanceAccountPatchInput = z.infer<typeof FinanceAccountPatchSchema>
+
+export const FinanceTransactionCreateSchema = z.object({
+  accountId: z.string().uuid(),
+  bookedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  name: z.string().min(1).max(200),
+  description: z.string().max(4000).optional().default(''),
+  category: z.string().min(1).max(80).default('Sonstiges'),
+  projectLabel: z.string().max(160).optional().nullable(),
+  contactId: z.string().uuid().optional().nullable(),
+  status: FinanceTxStatusSchema.default('paid'),
+  kind: FinanceTxKindSchema,
+  source: z.string().min(1).max(80).default('manual'),
+  amountCents: z.number().int().nonnegative(),
+  recurring: z.boolean().default(false),
+  externalId: z.string().max(160).optional().nullable(),
+})
+export type FinanceTransactionCreateInput = z.infer<typeof FinanceTransactionCreateSchema>
+
+export const FinanceTransactionPatchSchema = FinanceTransactionCreateSchema.partial().omit({
+  accountId: true,
+})
+export type FinanceTransactionPatchInput = z.infer<typeof FinanceTransactionPatchSchema>
+
+export const FinanceSettingsPatchSchema = z.object({
+  taxReserveCents: z.number().int().nonnegative().optional(),
+  opsBufferCurrentCents: z.number().int().nonnegative().optional(),
+  opsBufferTargetCents: z.number().int().nonnegative().optional(),
+})
+export type FinanceSettingsPatchInput = z.infer<typeof FinanceSettingsPatchSchema>
+
+export const FinanceAccountClientSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  iban: z.string().nullable(),
+  bankName: z.string().nullable(),
+  currency: z.string(),
+  balanceCents: z.number().int(),
+  connectionId: z.string().uuid().nullable(),
+  source: z.string(),
+  archivedAt: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+export type FinanceAccountClient = z.infer<typeof FinanceAccountClientSchema>
+
+export const FinanceTxClientSchema = z.object({
+  id: z.string().uuid(),
+  date: z.string(),
+  name: z.string(),
+  desc: z.string(),
+  category: z.string(),
+  project: z.string(),
+  status: FinanceTxStatusLabelSchema,
+  kind: FinanceTxKindSchema,
+  source: z.string(),
+  amount: z.number(),
+  recurring: z.boolean(),
+  accountId: z.string().uuid(),
+  contactId: z.string().uuid().nullable(),
+})
+export type FinanceTxClient = z.infer<typeof FinanceTxClientSchema>
+
+export const FinanceSnapshotSchema = z.object({
+  freeAvailable: z.number().nullable(),
+  balance: z.number().nullable(),
+  obligations: z.number().nullable(),
+  reserves: z.number().nullable(),
+  liquidityOutlook: z.number().nullable(),
+  reserveProgress: z
+    .object({ current: z.number(), target: z.number() })
+    .nullable(),
+  nextPayment: z.string().nullable(),
+  openIncoming: z.number().nullable(),
+  revenue: z.number().nullable(),
+  costs: z.number().nullable(),
+  result: z.number().nullable(),
+  revenueDeltaPct: z.number().nullable(),
+  topCostShare: z.string().nullable(),
+  alerts: z.array(
+    z.object({
+      id: z.string(),
+      tone: z.enum(['red', 'warn', 'blue']),
+      title: z.string(),
+      detail: z.string(),
+      go: z.enum(['transactions', 'analysis', 'settings']),
+    }),
+  ),
+  transactions: z.array(FinanceTxClientSchema),
+  recurring: z.array(
+    z.object({
+      name: z.string(),
+      detail: z.string(),
+      amount: z.number(),
+    }),
+  ),
+  analysis: z.object({
+    cost: z.array(z.number()),
+    revenue: z.array(z.number()),
+    result: z.array(z.number()),
+    categories: z.array(
+      z.object({
+        name: z.string(),
+        amount: z.number(),
+        pct: z.number(),
+        color: z.string(),
+      }),
+    ),
+    marginPct: z.number().nullable(),
+    topDriverPct: z.number().nullable(),
+    topDriverName: z.string().nullable(),
+  }),
+  liquidityFlows: z.array(
+    z.object({
+      date: z.string(),
+      title: z.string(),
+      detail: z.string(),
+      amount: z.number(),
+    }),
+  ),
+  liquidityMinByHorizon: z.object({
+    30: z.number().nullable(),
+    60: z.number().nullable(),
+    90: z.number().nullable(),
+  }),
+  taxReserve: z.number().nullable(),
+  opsBuffer: z
+    .object({ current: z.number(), target: z.number() })
+    .nullable(),
+  profitability: z.object({
+    customers: z.array(z.tuple([z.string(), z.number(), z.number()])),
+    products: z.array(z.tuple([z.string(), z.number(), z.number()])),
+    projects: z.array(z.tuple([z.string(), z.number(), z.number()])),
+    directCosts: z.number().nullable(),
+    contribution: z.number().nullable(),
+    breakEven: z.number().nullable(),
+  }),
+  planningBaseBalance: z.number(),
+  planningMonthlyDrift: z.number(),
+  accounts: z.array(FinanceAccountClientSchema),
+  period: FinancePeriodSchema,
+  hasData: z.boolean(),
+})
+export type FinanceSnapshot = z.infer<typeof FinanceSnapshotSchema>

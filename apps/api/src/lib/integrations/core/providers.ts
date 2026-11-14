@@ -4,6 +4,9 @@
  */
 import type { ConnectionAuthMethod, IntegrationProvider } from '@bu2/shared'
 
+/** Batteries-included connector program order: Social → Paid → Finance → Generic. */
+export type ProviderDomainGroup = 'social' | 'paid' | 'finance' | 'generic'
+
 export type ProviderCatalogEntry = {
   id: IntegrationProvider
   label: string
@@ -13,6 +16,8 @@ export type ProviderCatalogEntry = {
   adapterReady: boolean
   /** Connect UX kind. */
   connectKind: 'oauth' | 'bot_token' | 'aggregator' | 'password' | 'mock'
+  /** Product lane for catalog grouping / roadmap. */
+  domainGroup: ProviderDomainGroup
 }
 
 /** Order = connect-modal / providers-tab display order. */
@@ -23,6 +28,7 @@ export const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
     authMethods: ['mock'],
     adapterReady: true,
     connectKind: 'mock',
+    domainGroup: 'generic',
   },
   {
     id: 'google',
@@ -30,6 +36,7 @@ export const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
     authMethods: ['oauth_pkce'],
     adapterReady: true,
     connectKind: 'oauth',
+    domainGroup: 'social',
   },
   {
     id: 'youtube',
@@ -37,6 +44,7 @@ export const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
     authMethods: ['oauth_pkce'],
     adapterReady: true,
     connectKind: 'oauth',
+    domainGroup: 'paid',
   },
   {
     id: 'google_ads',
@@ -44,6 +52,87 @@ export const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
     authMethods: ['oauth_pkce'],
     adapterReady: true,
     connectKind: 'oauth',
+    domainGroup: 'paid',
+  },
+  {
+    id: 'meta_ads',
+    label: 'Meta Ads',
+    authMethods: ['oauth_pkce'],
+    adapterReady: true,
+    connectKind: 'oauth',
+    domainGroup: 'paid',
+  },
+  {
+    id: 'tiktok_ads',
+    label: 'TikTok Ads',
+    authMethods: ['oauth_pkce'],
+    adapterReady: true,
+    connectKind: 'oauth',
+    domainGroup: 'paid',
+  },
+  {
+    id: 'chatgpt_ads',
+    label: 'ChatGPT Ads',
+    authMethods: ['oauth_pkce'],
+    adapterReady: true,
+    connectKind: 'oauth',
+    domainGroup: 'paid',
+  },
+  {
+    id: 'reddit_ads',
+    label: 'Reddit Ads',
+    authMethods: ['oauth_pkce'],
+    adapterReady: true,
+    connectKind: 'oauth',
+    domainGroup: 'paid',
+  },
+  {
+    id: 'pinterest_ads',
+    label: 'Pinterest Ads',
+    authMethods: ['oauth_pkce'],
+    adapterReady: true,
+    connectKind: 'oauth',
+    domainGroup: 'paid',
+  },
+  {
+    id: 'linkedin',
+    label: 'LinkedIn',
+    authMethods: ['oauth_pkce'],
+    adapterReady: true,
+    connectKind: 'oauth',
+    domainGroup: 'social',
+  },
+  {
+    id: 'tiktok',
+    label: 'TikTok',
+    authMethods: ['oauth_pkce'],
+    adapterReady: true,
+    connectKind: 'oauth',
+    domainGroup: 'social',
+  },
+  {
+    id: 'x',
+    label: 'X',
+    authMethods: ['oauth_pkce'],
+    adapterReady: true,
+    connectKind: 'oauth',
+    domainGroup: 'social',
+  },
+  {
+    id: 'pinterest',
+    label: 'Pinterest',
+    authMethods: ['oauth_pkce'],
+    adapterReady: true,
+    connectKind: 'oauth',
+    domainGroup: 'social',
+  },
+  {
+    id: 'microsoft_ads',
+    label: 'Microsoft Ads',
+    authMethods: ['oauth_pkce'],
+    adapterReady: true,
+    connectKind: 'oauth',
+    domainGroup: 'paid',
   },
   {
     id: 'microsoft',
@@ -51,6 +140,7 @@ export const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
     authMethods: ['oauth_pkce'],
     adapterReady: true,
     connectKind: 'oauth',
+    domainGroup: 'social',
   },
   {
     id: 'imap',
@@ -58,6 +148,7 @@ export const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
     authMethods: ['password'],
     adapterReady: true,
     connectKind: 'password',
+    domainGroup: 'social',
   },
   {
     id: 'whatsapp',
@@ -65,6 +156,7 @@ export const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
     authMethods: ['oauth_pkce'],
     adapterReady: true,
     connectKind: 'oauth',
+    domainGroup: 'social',
   },
   {
     id: 'instagram',
@@ -72,6 +164,7 @@ export const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
     authMethods: ['oauth_pkce'],
     adapterReady: true,
     connectKind: 'oauth',
+    domainGroup: 'social',
   },
   {
     id: 'facebook',
@@ -79,6 +172,7 @@ export const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
     authMethods: ['oauth_pkce'],
     adapterReady: true,
     connectKind: 'oauth',
+    domainGroup: 'social',
   },
   {
     id: 'telegram',
@@ -86,6 +180,7 @@ export const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
     authMethods: ['bot_token'],
     adapterReady: true,
     connectKind: 'bot_token',
+    domainGroup: 'social',
   },
   {
     id: 'unipile',
@@ -93,5 +188,18 @@ export const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
     authMethods: ['aggregator_session', 'api_key'],
     adapterReady: true,
     connectKind: 'aggregator',
+    domainGroup: 'social',
+  },
+  {
+    id: 'finapi',
+    label: 'finAPI (Bank)',
+    authMethods: ['api_key'],
+    adapterReady: true,
+    connectKind: 'password',
+    domainGroup: 'finance',
   },
 ]
+
+export function providersByDomainGroup(group: ProviderDomainGroup): ProviderCatalogEntry[] {
+  return PROVIDER_CATALOG.filter((p) => p.domainGroup === group)
+}

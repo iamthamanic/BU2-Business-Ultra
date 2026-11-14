@@ -19,6 +19,8 @@ export type RailItem = {
   icon: Icon
   /** Legacy data-ic brand color key */
   dataIc?: string
+  /** Extra path prefixes that keep this item active (e.g. /customer + /partner). */
+  matchTo?: string[]
 }
 
 export type RailGroup = {
@@ -111,6 +113,8 @@ function RailLink({
   onNavigate?: () => void
 }) {
   const Glyph = item.icon
+  const location = useLocation()
+  const aliasActive = (item.matchTo || []).some((to) => pathMatches(location.pathname, to, item.end))
   return (
     <NavLink
       to={item.to}
@@ -118,7 +122,7 @@ function RailLink({
       title={item.label}
       aria-label={item.label}
       data-ic={item.dataIc || item.key}
-      className={({ isActive }) => `sb-item${isActive ? ' active' : ''}`}
+      className={({ isActive }) => `sb-item${isActive || aliasActive ? ' active' : ''}`}
       onClick={onNavigate}
     >
       <span className="sb-ic" aria-hidden>

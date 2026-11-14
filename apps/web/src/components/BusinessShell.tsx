@@ -26,11 +26,11 @@ import { AppShell } from './AppShell'
 import type { RailGroup, RailItem } from './IconRail'
 
 export type MembershipPayload = {
-  role: 'owner' | 'admin' | 'editor' | 'viewer'
-  grantSeoOpen: boolean
-  grantToolsUse: boolean
-  grantToolsManage: boolean
+  isOwner: boolean
+  permissions: string[]
   tabs: string[] | null
+  status?: string
+  membershipStatus?: string
 }
 
 /** Outlet context for company pages (MarketingShell reads membership). */
@@ -109,9 +109,10 @@ export function BusinessShell({
       items.push({
         key: 'customer',
         to: routes.customer,
-        label: t('customer'),
+        label: t('contacts'),
         icon: UsersThree,
-        dataIc: 'customer',
+        dataIc: 'contacts',
+        matchTo: [routes.customer, routes.partner],
       })
     }
     if (canSeeNavTab(tabs, 'projects')) {
@@ -134,11 +135,10 @@ export function BusinessShell({
     }
     const toolsGranted =
       !membership ||
-      canUseTools(
-        membership.role,
-        membership.grantToolsUse ?? false,
-        membership.grantToolsManage ?? false,
-      )
+      canUseTools({
+        isOwner: membership.isOwner,
+        permissions: membership.permissions ?? [],
+      })
     if (toolsGranted && (canSeeNavTab(tabs, 'tools') || canSeeNavTab(tabs, 'sortanize'))) {
       items.push({
         key: 'tools',
@@ -154,12 +154,16 @@ export function BusinessShell({
   const groups: RailGroup[] = useMemo(() => [], [])
 
   const settingsItem: RailItem | null =
-    routes && canSeeNavTab(tabs, 'settings') && (membership?.role === 'owner' || membership?.role === 'admin' || user.isSuperadmin)
+    routes &&
+    canSeeNavTab(tabs, 'settings') &&
+    (membership?.isOwner ||
+      (membership?.permissions ?? []).includes('settings.manage') ||
+      user.isBreakglassOperator)
       ? { key: 'settings', to: routes.settings, label: t('settings'), icon: GearSix, dataIc: 'settings' }
       : null
 
-  const canCreateCompany =
-    user.isSuperadmin || membership?.role === 'owner' || membership?.role === 'admin'
+  // Create gated by platform grant `companies.create` (API enforces; UI mirrors /me).
+  const canCreateCompany = Boolean(user.platformCapabilities?.['companies.create'])
 
   return (
     <AppShell

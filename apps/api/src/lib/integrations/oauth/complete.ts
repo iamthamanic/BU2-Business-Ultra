@@ -54,29 +54,72 @@ function capabilitiesFor(
       { operation: 'sync', messageFormats: [], window: NONE_WINDOW },
     ])
   }
-  if (provider === 'google_ads') {
+  if (
+    provider === 'google_ads' ||
+    provider === 'chatgpt_ads' ||
+    provider === 'reddit_ads' ||
+    provider === 'microsoft_ads'
+  ) {
     return buildCapabilities(accountType, scopes, [
       { operation: 'insights', messageFormats: [], window: NONE_WINDOW },
       {
         operation: 'publish',
         messageFormats: [],
         window: NONE_WINDOW,
-        reason: 'mutate_when_ui_ready',
+        reason: 'ads_mutate_when_ui_ready',
       },
       { operation: 'sync', messageFormats: [], window: NONE_WINDOW },
     ])
   }
   const key = oauthRedirectKey(provider)
   if (key === 'meta') {
+    if (provider === 'meta_ads') {
+      return buildCapabilities(accountType, scopes, [
+        { operation: 'sync', messageFormats: [], window: NONE_WINDOW },
+        {
+          operation: 'publish',
+          messageFormats: [],
+          window: NONE_WINDOW,
+          reason: 'ads_mutate_when_ui_ready',
+        },
+      ])
+    }
     return buildCapabilities(accountType, scopes, [
-      { operation: 'read_dm', messageFormats: ['text'], window: CARE_WINDOW },
-      { operation: 'send_dm', messageFormats: ['text'], window: CARE_WINDOW },
+      {
+        operation: 'read_dm',
+        messageFormats: ['text', 'image', 'file', 'audio'],
+        window: CARE_WINDOW,
+      },
+      {
+        operation: 'send_dm',
+        messageFormats: ['text', 'image', 'file', 'audio', 'voice'],
+        window: CARE_WINDOW,
+      },
+      { operation: 'sync', messageFormats: [], window: NONE_WINDOW },
+    ])
+  }
+  if (
+    key === 'linkedin' ||
+    key === 'tiktok' ||
+    key === 'x' ||
+    key === 'pinterest' ||
+    provider === 'tiktok_ads' ||
+    provider === 'pinterest_ads'
+  ) {
+    return buildCapabilities(accountType, scopes, [
+      { operation: 'insights', messageFormats: [], window: NONE_WINDOW },
+      {
+        operation: 'publish',
+        messageFormats: ['text', 'image', 'video'],
+        window: NONE_WINDOW,
+        reason: 'publish_when_channel_ui_ready',
+      },
       { operation: 'sync', messageFormats: [], window: NONE_WINDOW },
     ])
   }
   return buildCapabilities(accountType, scopes, [
-    { operation: 'read_mail', messageFormats: ['text', 'html'], window: NONE_WINDOW },
-    { operation: 'send_mail', messageFormats: ['text', 'html'], window: NONE_WINDOW },
+    { operation: 'read_mail', messageFormats: ['text', 'html', 'file'], window: NONE_WINDOW },
+    { operation: 'send_mail', messageFormats: ['text', 'html', 'file'], window: NONE_WINDOW },
     { operation: 'sync', messageFormats: [], window: NONE_WINDOW },
   ])
 }
@@ -85,6 +128,9 @@ function shouldBindInbox(provider: IntegrationProvider): boolean {
   return (
     provider === 'google' ||
     provider === 'microsoft' ||
+    provider === 'imap' ||
+    provider === 'telegram' ||
+    provider === 'unipile' ||
     provider === 'whatsapp' ||
     provider === 'instagram' ||
     provider === 'facebook' ||
@@ -123,15 +169,20 @@ export function tokensToConnectResult(
   }
 }
 
+type TxOrDb = Pick<typeof db, 'delete' | 'insert' | 'update'>
+
 async function replaceCredentials(
+  executor: TxOrDb,
   connectionId: string,
   result: AdapterConnectResult,
   expiresAt: Date | null,
 ): Promise<void> {
-  await db.delete(connectionCredentials).where(eq(connectionCredentials.connectionId, connectionId))
+  await executor
+    .delete(connectionCredentials)
+    .where(eq(connectionCredentials.connectionId, connectionId))
   for (const cred of result.credentials) {
     const sealed = sealSecret(cred.plaintext)
-    await db.insert(connectionCredentials).values({
+    await executor.insert(connectionCredentials).values({
       connectionId,
       kind: cred.kind,
       ciphertext: sealed.ciphertext,
@@ -167,24 +218,29 @@ export async function persistOAuthConnection(opts: {
     )
     .limit(1)
 
-  if (existing[0]) {
-    const updated = await db
-      .update(connections)
-      .set({
-        displayName: result.displayName,
-        status: 'active',
-        accountType: result.accountType,
-        authMethod: result.authMethod,
-        health: result.health,
-        capabilitiesCache: result.capabilities,
-        updatedAt: new Date(),
-      })
-      .where(eq(connections.id, existing[0].id))
-      .returning()
+  const prior = existing[0]
+  if (prior) {
+    // Keep connection metadata + credential swap in one transaction.
+    const row = await db.transaction(async (tx) => {
+      const updated = await tx
+        .update(connections)
+        .set({
+          displayName: result.displayName,
+          status: 'active',
+          accountType: result.accountType,
+          authMethod: result.authMethod,
+          health: result.health,
+          capabilitiesCache: result.capabilities,
+          updatedAt: new Date(),
+        })
+        .where(eq(connections.id, prior.id))
+        .returning()
 
-    const row = updated[0]
-    if (!row) throw new Error('update_failed')
-    await replaceCredentials(row.id, result, opts.tokens.expiresAt)
+      const next = updated[0]
+      if (!next) throw new Error('update_failed')
+      await replaceCredentials(tx, next.id, result, opts.tokens.expiresAt)
+      return next
+    })
 
     return {
       id: row.id,

@@ -1,34 +1,11 @@
 /**
- * connProviderIcons — Phosphor brand glyphs for messaging connect cards.
+ * connProviderIcons — brand marks for connection cards / panels.
  * Location: apps/web/src/features/settings/connProviderIcons.tsx
  */
-import type { Icon } from '@phosphor-icons/react'
-import {
-  EnvelopeSimple,
-  FacebookLogo,
-  GoogleLogo,
-  InstagramLogo,
-  Megaphone,
-  TelegramLogo,
-  WhatsappLogo,
-  WindowsLogo,
-  YoutubeLogo,
-} from '@phosphor-icons/react'
+import { ConnBrandLogo } from './connBrandLogos'
 
-const ICONS: Record<string, Icon> = {
-  google: GoogleLogo,
-  youtube: YoutubeLogo,
-  google_ads: Megaphone,
-  microsoft: WindowsLogo,
-  imap: EnvelopeSimple,
-  whatsapp: WhatsappLogo,
-  instagram: InstagramLogo,
-  facebook: FacebookLogo,
-  telegram: TelegramLogo,
-  unipile: TelegramLogo,
-}
-
+/** Colored brand tile (Google, Meta, Telegram, …). size maps to brand tile. */
 export function ConnProviderIcon({ id, size = 22 }: { id: string; size?: number }) {
-  const Icon = ICONS[id] || EnvelopeSimple
-  return <Icon className="conn-provider-icon" size={size} weight="duotone" aria-hidden />
+  const tier = size <= 18 ? 'sm' : size >= 28 ? 'lg' : 'md'
+  return <ConnBrandLogo id={id} size={tier} />
 }

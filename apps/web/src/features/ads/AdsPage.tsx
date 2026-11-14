@@ -116,8 +116,13 @@ export function AdsPage() {
         api<{ campaigns: any[] }>(`/api/b/${slug}/ads`),
         api<{ ready: boolean }>(`/api/b/${slug}/integrations/${provider}/ready`),
       ])
-      setCampaigns(c.campaigns.filter((x) => x.provider === provider))
-      setReady(r.ready)
+      const forProvider = c.campaigns.filter((x) => x.provider === provider)
+      const hasDemoMetrics = forProvider.some((x) => {
+        const payload = x.payload as { demo?: boolean; metrics?: Record<string, unknown> } | null
+        return Boolean(payload?.demo && payload.metrics)
+      })
+      setCampaigns(forProvider)
+      setReady(r.ready || hasDemoMetrics)
       setConnectNeed('key')
     } finally {
       setLoading(false)
@@ -162,22 +167,25 @@ export function AdsPage() {
 
   const rows: PaidCampaignRow[] = useMemo(
     () =>
-      campaigns.map((c) => ({
-        id: String(c.id),
-        name: String(c.name || '—'),
-        notesCount: 0,
-        adsConv: null,
-        spendCents: typeof c.budgetDailyCents === 'number' ? null : null,
-        impressions: null,
-        clicks: null,
-        ctr: null,
-        cpcCents: null,
-        cvr: null,
-        cpaCents: null,
-        roas: null,
-        revenueCents: null,
-        status: c.status ? String(c.status) : undefined,
-      })),
+      campaigns.map((c) => {
+        const metrics = readCampaignMetrics(c.payload)
+        return {
+          id: String(c.id),
+          name: String(c.name || '—'),
+          notesCount: 0,
+          adsConv: metrics.adsConv,
+          spendCents: metrics.spendCents,
+          impressions: metrics.impressions,
+          clicks: metrics.clicks,
+          ctr: metrics.ctr,
+          cpcCents: metrics.cpcCents,
+          cvr: metrics.cvr,
+          cpaCents: metrics.cpaCents,
+          roas: metrics.roas,
+          revenueCents: metrics.revenueCents,
+          status: c.status ? String(c.status) : undefined,
+        }
+      }),
     [campaigns],
   )
 
@@ -255,4 +263,54 @@ function providerLabel(
   if (p === 'chatgpt_ads') return t('chatgptAds')
   if (p === 'linkedin_ads') return t('linkedinAds')
   return t('microsoftAds')
+}
+
+type CampaignMetrics = {
+  adsConv: number | null
+  spendCents: number | null
+  impressions: number | null
+  clicks: number | null
+  ctr: number | null
+  cpcCents: number | null
+  cvr: number | null
+  cpaCents: number | null
+  roas: number | null
+  revenueCents: number | null
+}
+
+function readCampaignMetrics(payload: unknown): CampaignMetrics {
+  const empty: CampaignMetrics = {
+    adsConv: null,
+    spendCents: null,
+    impressions: null,
+    clicks: null,
+    ctr: null,
+    cpcCents: null,
+    cvr: null,
+    cpaCents: null,
+    roas: null,
+    revenueCents: null,
+  }
+  if (!payload || typeof payload !== 'object') return empty
+  const metrics = (payload as { metrics?: Record<string, unknown> }).metrics
+  if (!metrics || typeof metrics !== 'object') return empty
+  const num = (k: string): number | null => {
+    const v = metrics[k]
+    return typeof v === 'number' && Number.isFinite(v) ? v : null
+  }
+  const ctr = num('ctr')
+  const cvr = num('cvr')
+  // Payload stores ratios (0–1); table fmtPct expects percent points.
+  return {
+    adsConv: num('adsConv'),
+    spendCents: num('spendCents'),
+    impressions: num('impressions'),
+    clicks: num('clicks'),
+    ctr: ctr != null ? (ctr <= 1 ? ctr * 100 : ctr) : null,
+    cpcCents: num('cpcCents'),
+    cvr: cvr != null ? (cvr <= 1 ? cvr * 100 : cvr) : null,
+    cpaCents: num('cpaCents'),
+    roas: num('roas'),
+    revenueCents: num('revenueCents'),
+  }
 }

@@ -6,12 +6,14 @@ import type { FastifyInstance } from 'fastify'
 import {
   ConnectTelegramSchema,
   FinalizeUnipileTelegramSchema,
+  InboxConversationPatchSchema,
   InboxReplySchema,
   LinkUnipileTelegramSchema,
   canManageCredentials,
   canMutateContent,
 } from '@bu2/shared'
 import {
+  assignConversation,
   connectTelegramBot,
   getConversationForBusiness,
   getIdentityContext,
@@ -31,6 +33,7 @@ import {
 } from '../../lib/integrations/unipile/inboxSync.js'
 import { ensureUnipileAdapterRegistered } from '../../lib/integrations/unipile/adapter.js'
 import { syncGmailConnection } from '../../lib/integrations/gmail/inboxSync.js'
+import { syncAllInboxConnections } from '../../lib/integrations/inbox/syncAll.js'
 import { httpError } from '../../lib/httpError.js'
 import { loadMembership, requireUser } from '../../plugins/auth.js'
 
@@ -51,7 +54,7 @@ export async function inboxRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || (!canManageCredentials(m.role) && !user.isSuperadmin)) {
+    if (!m || !canManageCredentials(m)) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     const body = ConnectTelegramSchema.safeParse(req.body)
@@ -76,7 +79,7 @@ export async function inboxRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || (!canMutateContent(m.role) && !user.isSuperadmin)) {
+    if (!m || !canMutateContent(m)) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     try {
@@ -92,7 +95,7 @@ export async function inboxRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || (!canMutateContent(m.role) && !user.isSuperadmin)) {
+    if (!m || !canMutateContent(m)) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     try {
@@ -104,11 +107,32 @@ export async function inboxRoutes(app: FastifyInstance) {
     }
   })
 
+  /** Sync every inbox-bound mail / messenger / Unipile account. */
+  app.post('/api/b/:slug/inbox/sync', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug } = req.params as { slug: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m || !canMutateContent(m)) {
+      return reply.code(403).send({ error: 'forbidden' })
+    }
+    try {
+      const summary = await syncAllInboxConnections(m.businessId)
+      const firstFail = summary.results.find((r) => !r.ok)
+      if (summary.failed > 0 && summary.synced === 0 && firstFail?.error) {
+        return reply.code(502).send({ error: firstFail.error, ...summary })
+      }
+      return summary
+    } catch (e) {
+      const { status, error } = httpError(e)
+      return reply.code(status).send({ error })
+    }
+  })
+
   app.get('/api/b/:slug/inbox/unipile/status', async (req, reply) => {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m && !user.isSuperadmin) return reply.code(403).send({ error: 'forbidden' })
+    if (!m) return reply.code(403).send({ error: 'forbidden' })
     return { configured: isUnipileConfigured() }
   })
 
@@ -116,7 +140,7 @@ export async function inboxRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || (!canManageCredentials(m.role) && !user.isSuperadmin)) {
+    if (!m || !canManageCredentials(m)) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     try {
@@ -135,7 +159,7 @@ export async function inboxRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || (!canManageCredentials(m.role) && !user.isSuperadmin)) {
+    if (!m || !canManageCredentials(m)) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     const body = FinalizeUnipileTelegramSchema.safeParse(req.body)
@@ -160,7 +184,7 @@ export async function inboxRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || (!canManageCredentials(m.role) && !user.isSuperadmin)) {
+    if (!m || !canManageCredentials(m)) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     const body = LinkUnipileTelegramSchema.safeParse(req.body)
@@ -185,7 +209,7 @@ export async function inboxRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || (!canMutateContent(m.role) && !user.isSuperadmin)) {
+    if (!m || !canMutateContent(m)) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     try {
@@ -217,11 +241,41 @@ export async function inboxRoutes(app: FastifyInstance) {
     return { ...data, identity }
   })
 
+  app.patch('/api/b/:slug/inbox/conversations/:id', async (req, reply) => {
+    const user = await requireUser(req)
+    const { slug, id } = req.params as { slug: string; id: string }
+    const m = await loadMembership(user.id, slug)
+    if (!m || !canMutateContent(m)) {
+      return reply.code(403).send({ error: 'forbidden' })
+    }
+    const body = InboxConversationPatchSchema.safeParse(req.body)
+    if (!body.success) {
+      return reply.code(400).send({ error: 'invalid_body', issues: body.error.issues })
+    }
+    try {
+      const conversation = await assignConversation({
+        businessId: m.businessId,
+        conversationId: id,
+        assigneeUserId: body.data.assigneeUserId,
+      })
+      return {
+        conversation: {
+          id: conversation.id,
+          assigneeUserId: conversation.assigneeUserId,
+          unreadCount: conversation.unreadCount,
+        },
+      }
+    } catch (e) {
+      const { status, error } = httpError(e)
+      return reply.code(status).send({ error })
+    }
+  })
+
   app.post('/api/b/:slug/inbox/conversations/:id/reply', async (req, reply) => {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || (!canMutateContent(m.role) && !user.isSuperadmin)) {
+    if (!m || !canMutateContent(m)) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     const body = InboxReplySchema.safeParse(req.body)
@@ -234,8 +288,9 @@ export async function inboxRoutes(app: FastifyInstance) {
       const message = await replyInConversation({
         businessId: m.businessId,
         conversationId: id,
-        body: body.data.body,
+        body: body.data.body || '',
         userId: user.id,
+        attachment: body.data.attachment,
       })
       return {
         message: {
@@ -246,6 +301,9 @@ export async function inboxRoutes(app: FastifyInstance) {
           errorDetail: message.errorDetail,
           sentAt: message.sentAt,
           createdAt: message.createdAt,
+          actorName: user.displayName || user.email || null,
+          actorAddress: null,
+          viaAccount: null,
         },
       }
     } catch (e) {

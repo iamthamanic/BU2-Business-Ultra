@@ -63,8 +63,15 @@ export function companyRoutes(slug: string) {
     catalog: `${base}/product`,
     marketing: `${base}/marketing`,
     product: `${base}/product`,
+    /** Kunden list (default contacts landing). */
     customer: `${base}/customer`,
     customerDetail: (id: string) => `${base}/customer/${encodeURIComponent(id)}`,
+    /** Partner list. */
+    partner: `${base}/partner`,
+    partnerDetail: (id: string) => `${base}/partner/${encodeURIComponent(id)}`,
+    /** @deprecated Prefer `customer` — redirects in App. */
+    contacts: `${base}/customer`,
+    contactDetail: (id: string) => `${base}/customer/${encodeURIComponent(id)}`,
     /** Omnichannel messaging inbox */
     inbox: `${base}/inbox`,
     projects: `${base}/projects`,
@@ -72,7 +79,7 @@ export function companyRoutes(slug: string) {
     projectsMine: `${base}/projects/mine`,
     projectsRecurring: `${base}/projects/recurring`,
     projectDetail: (id: string) => `${base}/projects/${encodeURIComponent(id)}`,
-    /** Finance department (placeholder) */
+    /** Finance department (demo UI; bank connectors later) */
     finance: `${base}/finance`,
     marketingPersonas: `${base}/marketing/personas`,
     marketingStyleguide: `${base}/marketing/styleguide`,
@@ -96,6 +103,8 @@ export function companyRoutes(slug: string) {
     geo: `${base}/marketing/funnel/organic/website?surface=geo`,
     settings: `${base}/settings`,
     settingsConnections: `${base}/settings#connections`,
+    /** Deep-link to Bank · finAPI panel under Verbindungen */
+    settingsFinanceConnections: `${base}/settings#finance-connections`,
     settingsLabels: `${base}/settings#labels`,
     /** @deprecated use settingsLabels */
     settingsTags: `${base}/settings#labels`,
@@ -207,6 +216,8 @@ export function mapOldBu2FrontendPath(slug: string, rest: string): string {
     marketing: routes.hub,
     product: routes.product,
     customer: routes.customer,
+    partner: routes.partner,
+    contacts: routes.customer,
     projects: routes.projects,
     inbox: routes.inbox,
     'projects/mine': routes.inbox,

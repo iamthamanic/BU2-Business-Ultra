@@ -1,15 +1,50 @@
 /**
- * SettingsConnectionsTab — Metricool brands, Brevo, OpenSEO, Direct Ads keys.
+ * SettingsConnectionsTab — Verbindungen as 6 surface tabs (Social, Ads, Email, Finance, Aggregators, Tools).
  * Location: apps/web/src/features/settings/SettingsConnectionsTab.tsx
  */
 import { useEffect, useState } from 'react'
+import {
+  Bank,
+  CirclesThreePlus,
+  EnvelopeSimple,
+  Megaphone,
+  ShareNetwork,
+  Wrench,
+} from '@phosphor-icons/react'
+import type { Icon } from '@phosphor-icons/react'
 import { Link } from 'react-router-dom'
+import { MktTab, MktTabs } from '../../components/MktTabs'
 import { api } from '../../lib/api'
 import { companyRoutes } from '../../lib/companyPaths'
 import { useI18n } from '../../lib/i18n'
+import {
+  CONN_SURFACES,
+  type ConnSurfaceId,
+  hashForSurface,
+  SURFACE_PROVIDERS,
+  SURFACE_SOON,
+  surfaceFromHash,
+} from './connectionSurfaces'
+import { ConnProviderIcon } from './connProviderIcons'
+import { FinanceBankPanel } from './FinanceBankPanel'
 import { MessagingConnectionsPanel } from './MessagingConnectionsPanel'
+const SURFACE_ICONS: Record<ConnSurfaceId, Icon> = {
+  social: ShareNetwork,
+  ads: Megaphone,
+  email: EnvelopeSimple,
+  finance: Bank,
+  aggregators: CirclesThreePlus,
+  tools: Wrench,
+}
 
-const DIRECT_PROVIDERS = ['google_ads', 'meta_ads', 'tiktok_ads', 'chatgpt_ads'] as const
+const SURFACE_DATA_IC: Record<ConnSurfaceId, string> = {
+  social: 'organic',
+  ads: 'paid',
+  email: 'email',
+  finance: 'offline',
+  aggregators: 'catalog',
+  tools: 'seo',
+}
 
 type SecretRow = { provider: string; valid: boolean; keyHint?: string | null }
 
@@ -31,13 +66,13 @@ type Props = {
 export function SettingsConnectionsTab({ slug, secrets, canManage, onSecretsChanged }: Props) {
   const { t } = useI18n()
   const routes = companyRoutes(slug)
+  const [surface, setSurface] = useState<ConnSurfaceId>(() => surfaceFromHash(window.location.hash) ?? 'social')
   const [mc, setMc] = useState<MetricoolPayload | null>(null)
   const [brandId, setBrandId] = useState('')
   const [brandLabel, setBrandLabel] = useState('')
   const [keys, setKeys] = useState<Record<string, string>>({})
   const [msg, setMsg] = useState('')
   const [seoStatus, setSeoStatus] = useState('…')
-  const [showDirect, setShowDirect] = useState(false)
 
   async function loadMetricool() {
     try {
@@ -55,6 +90,24 @@ export function SettingsConnectionsTab({ slug, secrets, canManage, onSecretsChan
       .then((r) => setSeoStatus(r.instance?.status ?? 'not_provisioned'))
       .catch(() => setSeoStatus('—'))
   }, [slug])
+
+  useEffect(() => {
+    const apply = () => {
+      const next = surfaceFromHash(window.location.hash)
+      if (next) setSurface(next)
+    }
+    apply()
+    window.addEventListener('hashchange', apply)
+    return () => window.removeEventListener('hashchange', apply)
+  }, [])
+
+  function selectSurface(next: ConnSurfaceId) {
+    setSurface(next)
+    const hash = hashForSurface(next)
+    if (window.location.hash !== hash) {
+      window.history.replaceState({}, '', `${window.location.pathname}${window.location.search}${hash}`)
+    }
+  }
 
   function secretFor(p: string) {
     return secrets.find((s) => s.provider === p)
@@ -122,212 +175,268 @@ export function SettingsConnectionsTab({ slug, secrets, canManage, onSecretsChan
   const brevoSecret = secretFor('brevo')
   const seoOk = seoStatus !== 'not_provisioned' && seoStatus !== '—'
 
+  const coreSocial = SURFACE_PROVIDERS.social
+  const coreEmail = SURFACE_PROVIDERS.email
+  const coreAds = SURFACE_PROVIDERS.ads
+  const coreAgg = ['unipile']
+
   return (
     <div className="stack" id="connections">
-      <MessagingConnectionsPanel slug={slug} canManage={canManage} />
-
-      <h3 className="conn-legacy-heading">{t('connLegacyHeading')}</h3>
-
-      {/* Metricool */}
-      <section className="panel stack">
-        <div className="co-card-head">
-          <div>
-            <h3 className="co-card-title">Metricool</h3>
-            <p className="muted co-card-hint">{t('metricoolHint')}</p>
-          </div>
-          <span className={`badge ${mc?.linked.length || metricoolSecret?.valid ? 'ok' : 'warn'}`}>
-            {mc?.linked.length || metricoolSecret?.valid ? t('statusConnected') : t('statusOpen')}
-          </span>
-        </div>
-
-        <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
-          <input
-            className="input"
-            style={{ flex: 1, minWidth: 180 }}
-            type="password"
-            autoComplete="off"
-            placeholder={
-              metricoolSecret?.keyHint
-                ? `${t('apiKey')} · ${metricoolSecret.keyHint}`
-                : t('apiKey')
-            }
-            value={keys.metricool ?? ''}
-            onChange={(e) => setKeys({ ...keys, metricool: e.target.value })}
+      <MktTabs level="l2" label={t('connSurfacesLabel')} className="conn-surface-tabs">
+        {CONN_SURFACES.map((id) => (
+          <MktTab
+            key={id}
+            active={surface === id}
+            label={surfaceLabel(id, t)}
+            icon={SURFACE_ICONS[id]}
+            dataIc={SURFACE_DATA_IC[id]}
+            onClick={() => selectSurface(id)}
           />
-          <button className="btn primary" type="button" onClick={() => saveKey('metricool')}>
-            {t('save')}
-          </button>
-          {metricoolSecret ? (
-            <button className="btn" type="button" onClick={() => clearKey('metricool')}>
-              {t('removeKey')}
-            </button>
+        ))}
+      </MktTabs>
+
+      {surface === 'social' ? (
+        <MessagingConnectionsPanel
+          slug={slug}
+          canManage={canManage}
+          providerIds={coreSocial}
+          soonProviders={SURFACE_SOON.social}
+          title={t('connSurfaceSocialTitle')}
+          sectionId="connections-social"
+          hideHeaderConnect
+        />
+      ) : null}
+
+      {surface === 'ads' ? (
+        <MessagingConnectionsPanel
+          slug={slug}
+          canManage={canManage}
+          providerIds={coreAds}
+          soonProviders={SURFACE_SOON.ads}
+          title={t('connSurfaceAdsTitle')}
+          sectionId="connections-ads"
+          hideHeaderConnect
+          secrets={secrets}
+          onSecretsChanged={onSecretsChanged}
+        />
+      ) : null}
+
+      {surface === 'email' ? (
+        <MessagingConnectionsPanel
+          slug={slug}
+          canManage={canManage}
+          providerIds={coreEmail}
+          accountProviderIds={[...coreEmail.filter((id) => id !== 'brevo'), 'unipile']}
+          soonProviders={SURFACE_SOON.email}
+          title={t('connSurfaceEmailTitle')}
+          sectionId="connections-email"
+          hideHeaderConnect
+          secrets={secrets}
+          onSecretsChanged={onSecretsChanged}
+        />
+      ) : null}
+
+      {surface === 'finance' ? (
+        <div className="stack" id="finance-connections-wrap">
+          <FinanceBankPanel slug={slug} canManage={canManage} />
+          {SURFACE_SOON.finance.length ? (
+            <section className="panel stack">
+              <h3 className="co-card-title">{t('connSoonFinanceTitle')}</h3>
+              <p className="muted co-card-hint">{t('connSoonFinanceHint')}</p>
+              <ul className="conn-provider-list conn-provider-grid">
+                {SURFACE_SOON.finance.map((s) => (
+                  <li key={s.id}>
+                    <div className="conn-provider-card conn-provider-card--premium is-disabled" data-ic={s.id}>
+                      <ConnProviderIcon id={s.id} size={28} />
+                      <span className="conn-provider-copy">
+                        <span className="conn-provider-name">{s.label}</span>
+                        <span className="muted" style={{ fontSize: 12 }}>
+                          {t('connProviderSoon')}
+                        </span>
+                      </span>
+                      <button type="button" className="btn conn-provider-cta" disabled>
+                        {t('connectBannerCta')}
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ) : null}
         </div>
+      ) : null}
 
-        {mc?.linked.length ? (
-          <div className="co-brand-chips">
-            {mc.linked.map((b) => (
-              <div key={b.id} className="co-brand-chip">
-                <span className="co-brand-chip-name">{b.label || b.blogId}</span>
-                <span className="kpi muted">{b.blogId}</span>
-                <button className="btn" type="button" onClick={() => unlinkBrand(b.id)}>
-                  {t('unlink')}
-                </button>
+      {surface === 'aggregators' ? (
+        <div className="stack">
+          <section className="panel stack">
+            <div className="co-card-head">
+              <div className="co-card-title-row">
+                <ConnProviderIcon id="metricool" size={28} />
+                <div>
+                  <h3 className="co-card-title">Metricool</h3>
+                  <p className="muted co-card-hint">{t('metricoolHint')}</p>
+                </div>
               </div>
-            ))}
-          </div>
-        ) : (
-          <p className="muted" style={{ margin: 0 }}>
-            {t('noBrandsLinked')}
-          </p>
-        )}
+              <span className={`badge ${mc?.linked.length || metricoolSecret?.valid ? 'ok' : 'warn'}`}>
+                {mc?.linked.length || metricoolSecret?.valid ? t('statusConnected') : t('statusOpen')}
+              </span>
+            </div>
 
-        <div className="co-connect-box stack">
-          <div className="co-connect-label">{t('linkBrand')}</div>
-          <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
-            <select
-              className="input"
-              style={{ flex: 1, minWidth: 160 }}
-              value={brandId}
-              onChange={(e) => setBrandId(e.target.value)}
-              aria-label="Metricool Brand"
-              disabled={!mc?.keyReady}
-            >
-              <option value="">
-                {mc?.brandsError === 'metricool_key_required'
-                  ? t('keyRequired')
-                  : mc?.brandsError
-                    ? t('brandsLoadError')
-                    : t('pickBrand')}
-              </option>
-              {(mc?.available ?? []).map((b) => (
-                <option key={b.blogId} value={b.blogId}>
-                  {b.label}
-                </option>
-              ))}
-            </select>
-            <input
-              className="input"
-              style={{ maxWidth: 160 }}
-              placeholder={t('labelOptional')}
-              value={brandLabel}
-              onChange={(e) => setBrandLabel(e.target.value)}
-            />
-            <button className="btn primary" type="button" onClick={linkBrand} disabled={!mc?.keyReady}>
-              {t('link')}
-            </button>
-          </div>
-        </div>
-      </section>
+            {canManage ? (
+              <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
+                <input
+                  className="input"
+                  style={{ flex: 1, minWidth: 180 }}
+                  type="password"
+                  autoComplete="off"
+                  placeholder={
+                    metricoolSecret?.keyHint
+                      ? `${t('apiKey')} · ${metricoolSecret.keyHint}`
+                      : t('apiKey')
+                  }
+                  value={keys.metricool ?? ''}
+                  onChange={(e) => setKeys({ ...keys, metricool: e.target.value })}
+                />
+                <button className="btn primary" type="button" onClick={() => saveKey('metricool')}>
+                  {t('save')}
+                </button>
+                {metricoolSecret ? (
+                  <button className="btn" type="button" onClick={() => clearKey('metricool')}>
+                    {t('removeKey')}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
 
-      {/* Brevo */}
-      <section className="panel stack">
-        <div className="co-card-head">
-          <div>
-            <h3 className="co-card-title">{t('emailMarketing')} · Brevo</h3>
-            <p className="muted co-card-hint">{t('brevoHint')}</p>
-          </div>
-          <span className={`badge ${brevoSecret?.valid ? 'ok' : 'warn'}`}>
-            {brevoSecret?.valid ? t('statusConnected') : t('statusOpen')}
-          </span>
-        </div>
-        <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
-          <input
-            className="input"
-            style={{ flex: 1, minWidth: 180 }}
-            type="password"
-            autoComplete="off"
-            placeholder={
-              brevoSecret?.keyHint ? `${t('apiKey')} · ${brevoSecret.keyHint}` : 'xkeysib-…'
-            }
-            value={keys.brevo ?? ''}
-            onChange={(e) => setKeys({ ...keys, brevo: e.target.value })}
-          />
-          <button className="btn primary" type="button" onClick={() => saveKey('brevo')}>
-            {t('save')}
-          </button>
-          {brevoSecret ? (
-            <button className="btn" type="button" onClick={() => clearKey('brevo')}>
-              {t('removeKey')}
-            </button>
-          ) : null}
-        </div>
-      </section>
-
-      {/* OpenSEO */}
-      <section className="panel stack">
-        <div className="co-card-head">
-          <div>
-            <h3 className="co-card-title">OpenSEO</h3>
-            <p className="muted co-card-hint">{t('openseoHint')}</p>
-          </div>
-          <span className={`badge ${seoOk ? 'ok' : 'warn'}`}>
-            {seoOk ? t('statusConnected') : t('statusOpen')}
-          </span>
-        </div>
-        <p className="kpi muted" style={{ margin: 0 }}>
-          {t('status')}: {seoStatus}
-        </p>
-        <div className="row" style={{ gap: 8 }}>
-          <button className="btn primary" type="button" onClick={provisionSeo}>
-            {t('provisionSeo')}
-          </button>
-          <Link className="btn" to={routes.openseo}>
-            {t('launchOpenSeo')}
-          </Link>
-        </div>
-      </section>
-
-      {/* Direct Ads */}
-      <section className="panel stack">
-        <div className="co-card-head">
-          <div>
-            <h3 className="co-card-title">{t('directAdsKeys')}</h3>
-            <p className="muted co-card-hint">{t('directAdsHint')}</p>
-          </div>
-          <button className="btn" type="button" onClick={() => setShowDirect((v) => !v)}>
-            {showDirect ? t('hide') : t('show')}
-          </button>
-        </div>
-        {showDirect
-          ? DIRECT_PROVIDERS.map((p) => {
-              const st = secretFor(p)
-              return (
-                <div key={p} className="stack" style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
-                  <div className="row" style={{ justifyContent: 'space-between' }}>
-                    <strong>{providerLabel(p, t)}</strong>
-                    <span className={`badge ${st?.valid ? 'ok' : 'warn'}`}>
-                      {st?.valid ? `${t('statusValid')} ${st.keyHint ?? ''}` : t('statusMissing')}
-                    </span>
-                  </div>
-                  <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
-                    <input
-                      className="input"
-                      style={{ flex: 1, minWidth: 160 }}
-                      type="password"
-                      autoComplete="off"
-                      placeholder={t('apiKey')}
-                      value={keys[p] ?? ''}
-                      onChange={(e) => setKeys({ ...keys, [p]: e.target.value })}
-                    />
-                    <button className="btn primary" type="button" onClick={() => saveKey(p)}>
-                      {t('save')}
-                    </button>
-                    {st ? (
-                      <button className="btn" type="button" onClick={() => clearKey(p)}>
-                        {t('removeKey')}
+            {mc?.linked.length ? (
+              <div className="co-brand-chips">
+                {mc.linked.map((b) => (
+                  <div key={b.id} className="co-brand-chip">
+                    <span className="co-brand-chip-name">{b.label || b.blogId}</span>
+                    <span className="kpi muted">{b.blogId}</span>
+                    {canManage ? (
+                      <button className="btn" type="button" onClick={() => unlinkBrand(b.id)}>
+                        {t('unlink')}
                       </button>
                     ) : null}
                   </div>
+                ))}
+              </div>
+            ) : (
+              <p className="muted" style={{ margin: 0 }}>
+                {t('noBrandsLinked')}
+              </p>
+            )}
+
+            {canManage ? (
+              <div className="co-connect-box stack">
+                <div className="co-connect-label">{t('linkBrand')}</div>
+                <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
+                  <select
+                    className="input"
+                    style={{ flex: 1, minWidth: 160 }}
+                    value={brandId}
+                    onChange={(e) => setBrandId(e.target.value)}
+                    aria-label="Metricool Brand"
+                    disabled={!mc?.keyReady}
+                  >
+                    <option value="">
+                      {mc?.brandsError === 'metricool_key_required'
+                        ? t('keyRequired')
+                        : mc?.brandsError
+                          ? t('brandsLoadError')
+                          : t('pickBrand')}
+                    </option>
+                    {(mc?.available ?? []).map((b) => (
+                      <option key={b.blogId} value={b.blogId}>
+                        {b.label}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    className="input"
+                    style={{ maxWidth: 160 }}
+                    placeholder={t('labelOptional')}
+                    value={brandLabel}
+                    onChange={(e) => setBrandLabel(e.target.value)}
+                  />
+                  <button
+                    className="btn primary"
+                    type="button"
+                    onClick={linkBrand}
+                    disabled={!mc?.keyReady}
+                  >
+                    {t('link')}
+                  </button>
                 </div>
-              )
-            })
-          : null}
-      </section>
+              </div>
+            ) : null}
+          </section>
+
+          <MessagingConnectionsPanel
+            slug={slug}
+            canManage={canManage}
+            providerIds={coreAgg}
+            title={t('connSurfaceAggCoreTitle')}
+            sectionId="connections-aggregators-core"
+            hideHeaderConnect
+          />
+        </div>
+      ) : null}
+
+      {surface === 'tools' ? (
+        <section className="panel stack" id="connections-tools">
+          <div className="co-card-head">
+            <div className="co-card-title-row">
+              <ConnProviderIcon id="openseo" size={28} />
+              <div>
+                <h3 className="co-card-title">OpenSEO</h3>
+                <p className="muted co-card-hint">{t('openseoHint')}</p>
+              </div>
+            </div>
+            <span className={`badge ${seoOk ? 'ok' : 'warn'}`}>
+              {seoOk ? t('statusConnected') : t('statusOpen')}
+            </span>
+          </div>
+          <p className="kpi muted" style={{ margin: 0 }}>
+            {t('status')}: {seoStatus}
+          </p>
+          <div className="row" style={{ gap: 8 }}>
+            {canManage ? (
+              <button className="btn primary" type="button" onClick={provisionSeo}>
+                {t('provisionSeo')}
+              </button>
+            ) : null}
+            <Link className="btn" to={routes.openseo}>
+              {t('launchOpenSeo')}
+            </Link>
+          </div>
+        </section>
+      ) : null}
 
       {msg ? <p className="muted">{msg}</p> : null}
     </div>
   )
+}
+
+function surfaceLabel(
+  id: ConnSurfaceId,
+  t: (
+    k:
+      | 'connSurfaceSocial'
+      | 'connSurfaceAds'
+      | 'connSurfaceEmail'
+      | 'connSurfaceFinance'
+      | 'connSurfaceAggregators'
+      | 'connSurfaceTools',
+  ) => string,
+) {
+  if (id === 'social') return t('connSurfaceSocial')
+  if (id === 'ads') return t('connSurfaceAds')
+  if (id === 'email') return t('connSurfaceEmail')
+  if (id === 'finance') return t('connSurfaceFinance')
+  if (id === 'aggregators') return t('connSurfaceAggregators')
+  return t('connSurfaceTools')
 }
 
 function providerLabel(

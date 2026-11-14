@@ -1,15 +1,23 @@
 /**
- * MessagingConnectionsPanel — Omnichannel account table + bindings (Settings → Verbindungen).
- * Uses Integration Core APIs; Telegram connect via ConnectAccountModal.
+ * MessagingConnectionsPanel — provider catalog + connected accounts for one Verbindungen surface.
+ * Filters Integration Core providers/connections by providerIds; soon-cards are UI-only.
  * Location: apps/web/src/features/settings/MessagingConnectionsPanel.tsx
  */
-import { Fragment, useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { ArrowsClockwise, Plus } from '@phosphor-icons/react'
-import { MktTab, MktTabs } from '../../components/MktTabs'
 import { api } from '../../lib/api'
 import { useI18n } from '../../lib/i18n'
 import { ConnectAccountModal } from './ConnectAccountModal'
+import { ConnectApiKeyModal } from './ConnectApiKeyModal'
+import type { SoonProvider } from './connectionSurfaces'
+import {
+  ADS_PROVIDER_LABELS,
+  API_KEY_CONNECT_PROVIDERS,
+  CORE_CONNECT_PROVIDERS,
+} from './connectionSurfaces'
 import { ConnProviderIcon } from './connProviderIcons'
+
+export type SecretStatus = { provider: string; valid: boolean; keyHint?: string | null }
 
 type PublicConnection = {
   id: string
@@ -35,29 +43,60 @@ type ProviderRow = {
   adapterReady: boolean
   selectable?: boolean
   connectKind?: string
+  domainGroup?: string
   redirectUri?: string | null
   oauthConfigured?: boolean | null
   clientConfigured?: boolean
 }
 
-type SubTab = 'accounts' | 'providers' | 'log'
-
 type Props = {
   slug: string
   canManage: boolean
+  /** Provider ids for catalog Verbinden cards (Core connect). */
+  providerIds: string[]
+  /**
+   * Providers whose connections appear in the accounts table.
+   * Defaults to providerIds — widen to mirror accounts across tabs (e.g. Unipile on Email).
+   */
+  accountProviderIds?: string[]
+  soonProviders?: SoonProvider[]
+  title: string
+  sectionId?: string
+  /** Hide “Konto verbinden” header CTA (surface already has per-card CTAs). */
+  hideHeaderConnect?: boolean
+  /** settings_secrets status for API-key Verbinden rows. */
+  secrets?: SecretStatus[]
+  onSecretsChanged?: () => void
+  children?: ReactNode
 }
 
 const USAGE_MODULES = ['inbox', 'crm', 'marketing'] as const
 
-export function MessagingConnectionsPanel({ slug, canManage }: Props) {
+export function MessagingConnectionsPanel({
+  slug,
+  canManage,
+  providerIds,
+  accountProviderIds,
+  soonProviders = [],
+  title,
+  sectionId = 'messaging-connections',
+  hideHeaderConnect = false,
+  secrets = [],
+  onSecretsChanged,
+  children,
+}: Props) {
   const { t } = useI18n()
-  const [sub, setSub] = useState<SubTab>('accounts')
+  const idSet = new Set(providerIds)
+  const accountSet = new Set(accountProviderIds ?? providerIds)
   const [connections, setConnections] = useState<PublicConnection[]>([])
   const [bindings, setBindings] = useState<Binding[]>([])
   const [providers, setProviders] = useState<ProviderRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showConnect, setShowConnect] = useState(false)
+  const [connectProviderId, setConnectProviderId] = useState<string | null>(null)
+  const [apiKeyProvider, setApiKeyProvider] = useState<{ id: string; label: string } | null>(null)
+  const [query, setQuery] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [toggling, setToggling] = useState<string | null>(null)
   const [syncingId, setSyncingId] = useState<string | null>(null)
@@ -160,40 +199,189 @@ export function MessagingConnectionsPanel({ slug, canManage }: Props) {
     return providers.find((p) => p.id === id)?.label || id
   }
 
-  const messagingConnections = connections.filter((c) => c.provider !== 'mock')
+  function providerReady(p: ProviderRow): boolean {
+    if (p.selectable != null) return p.selectable
+    return Boolean(p.adapterReady || p.connectKind === 'oauth')
+  }
+
+  function providerStatus(p: ProviderRow): string {
+    if (p.connectKind === 'oauth') {
+      return p.oauthConfigured ? t('connProviderReady') : t('connOauthNeedsClient')
+    }
+    if (p.id === 'unipile' && !p.adapterReady) return t('connUnipileNotConfigured')
+    if (p.adapterReady) return t('connProviderReady')
+    return t('connProviderSoon')
+  }
+
+  function openConnect(providerId?: string) {
+    setConnectProviderId(providerId ?? null)
+    setShowConnect(true)
+  }
+
+  function openApiKey(id: string, label: string) {
+    setApiKeyProvider({ id, label })
+  }
+
+  function matchesQuery(label: string, id: string): boolean {
+    const q = query.trim().toLowerCase()
+    if (!q) return true
+    return label.toLowerCase().includes(q) || id.toLowerCase().includes(q)
+  }
+
+  const surfaceProviders = providers.filter((p) => idSet.has(p.id) && CORE_CONNECT_PROVIDERS.has(p.id))
+  const surfaceConnections = connections.filter((c) => accountSet.has(c.provider) && c.provider !== 'mock')
+  const apiKeyIds = providerIds.filter((id) => API_KEY_CONNECT_PROVIDERS.has(id))
+  const missingCoreIds = providerIds.filter(
+    (id) => CORE_CONNECT_PROVIDERS.has(id) && !providers.some((p) => p.id === id),
+  )
 
   return (
-    <section className="panel stack conn-messaging" id="messaging-connections">
+    <section className="panel stack conn-messaging" id={sectionId}>
       <div className="co-card-head">
         <div>
-          <h3 className="co-card-title">{t('connMessagingTitle')}</h3>
-          <p className="muted co-card-hint">{t('connMessagingHint')}</p>
+          <h3 className="co-card-title">{title}</h3>
         </div>
-        {canManage ? (
-          <button type="button" className="btn primary" onClick={() => setShowConnect(true)}>
+        {canManage && !hideHeaderConnect ? (
+          <button type="button" className="btn primary" onClick={() => openConnect()}>
             <Plus size={14} weight="bold" aria-hidden />
             {t('connConnectAccount')}
           </button>
         ) : null}
       </div>
 
-      <div className="conn-info-banner" role="note">
-        {t('connInboxBanner')}
+      <div className="conn-catalog">
+        <div className="conn-catalog-head conn-catalog-head--search">
+          <h4 className="conn-catalog-title">{t('connCatalogTitle')}</h4>
+          <input
+            className="input conn-catalog-search"
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t('connCatalogSearch')}
+            aria-label={t('connCatalogSearch')}
+          />
+        </div>
+        <ul className="conn-provider-list conn-provider-grid">
+          {surfaceProviders
+            .filter((p) => matchesQuery(p.label, p.id))
+            .map((p) => {
+            const ready = providerReady(p)
+            const linkedAccounts = surfaceConnections.filter((c) => c.provider === p.id)
+            const linked = linkedAccounts.length > 0
+            return (
+              <li key={p.id}>
+                <div
+                  className={`conn-provider-card conn-provider-card--premium${!ready ? ' is-disabled' : ''}${linked ? ' is-linked' : ''}`}
+                  data-ic={p.id}
+                >
+                  <ConnProviderIcon id={p.id} size={28} />
+                  <span className="conn-provider-copy">
+                    <span className="conn-provider-name">{p.label}</span>
+                    <span className="muted" style={{ fontSize: 12 }}>
+                      {linked
+                        ? `${t('connStatusConnected')}${linkedAccounts.length > 1 ? ` · ${linkedAccounts.length}` : ''}`
+                        : providerStatus(p)}
+                    </span>
+                    {linkedAccounts[0] ? (
+                      <span className="conn-provider-account muted">
+                        {linkedAccounts[0].displayName || linkedAccounts[0].externalAccountId}
+                        {linkedAccounts.length > 1 ? ` +${linkedAccounts.length - 1}` : ''}
+                      </span>
+                    ) : null}
+                  </span>
+                  {canManage ? (
+                    <button
+                      type="button"
+                      className="btn primary conn-provider-cta"
+                      disabled={!ready}
+                      onClick={() => openConnect(p.id)}
+                    >
+                      {linked ? t('connConnectAnother') : t('connectBannerCta')}
+                    </button>
+                  ) : null}
+                </div>
+              </li>
+            )
+          })}
+          {apiKeyIds
+            .filter((id) => matchesQuery(ADS_PROVIDER_LABELS[id] || id, id))
+            .map((id) => {
+              const st = secrets.find((s) => s.provider === id)
+              const label = ADS_PROVIDER_LABELS[id] || id
+              const linkedAccounts = surfaceConnections.filter((c) => c.provider === id)
+              const linked = Boolean(st?.valid) || linkedAccounts.length > 0
+              const accountHint =
+                linkedAccounts[0]?.displayName ||
+                linkedAccounts[0]?.externalAccountId ||
+                st?.keyHint ||
+                null
+              return (
+                <li key={`key-${id}`}>
+                  <div
+                    className={`conn-provider-card conn-provider-card--premium${linked ? ' is-linked' : ''}`}
+                    data-ic={id}
+                  >
+                    <ConnProviderIcon id={id} size={28} />
+                    <span className="conn-provider-copy">
+                      <span className="conn-provider-name">{label}</span>
+                      <span className="muted" style={{ fontSize: 12 }}>
+                        {linked
+                          ? `${t('connStatusConnected')}${accountHint ? ` · ${accountHint}` : ''}`
+                          : t('connApiKeyReady')}
+                      </span>
+                    </span>
+                    {canManage ? (
+                      <button
+                        type="button"
+                        className="btn primary conn-provider-cta"
+                        onClick={() => openApiKey(id, label)}
+                      >
+                        {linked ? t('connConnectAnother') : t('connectBannerCta')}
+                      </button>
+                    ) : null}
+                  </div>
+                </li>
+              )
+            })}
+          {missingCoreIds
+            .filter((id) => matchesQuery(id, id))
+            .map((id) => (
+            <li key={`missing-${id}`}>
+              <div className="conn-provider-card conn-provider-card--premium is-disabled" data-ic={id}>
+                <ConnProviderIcon id={id} size={28} />
+                <span className="conn-provider-copy">
+                  <span className="conn-provider-name">{ADS_PROVIDER_LABELS[id] || id}</span>
+                  <span className="muted" style={{ fontSize: 12 }}>
+                    {t('connProviderSoon')}
+                  </span>
+                </span>
+              </div>
+            </li>
+          ))}
+          {soonProviders
+            .filter((s) => matchesQuery(s.label, s.id))
+            .map((s) => (
+            <li key={`soon-${s.id}`}>
+              <div className="conn-provider-card conn-provider-card--premium is-disabled" data-ic={s.id}>
+                <ConnProviderIcon id={s.id} size={28} />
+                <span className="conn-provider-copy">
+                  <span className="conn-provider-name">{s.label}</span>
+                  <span className="muted" style={{ fontSize: 12 }}>
+                    {t('connProviderSoon')}
+                  </span>
+                </span>
+                <button type="button" className="btn conn-provider-cta" disabled>
+                  {t('connectBannerCta')}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
       </div>
 
-      <MktTabs level="surface" label={t('connMessagingTitle')}>
-        <MktTab
-          active={sub === 'accounts'}
-          label={`${t('connTabAccounts')} (${messagingConnections.length})`}
-          onClick={() => setSub('accounts')}
-        />
-        <MktTab
-          active={sub === 'providers'}
-          label={t('connTabProviders')}
-          onClick={() => setSub('providers')}
-        />
-        <MktTab active={sub === 'log'} label={t('connTabLog')} onClick={() => setSub('log')} />
-      </MktTabs>
+      {children}
+
+      <h4 className="conn-accounts-title">{t('connTabAccounts')}</h4>
 
       {oauthFlash ? (
         <p className="conn-info-banner" role="status">
@@ -207,166 +395,151 @@ export function MessagingConnectionsPanel({ slug, canManage }: Props) {
         </p>
       ) : null}
 
-      {sub === 'accounts' ? (
-        loading ? (
-          <p className="muted">{t('loading')}</p>
-        ) : messagingConnections.length === 0 ? (
-          <p className="muted">{t('connEmptyAccounts')}</p>
-        ) : (
-          <div className="conn-table-wrap">
-            <table className="conn-table">
-              <thead>
-                <tr>
-                  <th>{t('connColProvider')}</th>
-                  <th>{t('connColAccount')}</th>
-                  <th>{t('connColStatus')}</th>
-                  <th>{t('connColUsage')}</th>
-                  <th>{t('connColActions')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {messagingConnections.map((c) => {
-                  const mods = modulesFor(c.id)
-                  const open = expandedId === c.id
-                  return (
-                    <Fragment key={c.id}>
-                      <tr>
-                        <td>
-                          <div className="conn-prov-cell">
+      {loading ? (
+        <p className="muted">{t('loading')}</p>
+      ) : surfaceConnections.length === 0 ? (
+        <p className="muted">{t('connEmptyAccounts')}</p>
+      ) : (
+        <div className="conn-table-wrap">
+          <table className="conn-table">
+            <thead>
+              <tr>
+                <th>{t('connColProvider')}</th>
+                <th>{t('connColAccount')}</th>
+                <th>{t('connColStatus')}</th>
+                <th>{t('connColUsage')}</th>
+                <th>{t('connColActions')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {surfaceConnections.map((c) => {
+                const mods = modulesFor(c.id)
+                const open = expandedId === c.id
+                return (
+                  <Fragment key={c.id}>
+                    <tr>
+                      <td>
+                        <div className="conn-prov-cell">
+                          <ConnProviderIcon id={c.provider} size={18} />
+                          <div>
                             <strong>{providerLabel(c.provider)}</strong>
-                            <span className="muted" style={{ fontSize: 12 }}>
+                            <span className="muted" style={{ fontSize: 12, display: 'block' }}>
                               {c.authMethod}
                             </span>
                           </div>
-                        </td>
-                        <td>{c.displayName || c.externalAccountId}</td>
-                        <td>
-                          <span
-                            className={`crm-status${c.status === 'active' ? ' crm-status--active' : ''}`}
-                          >
-                            {c.status === 'active' ? t('connStatusConnected') : c.status}
-                          </span>
-                        </td>
-                        <td>
-                          <div className="conn-usage-tags">
-                            {mods.length === 0 ? (
-                              <span className="muted">—</span>
-                            ) : (
-                              mods.map((m) => (
-                                <span key={m} className="crm-tag">
-                                  {usageLabel(m, t)}
-                                </span>
-                              ))
-                            )}
-                          </div>
-                        </td>
-                        <td>
-                          <div className="conn-row-actions">
-                            {c.provider === 'telegram' ||
-                            c.provider === 'unipile' ||
-                            c.provider === 'google' ? (
-                              <button
-                                type="button"
-                                className="btn"
-                                disabled={syncingId === c.id}
-                                title={t('inboxSync')}
-                                onClick={() => syncConnection(c).catch(console.error)}
-                              >
-                                <ArrowsClockwise size={14} weight="bold" aria-hidden />
-                              </button>
-                            ) : null}
+                        </div>
+                      </td>
+                      <td>{c.displayName || c.externalAccountId}</td>
+                      <td>
+                        <span
+                          className={`crm-status${c.status === 'active' ? ' crm-status--active' : ''}`}
+                        >
+                          {c.status === 'active' ? t('connStatusConnected') : c.status}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="conn-usage-tags">
+                          {mods.length === 0 ? (
+                            <span className="muted">—</span>
+                          ) : (
+                            mods.map((m) => (
+                              <span key={m} className="crm-tag">
+                                {usageLabel(m, t)}
+                              </span>
+                            ))
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="conn-row-actions">
+                          {c.provider === 'telegram' ||
+                          c.provider === 'unipile' ||
+                          c.provider === 'google' ? (
                             <button
                               type="button"
                               className="btn"
-                              onClick={() => setExpandedId(open ? null : c.id)}
+                              disabled={syncingId === c.id}
+                              title={t('inboxSync')}
+                              onClick={() => syncConnection(c).catch(console.error)}
                             >
-                              {open ? t('connHideDetail') : t('connShowDetail')}
+                              <ArrowsClockwise size={14} weight="bold" aria-hidden />
                             </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            className="btn"
+                            onClick={() => setExpandedId(open ? null : c.id)}
+                          >
+                            {open ? t('connHideDetail') : t('connShowDetail')}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {open ? (
+                      <tr className="conn-detail-row">
+                        <td colSpan={5}>
+                          <div className="conn-detail-panel stack">
+                            <h4 className="conn-detail-title">{t('connUsageTitle')}</h4>
+                            <p className="muted" style={{ margin: 0, fontSize: 12 }}>
+                              {t('connUsageDefaultsHint')}
+                            </p>
+                            {USAGE_MODULES.map((mod) => {
+                              const on = moduleOn(c.id, mod)
+                              const key = `${c.id}:${mod}`
+                              return (
+                                <label key={mod} className="conn-toggle-row">
+                                  <span>
+                                    <strong>{usageLabel(mod, t)}</strong>
+                                    <span className="muted" style={{ display: 'block', fontSize: 12 }}>
+                                      {usageHint(mod, t)}
+                                    </span>
+                                  </span>
+                                  <input
+                                    type="checkbox"
+                                    checked={on}
+                                    disabled={!canManage || toggling === key}
+                                    onChange={(e) =>
+                                      toggleModule(c.id, mod, e.target.checked).catch(console.error)
+                                    }
+                                  />
+                                </label>
+                              )
+                            })}
                           </div>
                         </td>
                       </tr>
-                      {open ? (
-                        <tr className="conn-detail-row">
-                          <td colSpan={5}>
-                            <div className="conn-detail-panel stack">
-                              <h4 className="conn-detail-title">{t('connUsageTitle')}</h4>
-                              {USAGE_MODULES.map((mod) => {
-                                const on = moduleOn(c.id, mod)
-                                const key = `${c.id}:${mod}`
-                                return (
-                                  <label key={mod} className="conn-toggle-row">
-                                    <span>
-                                      <strong>{usageLabel(mod, t)}</strong>
-                                      <span className="muted" style={{ display: 'block', fontSize: 12 }}>
-                                        {usageHint(mod, t)}
-                                      </span>
-                                    </span>
-                                    <input
-                                      type="checkbox"
-                                      checked={on}
-                                      disabled={!canManage || toggling === key}
-                                      onChange={(e) =>
-                                        toggleModule(c.id, mod, e.target.checked).catch(console.error)
-                                      }
-                                    />
-                                  </label>
-                                )
-                              })}
-                            </div>
-                          </td>
-                        </tr>
-                      ) : null}
-                    </Fragment>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )
-      ) : null}
-
-      {sub === 'providers' ? (
-        <ul className="conn-provider-list">
-          {providers
-            .filter((p) => p.id !== 'mock')
-            .map((p) => (
-              <li key={p.id}>
-                <div
-                  className={`conn-provider-card${p.adapterReady || p.connectKind === 'oauth' ? '' : ' is-disabled'}`}
-                  data-ic={p.id}
-                >
-                  <ConnProviderIcon id={p.id} />
-                  <span className="conn-provider-copy">
-                    <span className="conn-provider-name">{p.label}</span>
-                    <span className="muted" style={{ fontSize: 12 }}>
-                      {p.connectKind === 'oauth'
-                        ? p.oauthConfigured
-                          ? t('connProviderReady')
-                          : t('connOauthNeedsClient')
-                        : p.adapterReady
-                          ? t('connProviderReady')
-                          : p.id === 'unipile'
-                            ? t('connUnipileNotConfigured')
-                            : t('connProviderSoon')}
-                    </span>
-                    {p.redirectUri ? (
-                      <span className="conn-provider-redirect muted">{p.redirectUri}</span>
                     ) : null}
-                  </span>
-                </div>
-              </li>
-            ))}
-        </ul>
-      ) : null}
-
-      {sub === 'log' ? <p className="muted">{t('connLogSoon')}</p> : null}
+                  </Fragment>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {showConnect ? (
         <ConnectAccountModal
           slug={slug}
-          providers={providers}
-          onClose={() => setShowConnect(false)}
+          providers={surfaceProviders}
+          initialProviderId={connectProviderId}
+          onClose={() => {
+            setShowConnect(false)
+            setConnectProviderId(null)
+          }}
           onConnected={() => {
+            load().catch(console.error)
+          }}
+        />
+      ) : null}
+
+      {apiKeyProvider ? (
+        <ConnectApiKeyModal
+          slug={slug}
+          providerId={apiKeyProvider.id}
+          providerLabel={apiKeyProvider.label}
+          onClose={() => setApiKeyProvider(null)}
+          onConnected={() => {
+            onSecretsChanged?.()
             load().catch(console.error)
           }}
         />

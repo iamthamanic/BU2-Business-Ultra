@@ -7,6 +7,8 @@ import type { AdapterConnectInput, AdapterConnectResult, ProviderAdapter } from 
 import { registerAdapter } from '../core/adapter.js'
 import { telegramGetMe } from './api.js'
 
+const TG_DM_FORMATS = ['text', 'image', 'file', 'audio', 'voice']
+
 function telegramCapabilities(accountType: string): StructuredCapability[] {
   return [
     {
@@ -14,7 +16,7 @@ function telegramCapabilities(accountType: string): StructuredCapability[] {
       allowed: true,
       scopes: ['telegram.bot'],
       accountType,
-      messageFormats: ['text'],
+      messageFormats: TG_DM_FORMATS,
       window: { kind: 'none', freeReplyHours: null },
       availability: 'available',
       reason: undefined,
@@ -24,7 +26,7 @@ function telegramCapabilities(accountType: string): StructuredCapability[] {
       allowed: true,
       scopes: ['telegram.bot'],
       accountType,
-      messageFormats: ['text'],
+      messageFormats: TG_DM_FORMATS,
       window: { kind: 'none', freeReplyHours: null, notes: 'Bot can reply in chats where users messaged the bot' },
       availability: 'available',
     },

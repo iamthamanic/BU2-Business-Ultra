@@ -3,16 +3,23 @@
  * Columns mirror Legacy dashboard COLS (reach only for Meta). Location: apps/web/src/features/marketing/OrganicPostsPanel.tsx
  */
 import { useMemo, useState, type ReactNode } from 'react'
+import { useParams } from 'react-router-dom'
 import type { Icon } from '@phosphor-icons/react'
 import {
   Article,
   BookmarkSimple,
+  CaretDown,
+  CaretUp,
   ChatCircle,
   Eye,
+  FilmStrip,
   Heart,
+  Image as ImageIcon,
   Lightning,
+  PlayCircle,
   ShareNetwork,
   SquaresFour,
+  Stack,
   Storefront,
   UsersThree,
 } from '@phosphor-icons/react'
@@ -31,6 +38,7 @@ import {
   type DateRangeValue,
 } from '../../lib/dateRange'
 import { type FunnelExportPayload } from '../../lib/funnelExport'
+import { usePersistedTableColumns, type TableColumnDef } from '../../lib/tableColumns'
 
 export type OrganicPost = {
   id: string
@@ -77,16 +85,19 @@ export function OrganicPostsPanel({
   onWindowChange,
 }: Props) {
   const { t } = useI18n()
+  const { slug: paramSlug } = useParams()
+  const slug = paramSlug || ''
   const [range, setRange] = useState<DateRangeValue>(() => defaultDateRange(initialWindow))
   const [brand, setBrand] = useState('__all__')
   const [postType, setPostType] = useState('__all__')
   const [sortKey, setSortKey] = useState<string>('date')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [expandedTitles, setExpandedTitles] = useState<Record<string, boolean>>({})
   const showReach = META.has(channel)
 
   const cols = useMemo(() => {
-    const base: { key: string; label: string; tip?: MessageKey }[] = [
-      { key: 'rank', label: t('colRank') },
+    const base: (TableColumnDef & { tip: MessageKey })[] = [
+      { key: 'rank', label: t('colRank'), tip: 'tipColRank' },
       { key: 'date', label: t('colDate'), tip: 'tipColDate' },
       { key: 'type', label: t('colType'), tip: 'tipColType' },
       { key: 'bucket', label: t('colAge'), tip: 'tipColAge' },
@@ -115,8 +126,14 @@ export function OrganicPostsPanel({
       { key: 'er', label: t('colEr'), tip: 'tipColEr' },
       { key: 'kpi', label: t('colKpi'), tip: 'tipColKpi' },
     )
-    return base
+    return base.map((c) => ({ ...c, description: t(c.tip) }))
   }, [showReach, t])
+
+  const { visibleKeys, visibleColumns, setVisibleKeys, reset } = usePersistedTableColumns({
+    slug,
+    tableId: 'mkt-organic',
+    columns: cols,
+  })
 
   function onRangeChange(next: DateRangeValue) {
     setRange(next)
@@ -266,16 +283,26 @@ export function OrganicPostsPanel({
             <button
               key={ty}
               type="button"
-              className={`chip ${postType === ty ? 'active' : ''}`}
+              className={`chip funnel-type-chip ${postType === ty ? 'active' : ''}`}
+              data-type={ty}
               onClick={() => setPostType(ty)}
             >
-              {ty}
+              <PostTypeIcon type={ty} />
+              {formatPostTypeLabel(ty)}
               <span className="n">{posts.filter((p) => p.type === ty).length}</span>
             </button>
           ))}
         </div>
 
-        <FunnelExportMenu getPayload={getExportPayload} />
+        <FunnelExportMenu
+          getPayload={getExportPayload}
+          columnPicker={{
+            columns: cols,
+            visibleKeys,
+            onChange: setVisibleKeys,
+            onReset: reset,
+          }}
+        />
       </div>
 
       <div className="funnel-kpi-strip" aria-label="KPIs">
@@ -343,8 +370,9 @@ export function OrganicPostsPanel({
         <table className="table funnel-grid-table funnel-posts-table">
           <thead>
             <tr>
-              {cols.map((c) => {
+              {visibleColumns.map((c) => {
                 const active = sortKey === c.key
+                const tip = cols.find((x) => x.key === c.key)?.tip
                 return (
                   <th
                     key={c.key}
@@ -361,8 +389,8 @@ export function OrganicPostsPanel({
                         {active ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}
                       </span>
                     </button>
-                    {c.tip ? (
-                      <FunnelTip tip={t(c.tip)} iconOnly>
+                    {tip ? (
+                      <FunnelTip tip={t(tip)} iconOnly>
                         {c.label}
                       </FunnelTip>
                     ) : null}
@@ -374,59 +402,38 @@ export function OrganicPostsPanel({
           <tbody>
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={cols.length} className="funnel-table-empty muted">
+                <td colSpan={Math.max(visibleColumns.length, 1)} className="funnel-table-empty muted">
                   {emptyContent ?? emptyHint}
                 </td>
               </tr>
             ) : (
-              sorted.map((p, i) => (
-                <tr key={p.id}>
-                  <td className="num funnel-rank-cell">{i + 1}</td>
-                  <td className="num">{fmtDate(p.date)}</td>
-                  <td>
-                    <span className="badge">{p.type}</span>
-                  </td>
-                  <td>
-                    <span className="badge">{bucketLabel(p.bucket)}</span>
-                  </td>
-                  <td>
-                    {p.url ? (
-                      <a href={p.url} target="_blank" rel="noopener noreferrer">
-                        {p.title || '—'}
-                      </a>
-                    ) : (
-                      p.title || '—'
-                    )}
-                  </td>
-                  <td className="num">{fmtN(p.views)}</td>
-                  {showReach ? <td className="num">{p.reach != null ? fmtN(p.reach) : '—'}</td> : null}
-                  <td className="num">
-                    {p.sharesPer1000 != null ? String(p.sharesPer1000) : '—'}
-                  </td>
-                  <td className="num">
-                    {showReach
-                      ? p.savesPer1000 != null
-                        ? String(p.savesPer1000)
-                        : '—'
-                      : p.savesPer100 != null
-                        ? String(p.savesPer100)
-                        : '—'}
-                  </td>
-                  <td className="num">{p.watchPct != null ? `${p.watchPct}%` : '—'}</td>
-                  <td className="num">{fmtDuration(p.durationSec)}</td>
-                  <td className="num">
-                    {p.paidShare != null ? `${Math.round(p.paidShare * 100)}%` : '—'}
-                  </td>
-                  <td className="num">{fmtN(p.likes)}</td>
-                  <td className="num">{fmtN(p.comments)}</td>
-                  <td className="num">{fmtN(p.shares)}</td>
-                  <td className="num">{fmtN(p.saves)}</td>
-                  <td className="num">{p.engagement != null ? `${p.engagement}%` : '—'}</td>
-                  <td className="num">
-                    {p.kpiHit === true ? '✓' : p.kpiHit === false ? '✗' : '—'}
-                  </td>
-                </tr>
-              ))
+              sorted.map((p, i) => {
+                const titleOpen = Boolean(expandedTitles[p.id])
+                return (
+                  <tr key={p.id}>
+                    {visibleColumns.map((col) => (
+                      <td
+                        key={col.key}
+                        className={organicTdClass(col.key)}
+                      >
+                        {organicCell({
+                          key: col.key,
+                          post: p,
+                          rank: i + 1,
+                          showReach,
+                          titleOpen,
+                          t,
+                          onToggleTitle: () =>
+                            setExpandedTitles((prev) => ({
+                              ...prev,
+                              [p.id]: !prev[p.id],
+                            })),
+                        })}
+                      </td>
+                    ))}
+                  </tr>
+                )
+              })
             )}
           </tbody>
         </table>
@@ -494,11 +501,217 @@ function fmtDuration(sec: number | null) {
   return `${m}:${String(r).padStart(2, '0')}`
 }
 
-function bucketLabel(b: string) {
-  if (b === '24h') return '≤24h'
-  if (b === '7d') return '≤7d'
-  if (b === '30d') return '≤30d'
-  return b || 'alt'
+function formatPostAge(iso: string): {
+  relative: string
+  bucket: '24h' | '7d' | '30d' | 'older'
+  bucketLabel: string
+  absolute: string
+} {
+  const ts = Date.parse(iso)
+  if (!Number.isFinite(ts)) {
+    return { relative: '—', bucket: 'older', bucketLabel: 'älter', absolute: iso || '—' }
+  }
+  const ms = Math.max(0, Date.now() - ts)
+  const totalH = Math.floor(ms / 3_600_000)
+  const d = Math.floor(totalH / 24)
+  const h = totalH % 24
+  const relative =
+    totalH < 1
+      ? `<1h`
+      : d === 0
+        ? `${h}h`
+        : h === 0
+          ? `${d}d`
+          : `${d}d ${h}h`
+  const bucket: '24h' | '7d' | '30d' | 'older' =
+    totalH <= 24 ? '24h' : totalH <= 24 * 7 ? '7d' : totalH <= 24 * 30 ? '30d' : 'older'
+  const bucketLabel =
+    bucket === '24h' ? '≤24h' : bucket === '7d' ? '≤7d' : bucket === '30d' ? '≤30d' : 'älter'
+  return { relative, bucket, bucketLabel, absolute: new Date(ts).toLocaleString('de-DE') }
+}
+
+function formatPostTypeLabel(type: string | null | undefined): string {
+  const raw = (type || 'post').trim()
+  if (!raw) return 'Post'
+  return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase()
+}
+
+function PostTypeIcon({ type }: { type: string }) {
+  const t = (type || 'post').toLowerCase()
+  if (t === 'reel' || t === 'short') return <FilmStrip size={12} weight="bold" aria-hidden />
+  if (t === 'video') return <PlayCircle size={12} weight="bold" aria-hidden />
+  if (t === 'carousel' || t === 'album') return <Stack size={12} weight="bold" aria-hidden />
+  if (t === 'story') return <ImageIcon size={12} weight="bold" aria-hidden />
+  return <Article size={12} weight="bold" aria-hidden />
+}
+
+function MetricOrWhy({ value, why }: { value: string | null; why: string }) {
+  if (value != null) return <>{value}</>
+  return (
+    <span className="funnel-metric-empty muted" title={why}>
+      —
+      <span className="funnel-metric-why">{why}</span>
+    </span>
+  )
+}
+
+function organicTdClass(key: string): string | undefined {
+  if (key === 'rank') return 'num funnel-rank-cell'
+  if (key === 'bucket') return 'funnel-age-cell'
+  if (key === 'title') return 'funnel-post-title-cell'
+  if (key === 'type') return undefined
+  return 'num'
+}
+
+function organicCell(opts: {
+  key: string
+  post: OrganicPost
+  rank: number
+  showReach: boolean
+  titleOpen: boolean
+  t: (k: MessageKey) => string
+  onToggleTitle: () => void
+}): ReactNode {
+  const { key, post: p, rank, showReach, titleOpen, t, onToggleTitle } = opts
+  switch (key) {
+    case 'rank':
+      return rank
+    case 'date':
+      return fmtDate(p.date)
+    case 'type':
+      return (
+        <span className="badge funnel-type-badge" data-type={p.type || 'post'}>
+          <PostTypeIcon type={p.type} />
+          <span>{formatPostTypeLabel(p.type)}</span>
+        </span>
+      )
+    case 'bucket': {
+      const age = formatPostAge(p.date)
+      return (
+        <div className="funnel-age-stack" title={`${t('colAge')}: ${age.absolute}`}>
+          <span className="funnel-age-relative">{age.relative}</span>
+          <span className="badge funnel-age-bucket" data-bucket={age.bucket}>
+            {age.bucketLabel}
+          </span>
+        </div>
+      )
+    }
+    case 'title': {
+      const titleText = p.title || '—'
+      const titleLong = titleText.length > 42
+      return (
+        <div className={`funnel-post-title${titleOpen ? ' is-open' : ''}`}>
+          {p.url ? (
+            <a href={p.url} target="_blank" rel="noopener noreferrer">
+              {titleOpen || !titleLong ? titleText : `${titleText.slice(0, 40)}…`}
+            </a>
+          ) : (
+            <span>{titleOpen || !titleLong ? titleText : `${titleText.slice(0, 40)}…`}</span>
+          )}
+          {titleLong ? (
+            <button
+              type="button"
+              className="btn funnel-title-toggle"
+              aria-expanded={titleOpen}
+              onClick={onToggleTitle}
+            >
+              {titleOpen ? (
+                <>
+                  <CaretUp size={12} weight="bold" aria-hidden />
+                  {t('funnelTitleCollapse')}
+                </>
+              ) : (
+                <>
+                  <CaretDown size={12} weight="bold" aria-hidden />
+                  {t('funnelTitleExpand')}
+                </>
+              )}
+            </button>
+          ) : null}
+        </div>
+      )
+    }
+    case 'views':
+      return fmtN(p.views)
+    case 'reach':
+      return (
+        <MetricOrWhy
+          value={p.reach != null ? fmtN(p.reach) : null}
+          why={t('metricWhyNoReach')}
+        />
+      )
+    case 'shareRate':
+      return (
+        <MetricOrWhy
+          value={p.sharesPer1000 != null ? String(p.sharesPer1000) : null}
+          why={t('metricWhyNoShareRate')}
+        />
+      )
+    case 'saveRate':
+      return (
+        <MetricOrWhy
+          value={
+            showReach
+              ? p.savesPer1000 != null
+                ? String(p.savesPer1000)
+                : null
+              : p.savesPer100 != null
+                ? String(p.savesPer100)
+                : null
+          }
+          why={t('metricWhyNoSaveRate')}
+        />
+      )
+    case 'watch':
+      return (
+        <MetricOrWhy
+          value={p.watchPct != null ? `${p.watchPct}%` : null}
+          why={t('metricWhyWatchVideoOnly')}
+        />
+      )
+    case 'duration':
+      return (
+        <MetricOrWhy
+          value={
+            p.durationSec != null && Number.isFinite(p.durationSec)
+              ? fmtDuration(p.durationSec)
+              : null
+          }
+          why={t('metricWhyDurationVideoOnly')}
+        />
+      )
+    case 'paid':
+      return (
+        <MetricOrWhy
+          value={p.paidShare != null ? `${Math.round(p.paidShare * 100)}%` : null}
+          why={t('metricWhyNoPaidShare')}
+        />
+      )
+    case 'likes':
+      return fmtN(p.likes)
+    case 'comments':
+      return fmtN(p.comments)
+    case 'shares':
+      return fmtN(p.shares)
+    case 'saves':
+      return fmtN(p.saves)
+    case 'er':
+      return (
+        <MetricOrWhy
+          value={p.engagement != null ? `${p.engagement}%` : null}
+          why={t('metricWhyNoEr')}
+        />
+      )
+    case 'kpi':
+      return (
+        <MetricOrWhy
+          value={p.kpiHit === true ? '✓' : p.kpiHit === false ? '✗' : null}
+          why={t('metricWhyNoKpi')}
+        />
+      )
+    default:
+      return '—'
+  }
 }
 
 function exportOrganicRow(
@@ -509,8 +722,8 @@ function exportOrganicRow(
   const row: Record<string, string | number | null> = {
     rank,
     date: fmtDate(p.date),
-    type: p.type || '—',
-    bucket: bucketLabel(p.bucket),
+    type: formatPostTypeLabel(p.type),
+    bucket: formatPostAge(p.date).relative,
     title: p.title || '—',
     views: p.views,
     shareRate: p.sharesPer1000 != null ? String(p.sharesPer1000) : '—',
@@ -548,8 +761,10 @@ function sortValue(
       return p.date || ''
     case 'type':
       return p.type || ''
-    case 'bucket':
-      return p.bucket === '24h' ? 1 : p.bucket === '7d' ? 2 : p.bucket === '30d' ? 3 : 4
+    case 'bucket': {
+      const age = formatPostAge(p.date)
+      return age.bucket === '24h' ? 1 : age.bucket === '7d' ? 2 : age.bucket === '30d' ? 3 : 4
+    }
     case 'title':
       return (p.title || '').toLowerCase()
     case 'views':

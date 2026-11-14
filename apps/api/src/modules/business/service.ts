@@ -13,7 +13,7 @@ export async function listBusinessesForUser(userId: string) {
       name: businesses.name,
       slug: businesses.slug,
       status: businesses.status,
-      role: memberships.role,
+      isOwner: memberships.isOwner,
       logoPath: businesses.logoPath,
     })
     .from(memberships)

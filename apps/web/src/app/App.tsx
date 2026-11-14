@@ -13,6 +13,7 @@ import {
 } from '../lib/companyPaths'
 import { LoginPage } from '../features/auth/LoginPage'
 import { VerifyPage } from '../features/auth/VerifyPage'
+import { SetupPage } from '../features/auth/SetupPage'
 import { HomePage } from '../features/business/HomePage'
 import { BusinessShell } from '../components/BusinessShell'
 import { ProductShell } from '../features/products/ProductShell'
@@ -34,6 +35,7 @@ import { ToolsPage } from '../features/tools/ToolsPage'
 import { OpenSeoPage } from '../features/openseo/OpenSeoPage'
 import { SettingsPage } from '../features/settings/SettingsPage'
 import { AdminPage } from '../features/admin/AdminPage'
+import { LegalIndexPage, LegalPage } from '../features/legal/LegalPage'
 
 export type AuthUser = {
   id: string
@@ -42,6 +44,10 @@ export type AuthUser = {
   isSuperadmin: boolean
   isBreakglassOperator: boolean
   locale: string
+  /** Present on /api/auth/me; optional after login until me refresh. */
+  platformCapabilities?: {
+    'companies.create'?: boolean
+  }
 }
 
 /** Redirect helper: `/co/:slug/<to>` */
@@ -50,6 +56,13 @@ function CoRedirect({ to }: { to: string }) {
   if (!slug) return <Navigate to="/" replace />
   const path = to.startsWith('/') ? `${companyBase(slug)}${to}` : `${companyBase(slug)}/${to}`
   return <Navigate to={path} replace />
+}
+
+/** Legacy `/co/:slug/contacts/:id` → `/customer/:id`. */
+function ContactsIdRedirect() {
+  const { slug, id } = useParams()
+  if (!slug || !id) return <Navigate to="/" replace />
+  return <Navigate to={`${companyBase(slug)}/customer/${encodeURIComponent(id)}`} replace />
 }
 
 /** Bookmarks: `/b/:slug/*` → canonical `/co/:slug/...` */
@@ -61,16 +74,32 @@ function LegacyBu2Redirect() {
 
 export function App() {
   const [user, setUser] = useState<AuthUser | null | undefined>(undefined)
+  const [needsSetup, setNeedsSetup] = useState<boolean | null>(null)
   const navigate = useNavigate()
 
   useEffect(() => {
+    api<{ required: boolean }>('/api/setup/status')
+      .then((r) => setNeedsSetup(r.required))
+      .catch(() => setNeedsSetup(false))
     api<{ user: AuthUser }>('/api/auth/me')
       .then((r) => setUser(r.user))
       .catch(() => setUser(null))
   }, [])
 
-  if (user === undefined) {
+  if (user === undefined || needsSetup === null) {
     return <div className="login-page muted">…</div>
+  }
+
+  if (needsSetup && !user) {
+    return (
+      <SetupPage
+        onDone={(u) => {
+          setNeedsSetup(false)
+          setUser(u)
+          navigate('/', { replace: true })
+        }}
+      />
+    )
   }
 
   async function logout() {
@@ -93,6 +122,11 @@ export function App() {
     <Routes>
       <Route path="/login" element={<LoginPage onAuthed={(u) => { setUser(u); navigate('/') }} />} />
       <Route path="/login/verify" element={<VerifyPage onAuthed={(u) => { setUser(u); navigate('/') }} />} />
+      {/* Public legal pages — German URLs; /legal/* redirects for old drafts. */}
+      <Route path="/rechtliches" element={<LegalIndexPage />} />
+      <Route path="/rechtliches/:doc" element={<LegalPage />} />
+      <Route path="/legal" element={<Navigate to="/rechtliches" replace />} />
+      <Route path="/legal/:doc" element={<LegalPage />} />
       <Route
         path="/"
         element={user ? <HomePage user={user} onLogout={logout} /> : <Navigate to="/login" replace />}
@@ -127,6 +161,11 @@ export function App() {
         <Route path="customer" element={<CustomerShell />}>
           <Route path=":id" element={<CustomerDetail />} />
         </Route>
+        <Route path="partner" element={<CustomerShell />}>
+          <Route path=":id" element={<CustomerDetail />} />
+        </Route>
+        <Route path="contacts" element={<CoRedirect to="customer" />} />
+        <Route path="contacts/:id" element={<ContactsIdRedirect />} />
         <Route path="inbox" element={<InboxPage />} />
         <Route path="projects" element={<ProjectsShell />}>
           <Route path="mine" element={<MyTasksPage />} />

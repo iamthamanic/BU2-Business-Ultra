@@ -22,23 +22,63 @@ Provider  →  Connection  →  Binding (+ credentials, capability resolver, syn
 Code registry: `apps/api/src/lib/integrations/core/providers.ts`  
 HTTP: `apps/api/src/modules/integrations/*` under `/api/b/:slug/integrations/…`
 
+## Connector DX (batteries-included)
+
+**Goal:** new services are **adapter + catalog row only** — credentials in Connections, no one-off secret UIs.
+
+**Program order:** Social → Paid → Finance → Generic (`domainGroup` on `PROVIDER_CATALOG`).
+
+| Group | Intent | Ist examples |
+|-------|--------|--------------|
+| `social` | Messaging / inbox / organic social | Gmail, Outlook, IMAP, WhatsApp, Instagram, Facebook, LinkedIn, TikTok, X, Pinterest, Telegram, Unipile |
+| `paid` | Ads / paid social video | YouTube, Google Ads |
+| `finance` | Bank / bookkeeping | `finapi` (credentials stored; **adapter sync pending**). Domain SoR already live: `finance_accounts` / `finance_transactions` / `finance_settings` + `/api/b/:slug/finance/*` |
+| `generic` | Test / catch-all | Mock |
+
+**Add a connector (checklist):**
+
+1. Extend `IntegrationProviderSchema` in `packages/shared`
+2. Add catalog row in `lib/integrations/core/providers.ts` with `domainGroup` + `authMethods` + `connectKind`
+3. Copy `lib/integrations/core/adapterTemplate.ts` → `lib/integrations/<provider>/adapter.ts`, implement `connect` / `resolveCapabilities`, register on boot
+4. Prefer OAuth PKCE or API key; persist via Integration Core credentials — never `settings_secrets` for multi-account
+5. Sync/send live in a follow-up slice after credentials path is green
+
+Template: `apps/api/src/lib/integrations/core/adapterTemplate.ts`
+
 ## Provider catalog (Ist)
 
 From `PROVIDER_CATALOG` (adapterReady flags are code claims; live mode still needs env/keys):
 
-| Provider id | Label | Auth methods | Connect kind |
-|-------------|-------|--------------|--------------|
-| `mock` | Mock (contract tests) | `mock` | mock |
-| `google` | Gmail | `oauth_pkce` | oauth |
-| `youtube` | YouTube | `oauth_pkce` | oauth |
-| `google_ads` | Google Ads | `oauth_pkce` | oauth |
-| `microsoft` | Outlook | `oauth_pkce` | oauth |
-| `imap` | IMAP / POP | `password` | password |
-| `whatsapp` | WhatsApp | `oauth_pkce` | oauth |
-| `instagram` | Instagram | `oauth_pkce` | oauth |
-| `facebook` | Facebook | `oauth_pkce` | oauth |
-| `telegram` | Telegram (Bot) | `bot_token` | bot_token |
-| `unipile` | Telegram (privat) | `aggregator_session`, `api_key` | aggregator |
+| Provider id | Label | Group | Auth methods | Connect kind |
+|-------------|-------|-------|--------------|--------------|
+| `mock` | Mock (contract tests) | generic | `mock` | mock |
+| `google` | Gmail | social | `oauth_pkce` | oauth |
+| `youtube` | YouTube | paid | `oauth_pkce` | oauth |
+| `google_ads` | Google Ads | paid | `oauth_pkce` | oauth |
+| `meta_ads` | Meta Ads | paid | `oauth_pkce` | oauth |
+| `tiktok_ads` | TikTok Ads | paid | `oauth_pkce` | oauth (same TikTok app as organic) |
+| `pinterest_ads` | Pinterest Ads | paid | `oauth_pkce` | oauth (same Pinterest app) |
+| `chatgpt_ads` | ChatGPT Ads | paid | `oauth_pkce` | oauth (`CHATGPT_ADS_*`) |
+| `reddit_ads` | Reddit Ads | paid | `oauth_pkce` | oauth (`REDDIT_OAUTH_*`) |
+| `microsoft_ads` | Microsoft Ads | paid | `oauth_pkce` | oauth (same Azure AD app as Outlook) |
+| `microsoft` | Outlook | social | `oauth_pkce` | oauth |
+| `imap` | IMAP / POP | social | `password` | password |
+| `whatsapp` | WhatsApp | social | `oauth_pkce` | oauth |
+| `instagram` | Instagram | social | `oauth_pkce` | oauth |
+| `facebook` | Facebook | social | `oauth_pkce` | oauth |
+| `linkedin` | LinkedIn | social | `oauth_pkce` | oauth |
+| `tiktok` | TikTok | social | `oauth_pkce` | oauth |
+| `x` | X | social | `oauth_pkce` | oauth |
+| `pinterest` | Pinterest | social | `oauth_pkce` | oauth |
+| `telegram` | Telegram (Bot) | social | `bot_token` | bot_token |
+| `unipile` | Telegram (privat) | social | `aggregator_session`, `api_key` | aggregator |
+| `finapi` | finAPI (Bank) | finance | `api_key` | password (client id/secret form) |
+
+**Platform env pattern:** one Developer Console Client ID/Secret per family (`GOOGLE_OAUTH_*`, `META_OAUTH_*`, `LINKEDIN_OAUTH_*`, `TIKTOK_OAUTH_*`, `X_OAUTH_*`, `PINTEREST_OAUTH_*`, `REDDIT_OAUTH_*`, `CHATGPT_ADS_*`; Microsoft Ads reuses `MICROSOFT_OAUTH_*`). Paste redirect URIs from `GET /api/oauth/redirect-uris`. End-user tokens → `connection_credentials`.
+
+**Sync / Publish:** Connect stores tokens first. Channel workers live under `lib/integrations/social/` (organic LinkedIn/TikTok/X/Pinterest) and ads mutate helpers — same pattern as Meta DMs / Inbox (credentials path green, deeper workers follow).
+
+**PKCE:** Verifier is sealed in an HttpOnly cookie (`bu2_oauth_pkce`, path `/api/oauth`) plus in-memory fallback — multi-instance safe without Redis. Ads keys are **not** stored in `settings_secrets` (PUT → 410); use OAuth connect only.
 
 ### Related non-catalog / settings-gated
 
@@ -63,6 +103,8 @@ From `PROVIDER_CATALOG` (adapterReady flags are code claims; live mode still nee
 | Kind | Where |
 |------|-------|
 | OAuth client id/secret (platform) | Env — see `.env.example` / `.github/SECRETS.md` |
+| finAPI app client id/secret (platform) | Env: `FINAPI_CLIENT_ID` / `FINAPI_CLIENT_SECRET` (+ optional data key / base URL). Settings UI only verifies env — bank Web Form still pending |
+| Google Ads developer token (platform) | Env: `GOOGLE_ADS_DEVELOPER_TOKEN` (with `GOOGLE_OAUTH_*`) |
 | Per-connection tokens | DB `connection_credentials` (encrypted at rest via app crypto) |
 | Bot tokens / aggregator | Same credentials table / Unipile env (`UNIPILE_DSN`, `UNIPILE_ACCESS_TOKEN`) |
 | Single feature API keys | `settings_secrets` via Settings UI |
@@ -74,6 +116,8 @@ Never commit real values. UI: Settings → Verbindungen.
 - Flow: PKCE authorize → provider → callback → `oauth/complete` upserts connection.
 - Redirect keys: `lib/integrations/oauth/redirects.ts` + `PUBLIC_WEB_URL` / `PUBLIC_API_URL`.
 - Gmail launch: restricted scopes; public OAuth verification is a release-plan item (DECISIONS) — OK for local/dev.
+- Local Gmail inbox sync requires **Gmail API enabled** on the same GCP project as `GOOGLE_OAUTH_CLIENT_ID` (otherwise `gmail_api_403` / `gmail_api_disabled`).
+- Omnichannel sync (`POST /api/b/:slug/inbox/sync`): Gmail, Telegram Bot, Unipile today; Outlook/IMAP/Meta native DMs bind to inbox but sync via Unipile or upcoming adapters.
 
 ## Webhooks / sync
 

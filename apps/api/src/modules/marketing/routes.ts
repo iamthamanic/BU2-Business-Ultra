@@ -25,6 +25,7 @@ import {
 import { createEmailCampaign, sendEmailCampaignNow } from '../../lib/integrations/brevo.js'
 import { loadEnv } from '../../lib/env.js'
 import {
+  demoOrganicPosts,
   emptyOrganicPosts,
   isOrganicChannel,
   organicSurface,
@@ -104,13 +105,57 @@ export async function marketingRoutes(app: FastifyInstance) {
       }
     }
 
+    // LinkedIn / TikTok / X / Pinterest — Connect stores tokens; sync workers best-effort.
+    if (
+      connector.connectionId &&
+      (ch === 'linkedin' ||
+        ch === 'tiktok' ||
+        ch === 'x' ||
+        ch === 'pinterest' ||
+        connector.provider === 'linkedin' ||
+        connector.provider === 'tiktok' ||
+        connector.provider === 'x' ||
+        connector.provider === 'pinterest')
+    ) {
+      try {
+        const { syncOrganicSocial } = await import('../../lib/integrations/social/sync.js')
+        const synced = await syncOrganicSocial({
+          businessId: m.businessId,
+          connectionId: connector.connectionId,
+          channel: ch,
+        })
+        if (synced.mode === 'live') {
+          return {
+            channel: ch,
+            surface,
+            connector,
+            posts: synced.posts,
+            window,
+            mode: 'live' as const,
+            generatedAt: new Date().toISOString(),
+          }
+        }
+      } catch {
+        // Fall through to demo/stub.
+      }
+    }
+
+    const useDemoRows =
+      connector.contentReady &&
+      (connector.message?.includes('Demo-Metricool') ||
+        (connector.brandLabel || '').toLowerCase().includes('demo-metricool') ||
+        (connector.brandLabel || '').toLowerCase().startsWith('metricool ·'))
+    const posts = useDemoRows
+      ? demoOrganicPosts(ch, connector.brandLabel)
+      : emptyOrganicPosts()
+
     return {
       channel: ch,
       surface,
       connector,
-      posts: emptyOrganicPosts(),
+      posts,
       window,
-      mode: 'stub' as const,
+      mode: useDemoRows ? ('demo' as const) : ('stub' as const),
       generatedAt: new Date().toISOString(),
     }
   })
@@ -139,7 +184,7 @@ export async function marketingRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     const body = SocialMasterDraftSchema.parse(req.body)
     const [draft] = await db
       .insert(socialDrafts)
@@ -164,7 +209,7 @@ export async function marketingRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     const body = SocialMasterDraftSchema.partial().parse(req.body)
     const [draft] = await db
       .update(socialDrafts)
@@ -184,7 +229,7 @@ export async function marketingRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     const body = ConfirmMutationSchema.extend({
       onlyNetworks: z.array(SocialNetworkSchema).optional(),
       blogId: z.string().optional(),
@@ -242,7 +287,7 @@ export async function marketingRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     ConfirmMutationSchema.parse(req.body)
     const secret = await getBusinessSecret(m.businessId, 'metricool')
     if (!secret?.valid) return reply.code(409).send({ error: 'metricool_key_required' })
@@ -294,7 +339,7 @@ export async function marketingRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     const body = z
       .object({
         name: z.string().min(1),
@@ -319,7 +364,7 @@ export async function marketingRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canSendMail(m.role)) return reply.code(403).send({ error: 'forbidden_mail_send' })
+    if (!m || !canSendMail(m)) return reply.code(403).send({ error: 'forbidden_mail_send' })
     ConfirmMutationSchema.parse(req.body)
     const secret = await getBusinessSecret(m.businessId, 'brevo')
     if (!secret?.valid) return reply.code(409).send({ error: 'brevo_key_required', gate: 'brevo' })
@@ -368,14 +413,14 @@ export async function marketingRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m && !user.isSuperadmin) return reply.code(404).send({ error: 'not_found' })
+    if (!m) return reply.code(404).send({ error: 'not_found' })
     const rows = await db.select().from(businesses).where(eq(businesses.slug, slug)).limit(1)
     const biz = rows[0]
     if (!biz) return reply.code(404).send({ error: 'not_found' })
     return {
       business: { name: biz.name, logoPath: biz.logoPath },
       styleguide: (biz.styleguide || {}) as Record<string, unknown>,
-      canEdit: m ? canMutateContent(m.role) : Boolean(user.isSuperadmin),
+      canEdit: canMutateContent(m),
     }
   })
 
@@ -383,7 +428,7 @@ export async function marketingRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     const body = StyleguidePutSchema.parse(req.body)
     const [row] = await db
       .update(businesses)

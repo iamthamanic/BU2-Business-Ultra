@@ -15,7 +15,7 @@ export async function registerNoteRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadCustomer(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     const body = CustomerNoteSchema.parse(req.body)
@@ -54,7 +54,7 @@ export async function registerNoteRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id, noteId } = req.params as { slug: string; id: string; noteId: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadCustomer(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     const body = CustomerNotePatchSchema.parse(req.body)
@@ -82,7 +82,7 @@ export async function registerNoteRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id, noteId } = req.params as { slug: string; id: string; noteId: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadCustomer(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     const [deleted] = await db

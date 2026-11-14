@@ -10,8 +10,10 @@ import { loadEnv } from './lib/env.js'
 import { registerAuth } from './plugins/auth.js'
 import { authRoutes } from './modules/auth/routes.js'
 import { businessRoutes } from './modules/business/routes.js'
+import { bundleRoutes } from './modules/business/bundleRoutes.js'
 import { catalogRoutes } from './modules/catalog/routes.js'
 import { productRoutes } from './modules/products/routes.js'
+import { orderRoutes } from './modules/orders/routes.js'
 import { customerRoutes } from './modules/customers/routes.js'
 import { projectRoutes } from './modules/projects/routes.js'
 import { settingsRoutes } from './modules/settings/routes.js'
@@ -27,9 +29,13 @@ import { adminRoutes } from './modules/admin/routes.js'
 import { integrationRoutes } from './modules/integrations/routes.js'
 import { oauthIntegrationRoutes } from './modules/integrations/oauthRoutes.js'
 import { inboxRoutes } from './modules/inbox/routes.js'
+import { financeRoutes } from './modules/finance/routes.js'
 import './lib/integrations/core/mockAdapter.js'
+import { ensureFinapiAdapterRegistered } from './lib/integrations/finapi/adapter.js'
 import { ensureTelegramAdapterRegistered } from './lib/integrations/telegram/adapter.js'
 import { ensureUnipileAdapterRegistered } from './lib/integrations/unipile/adapter.js'
+
+ensureFinapiAdapterRegistered()
 
 async function main() {
   const env = loadEnv()
@@ -73,8 +79,10 @@ async function main() {
 
   await authRoutes(app)
   await businessRoutes(app)
+  await bundleRoutes(app)
   await catalogRoutes(app)
   await productRoutes(app)
+  await orderRoutes(app)
   await customerRoutes(app)
   await projectRoutes(app)
   await settingsRoutes(app)
@@ -87,6 +95,7 @@ async function main() {
   await integrationRoutes(app)
   await oauthIntegrationRoutes(app)
   await inboxRoutes(app)
+  await financeRoutes(app)
   await sortanizeRoutes(app)
   await openseoRoutes(app)
   await adminRoutes(app)

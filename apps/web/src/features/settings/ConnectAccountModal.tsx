@@ -26,12 +26,24 @@ type Props = {
   providers: ProviderRow[]
   onClose: () => void
   onConnected: () => void
+  /** Open directly on this provider's auth step (from catalog Verbinden). */
+  initialProviderId?: string | null
 }
 
-export function ConnectAccountModal({ slug, providers, onClose, onConnected }: Props) {
+export function ConnectAccountModal({
+  slug,
+  providers,
+  onClose,
+  onConnected,
+  initialProviderId,
+}: Props) {
   const { t } = useI18n()
-  const [step, setStep] = useState<'provider' | 'auth'>('provider')
-  const [picked, setPicked] = useState<ProviderRow | null>(null)
+  const initial =
+    initialProviderId != null
+      ? providers.find((p) => p.id === initialProviderId) ?? null
+      : null
+  const [step, setStep] = useState<'provider' | 'auth'>(initial ? 'auth' : 'provider')
+  const [picked, setPicked] = useState<ProviderRow | null>(initial)
   const [botToken, setBotToken] = useState('')
   const [accountId, setAccountId] = useState('')
   const [qrAccountId, setQrAccountId] = useState<string | null>(null)
@@ -283,7 +295,7 @@ export function ConnectAccountModal({ slug, providers, onClose, onConnected }: P
                       disabled={!open}
                       onClick={() => pick(p)}
                     >
-                      <ConnProviderIcon id={p.id} />
+                      <ConnProviderIcon id={p.id} size={28} />
                       <span className="conn-provider-copy">
                         <span className="conn-provider-name">{p.label}</span>
                         <span className="muted" style={{ fontSize: 12 }}>

@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { db } from '../../db/client.js'
 import {
+  businesses,
   memberships,
   openseoHandoffs,
   openseoIdentities,
@@ -23,7 +24,7 @@ export async function openseoRoutes(app: FastifyInstance) {
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
     if (!m) return reply.code(404).send({ error: 'not_found' })
-    if (!canOpenSeo(m.role, m.grantSeoOpen)) {
+    if (!canOpenSeo(m)) {
       return reply.code(403).send({ error: 'seo_access_denied' })
     }
     const rows = await db
@@ -44,9 +45,10 @@ export async function openseoRoutes(app: FastifyInstance) {
       instance: rows[0] ?? { status: 'not_provisioned' },
       identity: identity ?? null,
       access: {
-        role: m.role,
-        grantSeoOpen: m.grantSeoOpen,
-        roleMapped: mapRole(m.role),
+        isOwner: m.isOwner,
+        permissions: m.permissions,
+        canOpenSeo: m.isOwner || m.permissions.includes('seo.open'),
+        roleMapped: m.isOwner ? 'owner' : 'editor',
         ...editorCapabilities(),
       },
     }
@@ -56,7 +58,7 @@ export async function openseoRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canManageMembers(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canManageMembers(m)) return reply.code(403).send({ error: 'forbidden' })
     const env = loadEnv()
     const existing = await db
       .select()
@@ -91,7 +93,7 @@ export async function openseoRoutes(app: FastifyInstance) {
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
     if (!m) return reply.code(404).send({ error: 'not_found' })
-    if (!canOpenSeo(m.role, m.grantSeoOpen)) {
+    if (!canOpenSeo(m)) {
       return reply.code(403).send({ error: 'seo_access_denied' })
     }
     if (m.status === 'archived') {
@@ -114,7 +116,7 @@ export async function openseoRoutes(app: FastifyInstance) {
           businessId: m.businessId,
           userId: user.id,
           openseoUserRef: `bu2:${m.businessId}:${user.id}`,
-          roleMapped: mapRole(m.role),
+          roleMapped: m.isOwner ? 'owner' : 'editor',
         })
         .returning()
     }
@@ -194,12 +196,12 @@ export async function openseoRoutes(app: FastifyInstance) {
         .limit(1)
     )[0]
     if (!membership) return reply.code(403).send({ error: 'membership_missing' })
-    if (
-      !canOpenSeo(
-        membership.role as 'owner' | 'admin' | 'editor' | 'viewer',
-        membership.grantSeoOpen,
-      )
-    ) {
+    const biz = (
+      await db.select().from(businesses).where(eq(businesses.id, handoff.businessId)).limit(1)
+    )[0]
+    if (!biz) return reply.code(404).send({ error: 'not_found' })
+    const mctx = await loadMembership(handoff.userId, biz.slug)
+    if (!mctx || !canOpenSeo(mctx)) {
       return reply.code(403).send({ error: 'seo_access_denied' })
     }
     const user = (await db.select().from(users).where(eq(users.id, handoff.userId)).limit(1))[0]
@@ -226,7 +228,7 @@ export async function openseoRoutes(app: FastifyInstance) {
     return {
       openseoUserRef: identity?.openseoUserRef ?? `bu2:${handoff.businessId}:${handoff.userId}`,
       email: user?.email,
-      roleMapped: identity?.roleMapped ?? mapRole(membership.role),
+      roleMapped: identity?.roleMapped ?? (membership.isOwner ? 'owner' : 'editor'),
       capabilities: caps.allowed,
       denied: caps.denied,
       businessId: handoff.businessId,
@@ -265,18 +267,14 @@ export async function openseoRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, userId } = req.params as { slug: string; userId: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canManageMembers(m.role)) return reply.code(403).send({ error: 'forbidden' })
-    const body = z.object({ grantSeoOpen: z.boolean() }).parse(req.body)
-    await db
-      .update(memberships)
-      .set({ grantSeoOpen: body.grantSeoOpen })
-      .where(and(eq(memberships.businessId, m.businessId), eq(memberships.userId, userId)))
+    if (!m || !canManageMembers(m)) return reply.code(403).send({ error: 'forbidden' })
+    // Legacy grant endpoint retired — assign seo.open via permission bundles.
     await writeAudit({
       businessId: m.businessId,
       actorUserId: user.id,
-      action: 'openseo.grant_updated',
+      action: 'openseo.grant_rejected_use_bundles',
       resourceRef: userId,
-      meta: body,
+      meta: { note: 'use_permission_bundles' },
     })
     return { ok: true }
   })

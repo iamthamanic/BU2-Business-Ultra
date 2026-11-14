@@ -14,7 +14,7 @@ import {
   UsersThree,
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
-import { canManageCredentials, canManageMembers, type Role } from '@bu2/shared'
+import { canManageCredentials, canManageMembers } from '@bu2/shared'
 import { MktTab, MktTabs } from '../../components/MktTabs'
 import { api } from '../../lib/api'
 import { writeLastCompany } from '../../lib/lastCompany'
@@ -42,7 +42,8 @@ type CompanyMeta = {
   logoPath?: string | null
   status: string
   createdAt?: string | null
-  role?: string | null
+  isOwner?: boolean
+  permissions?: string[]
 }
 
 export function SettingsPage() {
@@ -98,7 +99,7 @@ export function SettingsPage() {
           status: string
           createdAt?: string
         }
-        membership: { role: string } | null
+        membership: { isOwner: boolean; permissions: string[] } | null
       }>(`/api/b/${slug}`),
       api<{ secrets: SecretRow[] }>(`/api/b/${slug}/settings/secrets`).catch(() => ({
         secrets: [] as SecretRow[],
@@ -112,7 +113,8 @@ export function SettingsPage() {
           logoPath: biz.business.logoPath,
           status: biz.business.status,
           createdAt: biz.business.createdAt ?? null,
-          role: biz.membership?.role ?? null,
+          isOwner: biz.membership?.isOwner ?? false,
+          permissions: biz.membership?.permissions ?? [],
         })
         setSecrets(sec.secrets)
         setStatus(st.status)
@@ -165,7 +167,11 @@ export function SettingsPage() {
 
   if (!slug) return null
 
-  const canEdit = canManageMembers((companyMeta?.role as Role) || 'viewer')
+  const membershipAuthz = {
+    isOwner: Boolean(companyMeta?.isOwner),
+    permissions: companyMeta?.permissions ?? [],
+  }
+  const canEdit = canManageMembers(membershipAuthz)
 
   const tabLabels: Record<SettingsTab, string> = {
     details: t('settingsDetails'),
@@ -206,7 +212,7 @@ export function SettingsPage() {
             logoPath={companyMeta?.logoPath}
             companyStatus={companyMeta?.status ?? 'active'}
             createdAt={companyMeta?.createdAt}
-            role={companyMeta?.role}
+            role={companyMeta?.isOwner ? 'owner' : 'member'}
             msg={dangerMsg}
             canEdit={canEdit}
             onMetaChanged={(next) =>
@@ -221,7 +227,7 @@ export function SettingsPage() {
           <SettingsConnectionsTab
             slug={slug}
             secrets={secrets}
-            canManage={canManageCredentials((companyMeta?.role as Role) || 'viewer')}
+            canManage={canManageCredentials(membershipAuthz)}
             onSecretsChanged={() => {
               refreshAll().catch(console.error)
             }}

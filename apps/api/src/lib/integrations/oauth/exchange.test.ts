@@ -117,12 +117,13 @@ describe('exchangeMicrosoftCode', () => {
 })
 
 describe('exchangeMetaCode', () => {
-  it('exchanges short token, upgrades long-lived, loads /me', async () => {
+  it('exchanges Instagram Business Login code via api.instagram.com + graph.instagram.com', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({
         ok: true,
-        text: async () => JSON.stringify({ access_token: 'short', expires_in: 3600 }),
+        text: async () =>
+          JSON.stringify({ access_token: 'short', user_id: 99, expires_in: 3600 }),
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -130,19 +131,22 @@ describe('exchangeMetaCode', () => {
       })
       .mockResolvedValueOnce({
         ok: true,
-        text: async () => JSON.stringify({ id: 'page-1', name: 'Brand Page' }),
+        text: async () =>
+          JSON.stringify({ user_id: '99', username: 'brand.ig', name: 'Brand' }),
       })
     vi.stubGlobal('fetch', fetchMock)
 
     const tokens = await exchangeMetaCode({
       code: 'code',
-      redirectUri: 'http://127.0.0.1:8742/api/oauth/meta/callback',
+      redirectUri: 'https://business-ultra.raccoova.com/api/oauth/meta/callback',
       provider: 'instagram',
       cfg,
     })
     expect(tokens.accessToken).toBe('long')
-    expect(tokens.externalAccountId).toBe('page-1')
+    expect(tokens.externalAccountId).toBe('99')
+    expect(tokens.displayName).toBe('brand.ig')
     expect(tokens.accountType).toBe('instagram')
     expect(tokens.refreshToken).toBeNull()
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('api.instagram.com/oauth/access_token')
   })
 })

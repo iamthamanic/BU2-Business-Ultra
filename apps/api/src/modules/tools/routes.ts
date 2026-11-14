@@ -3,15 +3,12 @@
  * Location: apps/api/src/modules/tools/routes.ts
  */
 import type { FastifyInstance } from 'fastify'
-import { eq } from 'drizzle-orm'
 import {
   CreateToolInstallSchema,
   UpdateToolInstallSchema,
   canManageTools,
   canUseTools,
 } from '@bu2/shared'
-import { db } from '../../db/client.js'
-import { businesses } from '../../db/schema.js'
 import { writeAudit } from '../../lib/audit.js'
 import { loadMembership, requireUser } from '../../plugins/auth.js'
 import {
@@ -21,32 +18,20 @@ import {
   updateToolInstall,
 } from './service.js'
 
-async function businessIdForSlug(slug: string): Promise<string | null> {
-  const rows = await db
-    .select({ id: businesses.id })
-    .from(businesses)
-    .where(eq(businesses.slug, slug))
-    .limit(1)
-  return rows[0]?.id ?? null
-}
 
 export async function toolsRoutes(app: FastifyInstance) {
   app.get('/api/b/:slug/tools', async (req, reply) => {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m && !user.isSuperadmin) return reply.code(404).send({ error: 'not_found' })
-    if (
-      m &&
-      !canUseTools(m.role, m.grantToolsUse, m.grantToolsManage) &&
-      !user.isSuperadmin
-    ) {
+    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!canUseTools(m)) {
       return reply.code(403).send({ error: 'forbidden' })
     }
-    const businessId = m?.businessId ?? (await businessIdForSlug(slug))
+    const businessId = m.businessId
     if (!businessId) return reply.code(404).send({ error: 'not_found' })
     const tools = await listToolsForBusiness(businessId)
-    const canManage = user.isSuperadmin || (m ? canManageTools(m.role, m.grantToolsManage) : false)
+    const canManage = canManageTools(m)
     return { tools, canManage }
   })
 
@@ -55,7 +40,7 @@ export async function toolsRoutes(app: FastifyInstance) {
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
     if (!m) return reply.code(404).send({ error: 'not_found' })
-    if (!canManageTools(m.role, m.grantToolsManage) && !user.isSuperadmin) {
+    if (!canManageTools(m)) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     const body = CreateToolInstallSchema.parse(req.body)
@@ -78,7 +63,7 @@ export async function toolsRoutes(app: FastifyInstance) {
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
     if (!m) return reply.code(404).send({ error: 'not_found' })
-    if (!canManageTools(m.role, m.grantToolsManage) && !user.isSuperadmin) {
+    if (!canManageTools(m)) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     if (id === '00000000-0000-4000-8000-000000000001') {
@@ -101,7 +86,7 @@ export async function toolsRoutes(app: FastifyInstance) {
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
     if (!m) return reply.code(404).send({ error: 'not_found' })
-    if (!canManageTools(m.role, m.grantToolsManage) && !user.isSuperadmin) {
+    if (!canManageTools(m)) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     if (id === '00000000-0000-4000-8000-000000000001') {

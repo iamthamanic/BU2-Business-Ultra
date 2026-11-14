@@ -53,11 +53,14 @@ Primary auth is **email + password**. Magic Link / OTP remains as a secondary/de
 | Email | `raccoova@gmail.com` (`BOOTSTRAP_OWNER_EMAIL`) |
 | Password | `change-me-local` (`BOOTSTRAP_OWNER_PASSWORD`) |
 
-1. `pnpm db:migrate && pnpm db:seed` (seeds/refreshes the bootstrap password hash)
+1. `pnpm db:migrate && pnpm db:seed` (creates/refreshes Better Auth credential for bootstrap owner; password must be ≥8 chars — otherwise seed uses `change-me-local`)
 2. Open `/login` → email + password → **Anmelden**
 3. Optional: expand Magic Link / OTP; without `BREVO_API_KEY`, codes print to the API console
 4. Create first company (empty start) → Marketing Hub at `/co/:slug/marketing`
-5. Settings → Verbindungen → paste provider keys (features stay gated until valid)
+5. Settings → Verbindungen → OAuth connect for Google/Meta/LinkedIn/TikTok/X/Pinterest/Ads (Client ID/Secret in server env); Metricool/Brevo remain API-key gates
+
+**Local demo data (optional):** set `BU2_DEMO_SEED=1` in `.env.local`, then `pnpm db:seed:demo`.  
+Wipes all businesses (owner stays), plants three DE firms (`wendy-spirit` S, `physiopraxis-hammer` M, `sagatree-vtt` L) with Kontakte, Produkte, Projekte, Marketing, Inbox, Finance, Verbindungen. Replace on every run. Never enable in production.
 
 Change password while logged in: `POST /api/auth/password` with `{ "currentPassword": "…", "newPassword": "…" }`.
 
@@ -113,14 +116,13 @@ scripts/           backup/restore
 
 ## Recent changes
 
+- **2026-11-14** — OAuth for remaining ads (ChatGPT/Reddit/Microsoft) + social sync workers; Auth bundles / Better Auth; Finance screens; PKCE cookie + OAuth rate limits (`feat/finance-screens-connector-dx`)
 - **2026-11-04** — Unipile Telegram User (02b): QR/link personal account → sync private DMs → reply; env `UNIPILE_DSN` + `UNIPILE_ACCESS_TOKEN`
 - **2026-11-04** — Omnichannel UX shell: Verbindungen hub (table + connect wizard + usage toggles); Inbox sources/filters; connect moved out of Inbox
 - **2026-11-04** — Inbox Telegram E2E: connect bot → sync → thread → reply/outbox; three-pane Dark-Ops UI
 - **2026-11-04** — Integration Core step 01: `connections` / credentials / bindings / sync cursors + mock adapter (`/api/b/:slug/integrations/…`)
 - **2026-11-03** — CRM (Kunden), Produkte, Projekte/Tasks, Labels/Tags, Styleguide + Create-Post flow; migrations `0002`–`0010`; Dark-Ops CRM UI
-- **2026-11-01** — Shell IA: Marketing (Hub/Organic/Paid/Custom/Persona/SEO/GEO) + Tools; Marketing Hub default landing; no Website dept ([docs/ROUTING.md](./docs/ROUTING.md))
-- **2026-11-01** — Topbar company switcher restored (legacy-style dropdown); sidebar Companies nav removed; `/` + post-login land on `bu2_last_company`; create-first when empty
-- **2026-11-01** — Topbar chips sharper (`--radius-sm`)
-- **2026-11-01** — Topbar logo only; "Business Ultra" wordmark in sidebar `sb-head` (hidden when slim/collapsed)
-- **2026-11-01** — BU logo moved to topbar left (links home); sidebar head keeps collapse toggle only
-- **2026-11-01** — UI label Companies (not Businesses); frontend routes aligned to legacy `/co/:slug/...` with `/b/...` redirects ([docs/ROUTING.md](./docs/ROUTING.md))
+- **2026-11-01** — Shell IA: Marketing Hub default landing; Tools; no Website dept ([docs/ROUTING.md](./docs/ROUTING.md))
+- **2026-11-01** — Topbar company switcher; last-company landing; `/co/:slug/...` routes ([docs/ROUTING.md](./docs/ROUTING.md))
+- **2026-11-01** — Topbar logo + sidebar wordmark; sharper chips (`--radius-sm`)
+- **2026-11-01** — UI label Companies; `/b/...` redirects to `/co/...`

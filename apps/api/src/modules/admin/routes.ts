@@ -67,12 +67,13 @@ export async function adminRoutes(app: FastifyInstance) {
 
     const target = existing.find((m) => m.userId === body.newOwnerUserId)
     if (target) {
-      await db.update(memberships).set({ role: 'owner' }).where(eq(memberships.id, target.id))
+      await db.update(memberships).set({ isOwner: true, status: 'active' }).where(eq(memberships.id, target.id))
     } else {
       await db.insert(memberships).values({
         businessId: body.businessId,
         userId: body.newOwnerUserId,
-        role: 'owner',
+        isOwner: true,
+        status: 'active',
       })
     }
 

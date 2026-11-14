@@ -36,7 +36,7 @@ export const products = pgTable('products', {
   personaIds: jsonb('persona_ids').$type<string[]>().notNull().default([]),
   personaDraft: jsonb('persona_draft').$type<Record<string, unknown>>().notNull().default({}),
   journeyCanvas: jsonb('journey_canvas')
-    .$type<{ nodes: unknown[]; edges: unknown[] }>()
+    .$type<{ nodes: unknown[]; edges: unknown[]; map?: unknown }>()
     .notNull()
     .default({ nodes: [], edges: [] }),
   archivedAt: timestamp('archived_at', { withTimezone: true }),
@@ -44,16 +44,28 @@ export const products = pgTable('products', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
-/** CRM customers (person/org) — soft-archive. */
-export const customers = pgTable(
-  'customers',
+/**
+ * CRM contacts (person/org) — soft-archive.
+ * Roles are non-exclusive: isCustomer and/or isPartner (check constraint in SQL).
+ * Table renamed from `customers` in migration 0020; child FKs still use customer_id columns.
+ */
+export const contacts = pgTable(
+  'contacts',
   {
     id: uuid('id').defaultRandom().primaryKey(),
     businessId: uuid('business_id')
       .notNull()
       .references(() => businesses.id, { onDelete: 'cascade' }),
-    /** Per-business sequential number, starts at 100100 (always 6+ digits). */
-    customerNumber: integer('customer_number').notNull(),
+    /** K- number when customer role; null for partner-only. Starts at 100100. */
+    customerNumber: integer('customer_number'),
+    /** P- number when partner role; null when never partner. Starts at 100100. */
+    partnerNumber: integer('partner_number'),
+    isCustomer: boolean('is_customer').notNull().default(true),
+    isPartner: boolean('is_partner').notNull().default(false),
+    /** Free-text partner category (suggestions in UI, not a closed enum). */
+    partnerCategory: varchar('partner_category', { length: 80 }),
+    /** Partner lifecycle — independent from customer relationStatus. */
+    partnerStatus: varchar('partner_status', { length: 24 }).notNull().default('active'),
     kind: varchar('kind', { length: 16 }).notNull().default('person'),
     displayName: varchar('display_name', { length: 200 }).notNull(),
     firstName: varchar('first_name', { length: 100 }),
@@ -79,8 +91,14 @@ export const customers = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('customers_biz_number_uidx').on(t.businessId, t.customerNumber)],
+  (t) => [
+    uniqueIndex('contacts_biz_customer_number_uidx').on(t.businessId, t.customerNumber),
+    uniqueIndex('contacts_biz_partner_number_uidx').on(t.businessId, t.partnerNumber),
+  ],
 )
+
+/** @deprecated Prefer `contacts` — same table after 0020 rename. */
+export const customers = contacts
 
 /** Company label catalog by scope (customer/project/marketing/product). */
 export const businessTags = pgTable(

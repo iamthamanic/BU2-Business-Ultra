@@ -76,7 +76,7 @@ Target layout (no table renames, no behavior change):
 
 ```
 schema/
-  identity.ts      # users, sessions, businesses, memberships, …
+  identity.ts      # Better Auth + users, businesses, memberships, bundles, grants, …
   crm.ts           # customers, tags, notes, …
   projects.ts
   inbox.ts
@@ -101,9 +101,12 @@ schema.ts          # stable barrel re-export (keep import path `db/schema`)
 | API modules | `apps/api/src/modules/*` | HTTP + service per domain | Tenant via membership + slug |
 | Integration Core | `apps/api/src/lib/integrations/core/*` | Providers, connections, credentials, bindings, capabilities, adapters | Shared; modules own domain tables |
 | OAuth / adapters | `apps/api/src/lib/integrations/{oauth,gmail,telegram,unipile,…}` | Provider-specific I/O | DECISIONS Integration Core |
-| Shared contracts | `packages/shared` | Zod schemas, roles, capability helpers | Single public contract surface for UI↔API |
+| Shared contracts | `packages/shared` | Zod schemas, permission catalog + AuthZ helpers | Single public contract surface for UI↔API |
+| Finance SoR | `apps/api/src/modules/finance` + `db/schema/finance.ts` | Accounts, transactions, settings, snapshot API | UI under `features/finance`; finAPI sync later |
+| Demo seed | `apps/api/src/db/seedDemo.ts` + `db/demo/*` | Local replace seed (`BU2_DEMO_SEED=1`) | Three DE firms S/M/L; never prod |
 | Finance / CMB | `packages/finance-calc` | Pricing/CMB engine + goldens | Internal package |
-| Auth plugin | `apps/api/src/plugins/auth.ts` | Session cookie → user; membership by slug | Identity never from client headers |
+| Auth plugin | `apps/api/src/plugins/auth.ts` | Better Auth session → user; membership by slug | Identity never from client headers |
+| AuthZ resolver | `apps/api/src/lib/authorize.ts` + `packages/shared/permissions` | `is_owner` OR permission bundles; platform grants | Deny by default; no content superuser |
 | Persistence | `apps/api/src/db/*` | Schema, migrate, seed, client | Drizzle |
 
 ## Data ownership (Ist — schema-derived)
@@ -112,7 +115,7 @@ Approximate ownership by table group in `apps/api/src/db/schema.ts`:
 
 | Owner concern | Tables (examples) |
 |---------------|-------------------|
-| Identity / tenancy | `users`, `sessions`, `auth_challenges`, `businesses`, `memberships`, `invites` |
+| Identity / tenancy | Better Auth `user`/`session`/`account`/`verification`; BU2 `users`, `businesses`, `memberships`, `invites`, `platform_grants`, `permission_bundles`, `bundle_permissions`, `membership_bundles` |
 | Settings secrets (single-key gates) | `settings_secrets` |
 | Integration Core | `connections`, `connection_credentials`, `module_bindings`, `sync_cursors`, `outbox_jobs`, `business_integrations` |
 | Inbox / CRM identity | `contact_identities`, `conversations`, `messages` |
@@ -120,6 +123,7 @@ Approximate ownership by table group in `apps/api/src/db/schema.ts`:
 | Product / catalog | `products`, `catalog_products` |
 | Projects | `projects`, `tasks`, `task_*`, `recurrence_rules`, `task_occurrences`, `project_events` |
 | Marketing / ads | `social_drafts`, `ads_campaigns`, `funnel_bindings`, `brevo_campaigns` |
+| Finance | `finance_accounts`, `finance_transactions`, `finance_settings` |
 | Tools | `tool_installs`, `personas`, `cmb_*`, `openseo_*` |
 | Audit | `audit_log` |
 
@@ -147,7 +151,13 @@ Approximate ownership by table group in `apps/api/src/db/schema.ts`:
 
 ## AuthN / AuthZ boundaries
 
-See [SECURITY.md](./SECURITY.md). Summary (binding via DECISIONS + AGENTS Secure-by-Default): session cookie `bu2_session`; roles `owner|admin|editor|viewer`; API under `/api/b/:slug/...` loads membership for that business. Never take identity from client headers (B-09).
+See [SECURITY.md](./SECURITY.md). Summary (binding via DECISIONS Auth Bundles + AGENTS Secure-by-Default):
+
+- **AuthN:** Better Auth (email/password + magic link + email OTP); open signup disabled; session via Better Auth cookie; `plugins/auth.ts` maps session → BU2 `users` profile
+- **AuthZ (company):** `memberships.is_owner` **or** union of assigned permission bundles (`packages/shared` + `lib/authorize.ts`); deny unknown keys
+- **Platform:** `companies.create` via `platform_grants` (not a company bundle); bootstrap grants first installer
+- **Operators:** `isSuperadmin` / `isBreakglassOperator` are infra/admin only — **not** content superusers and must not bypass company membership AuthZ
+- **Tenant API:** `/api/b/:slug/...` loads membership server-side for that business. Never take identity from client headers (B-09).
 
 ## Shared code rules
 

@@ -117,6 +117,7 @@ export function MyTasksPage() {
           tasks={tasks}
           onOpen={openTask}
           t={t}
+          slug={slug}
           memberById={memberById}
           showFilters
           showProject

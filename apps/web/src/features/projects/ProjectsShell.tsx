@@ -83,8 +83,8 @@ export function ProjectsShell() {
   const slug = paramSlug || ctx?.slug || ''
   const { t } = useI18n()
   const navigate = useNavigate()
-  const role = ctx?.membership?.role
-  const canWrite = role ? canMutateContent(role) : Boolean(ctx?.user?.isSuperadmin)
+  const m = ctx?.membership
+  const canWrite = m ? canMutateContent({ isOwner: m.isOwner, permissions: m.permissions ?? [] }) : false
   const routes = companyRoutes(slug)
 
   const [projects, setProjects] = useState<BuProject[]>([])

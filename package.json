@@ -20,6 +20,8 @@
     "db:generate": "pnpm --filter @bu2/api db:generate",
     "db:migrate": "pnpm --filter @bu2/api db:migrate",
     "db:seed": "pnpm --filter @bu2/api db:seed",
+    "db:seed:demo": "pnpm --filter @bu2/api db:seed:demo",
+    "setup": "pnpm --filter @bu2/api setup",
     "docker:up": "docker compose up -d --build",
     "docker:down": "docker compose down"
   }

@@ -47,6 +47,8 @@ Override via env (`WEB_PORT`, `API_PORT`, `DATABASE_URL`, `PUBLIC_*`, `CORS_ORIG
 ```bash
 pnpm db:migrate
 pnpm db:seed          # bootstrap owner / local seed
+# Optional local demo (fail-closed unless BU2_DEMO_SEED=1):
+# pnpm db:seed:demo   # wipe businesses + 3 DE demo firms (S/M/L); owner kept
 ```
 
 Schema source: `apps/api/src/db/schema.ts` + migrate tooling under `apps/api/src/db/`.

@@ -27,13 +27,25 @@ export type FunnelSourceResult = {
   connectionsLinked?: number
 }
 
-const ORGANIC_CHANNELS = new Set(['instagram', 'facebook', 'tiktok', 'linkedin', 'youtube'])
+const ORGANIC_CHANNELS = new Set([
+  'instagram',
+  'facebook',
+  'tiktok',
+  'linkedin',
+  'youtube',
+  'x',
+  'pinterest',
+])
 
 /** Funnel Direct provider id → Integration Core provider id. */
 const DIRECT_TO_CONNECTION: Record<string, string> = {
   youtube: 'youtube',
   google_ads: 'google_ads',
   chatgpt_ads: 'chatgpt_ads',
+  linkedin: 'linkedin',
+  tiktok: 'tiktok',
+  x: 'x',
+  pinterest: 'pinterest',
 }
 
 export function organicSurface(channel: string): string {
@@ -139,7 +151,20 @@ export async function resolveFunnelSource(
     }
   }
 
-  if (!keyReady) {
+  let integ =
+    integrationId != null
+      ? linked.find((r) => r.id === integrationId) ?? null
+      : null
+  if (!integ && linked[0]) integ = linked[0]
+
+  const isDemoInteg = Boolean(
+    integ &&
+      integ.config &&
+      typeof integ.config === 'object' &&
+      (integ.config as { demo?: boolean }).demo === true,
+  )
+
+  if (!keyReady && !isDemoInteg) {
     return {
       surface,
       provider: 'metricool',
@@ -155,12 +180,6 @@ export async function resolveFunnelSource(
       needs: 'key',
     }
   }
-
-  let integ =
-    integrationId != null
-      ? linked.find((r) => r.id === integrationId) ?? null
-      : null
-  if (!integ && linked[0]) integ = linked[0]
 
   if (!integ) {
     return {
@@ -184,13 +203,14 @@ export async function resolveFunnelSource(
     provider: 'metricool',
     status: status || 'active',
     implemented: true,
-    keyReady: true,
+    keyReady: keyReady || isDemoInteg,
     brandsLinked,
     blogIds: [String(integ.externalId)],
     integrationId: integ.id,
     brandLabel: integ.label || integ.externalId,
     contentReady: true,
     needs: null,
+    message: isDemoInteg && !keyReady ? 'Demo-Metricool (ohne Live-Key)' : undefined,
   }
 }
 
@@ -221,4 +241,88 @@ export type OrganicPostRow = {
 
 export function emptyOrganicPosts(): OrganicPostRow[] {
   return []
+}
+
+/** Deterministic demo organic rows when Metricool live sync is absent. */
+export function demoOrganicPosts(channel: string, brandLabel: string | null): OrganicPostRow[] {
+  const ch = channel.toLowerCase()
+  const label = brandLabel || 'Demo Brand'
+  const base = [
+    {
+      title:
+        ch === 'youtube'
+          ? `${label}: Behind the scenes / Tutorial`
+          : ch === 'linkedin'
+            ? `${label}: Product note für Creator & Vereine`
+            : `${label}: Launch / Angebot der Woche`,
+      type: ch === 'youtube' ? 'video' : ch === 'instagram' ? 'reel' : 'post',
+      daysAgo: 2,
+      views: 4200,
+      reach: 6100,
+      likes: 310,
+      comments: 28,
+      shares: 44,
+      saves: 67,
+    },
+    {
+      title:
+        ch === 'facebook'
+          ? `${label}: Kundengeschichte / Social Proof`
+          : `${label}: Tipps & Community-Frage`,
+      type: 'post',
+      daysAgo: 6,
+      views: 1800,
+      reach: 2400,
+      likes: 120,
+      comments: 19,
+      shares: 22,
+      saves: 31,
+    },
+    {
+      title: `${label}: Story Highlight / Carousel`,
+      type: ch === 'instagram' ? 'carousel' : 'post',
+      daysAgo: 11,
+      views: 950,
+      reach: 1400,
+      likes: 78,
+      comments: 9,
+      shares: 11,
+      saves: 18,
+    },
+  ]
+  return base.map((p, i) => {
+    const d = new Date()
+    d.setUTCDate(d.getUTCDate() - p.daysAgo)
+    d.setUTCHours(d.getUTCHours() - (i + 1) * 3)
+    const ageMs = Date.now() - d.getTime()
+    const ageH = ageMs / 3_600_000
+    const bucket = ageH <= 24 ? '24h' : ageH <= 24 * 7 ? '7d' : ageH <= 24 * 30 ? '30d' : 'older'
+    const isVideo = p.type === 'video' || p.type === 'reel'
+    const engagement = p.likes + p.comments + p.shares + p.saves
+    const er =
+      p.reach > 0 ? Math.round((engagement / p.reach) * 1000) / 10 : null
+    return {
+      id: `demo-${ch}-${i}`,
+      date: d.toISOString(),
+      type: p.type,
+      bucket,
+      title: p.title,
+      url: null,
+      image: null,
+      views: p.views,
+      reach: p.reach,
+      likes: p.likes,
+      comments: p.comments,
+      shares: p.shares,
+      saves: p.saves,
+      engagement: er,
+      durationSec: isVideo ? 28 + i * 7 : null,
+      watchPct: isVideo ? 41 + i * 4 : null,
+      paidShare: i === 0 ? 0.12 : 0,
+      sharesPer1000: Math.round((p.shares / Math.max(p.views, 1)) * 1000),
+      savesPer1000: Math.round((p.saves / Math.max(p.views, 1)) * 1000),
+      savesPer100: Math.round((p.saves / Math.max(p.reach, 1)) * 100),
+      kpiHit: engagement > 150,
+    }
+  })
 }

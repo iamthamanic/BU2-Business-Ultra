@@ -23,6 +23,7 @@ import { db } from '../../db/client.js'
 import {
   businesses,
   businessIntegrations,
+  connections,
   funnelBindings,
   openseoInstances,
 } from '../../db/schema.js'
@@ -39,7 +40,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
     if (!m) return reply.code(404).send({ error: 'not_found' })
-    if (!canManageCredentials(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!canManageCredentials(m)) return reply.code(403).send({ error: 'forbidden' })
     const statuses = await listSecretStatuses(m.businessId)
     return { secrets: statuses }
   })
@@ -48,8 +49,24 @@ export async function settingsRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canManageCredentials(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canManageCredentials(m)) return reply.code(403).send({ error: 'forbidden' })
     const body = UpsertSecretSchema.parse(req.body)
+    // Paid ads + Google/Meta/TikTok Ads use Integration Core OAuth — no settings_secrets dual path.
+    const oauthOnly = new Set([
+      'chatgpt_ads',
+      'reddit_ads',
+      'microsoft_ads',
+      'pinterest_ads',
+      'google_ads',
+      'meta_ads',
+      'tiktok_ads',
+    ])
+    if (oauthOnly.has(body.provider)) {
+      return reply.code(410).send({
+        error: 'ads_secret_retired',
+        hint: `Use OAuth connect for ${body.provider} (Settings → Verbindungen).`,
+      })
+    }
     const check = await validateProviderKey(body.provider, body.apiKey)
     await upsertBusinessSecret({
       businessId: m.businessId,
@@ -75,7 +92,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     const parsed = SecretProviderSchema.safeParse(provider)
     if (!parsed.success) return reply.code(400).send({ error: 'unknown_provider' })
     const m = await loadMembership(user.id, slug)
-    if (!m || !canManageCredentials(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canManageCredentials(m)) return reply.code(403).send({ error: 'forbidden' })
     await deleteBusinessSecret(m.businessId, parsed.data)
     await writeAudit({
       businessId: m.businessId,
@@ -93,15 +110,22 @@ export async function settingsRoutes(app: FastifyInstance) {
     if (!m) return reply.code(404).send({ error: 'not_found' })
     const statuses = await listSecretStatuses(m.businessId)
     const by = Object.fromEntries(statuses.map((s) => [s.provider, s.valid]))
+    const adsProviders = ['google_ads', 'meta_ads', 'tiktok_ads', 'chatgpt_ads'] as const
+    const adsConn = await db
+      .select({ provider: connections.provider })
+      .from(connections)
+      .where(and(eq(connections.businessId, m.businessId), eq(connections.status, 'active')))
+    const adsReady = new Set(adsConn.map((r) => r.provider))
     return {
       gates: {
         metricool: !!by.metricool,
         brevo: !!by.brevo,
-        google_ads: !!by.google_ads,
-        meta_ads: !!by.meta_ads,
-        tiktok_ads: !!by.tiktok_ads,
-        chatgpt_ads: !!by.chatgpt_ads,
+        google_ads: adsReady.has('google_ads'),
+        meta_ads: adsReady.has('meta_ads'),
+        tiktok_ads: adsReady.has('tiktok_ads'),
+        chatgpt_ads: adsReady.has('chatgpt_ads'),
       },
+      oauthAds: Object.fromEntries(adsProviders.map((p) => [p, adsReady.has(p)])),
     }
   })
 
@@ -165,7 +189,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canManageCredentials(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canManageCredentials(m)) return reply.code(403).send({ error: 'forbidden' })
     const body = z
       .object({
         dataUrl: z.string().startsWith('data:image/'),
@@ -195,7 +219,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canManageCredentials(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canManageCredentials(m)) return reply.code(403).send({ error: 'forbidden' })
     await db
       .update(businesses)
       .set({ logoPath: null, updatedAt: new Date() })
@@ -224,7 +248,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
     if (!m) return reply.code(404).send({ error: 'not_found' })
-    if (!canManageCredentials(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!canManageCredentials(m)) return reply.code(403).send({ error: 'forbidden' })
 
     const linked = await db
       .select()
@@ -271,7 +295,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canManageCredentials(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canManageCredentials(m)) return reply.code(403).send({ error: 'forbidden' })
     const body = LinkMetricoolSchema.parse(req.body)
 
     const existing = (
@@ -327,7 +351,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canManageCredentials(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canManageCredentials(m)) return reply.code(403).send({ error: 'forbidden' })
 
     const row = (
       await db
@@ -394,7 +418,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canManageCredentials(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canManageCredentials(m)) return reply.code(403).send({ error: 'forbidden' })
     const body = FunnelBindingsPutSchema.parse(req.body)
 
     const integIds = new Set(

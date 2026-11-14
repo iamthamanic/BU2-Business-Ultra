@@ -10,7 +10,9 @@ RUN pnpm install --frozen-lockfile || pnpm install
 COPY packages/shared packages/shared
 COPY apps/web apps/web
 COPY tsconfig.base.json ./
-RUN pnpm --filter @bu2/shared build && pnpm --filter @bu2/web build
+RUN find packages apps -name '*.tsbuildinfo' -delete \
+ && pnpm --filter @bu2/shared build \
+ && pnpm --filter @bu2/web build
 
 FROM nginx:1.27-alpine
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf

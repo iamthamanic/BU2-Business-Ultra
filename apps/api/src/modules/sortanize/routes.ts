@@ -24,7 +24,7 @@ export async function sortanizeRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     const env = loadEnv()
     try {
       const res = await fetch(`${env.SORTANIZE_URL}/match`, {
@@ -50,7 +50,7 @@ export async function sortanizeRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     const env = loadEnv()
     try {
       const res = await fetch(`${env.SORTANIZE_URL}/run`, {

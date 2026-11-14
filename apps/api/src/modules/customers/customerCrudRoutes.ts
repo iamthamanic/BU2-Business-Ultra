@@ -2,11 +2,12 @@
  * Customer CRUD HTTP — list/detail/create/patch/archive/restore.
  * Location: apps/api/src/modules/customers/customerCrudRoutes.ts
  */
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { and, desc, eq, ilike, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm'
 import { CustomerPatchSchema, CustomerSchema, canMutateContent } from '@bu2/shared'
 import { db } from '../../db/client.js'
 import {
+  contactIdentities,
   customerConsents,
   customerEvents,
   customers,
@@ -20,6 +21,7 @@ import { loadMembership, requireUser } from '../../plugins/auth.js'
 import {
   addEvent,
   allocateCustomerNumber,
+  allocatePartnerNumber,
   composeDisplayName,
   formatAddressLine,
   loadCustomer,
@@ -29,67 +31,81 @@ import {
   toCustomer,
 } from './service.js'
 
-export async function registerCustomerCrudRoutes(app: FastifyInstance) {
-  app.get('/api/b/:slug/customers', async (req, reply) => {
-    const user = await requireUser(req)
-    const { slug } = req.params as { slug: string }
-    const q = (req.query as {
+async function listContactsHandler(req: FastifyRequest, reply: FastifyReply) {
+  const user = await requireUser(req)
+  const { slug } = req.params as { slug: string }
+  const q =
+    (req.query as {
       archive?: string
       status?: string
       q?: string
       tag?: string
+      role?: string
+      category?: string
     }) || {}
-    const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
-    const archived = q.archive === '1' || q.archive === 'true'
-    const conds = [
-      eq(customers.businessId, m.businessId),
-      archived ? isNotNull(customers.archivedAt) : isNull(customers.archivedAt),
-    ]
-    if (q.status && ['lead', 'prospect', 'customer'].includes(q.status)) {
-      conds.push(eq(customers.relationStatus, q.status))
-    }
-    if (q.q?.trim()) {
-      const term = `%${q.q.trim()}%`
-      conds.push(
-        or(
-          ilike(customers.displayName, term),
-          ilike(customers.email, term),
-          ilike(customers.phone, term),
-        )!,
-      )
-    }
-    if (q.tag?.trim()) {
-      conds.push(sql`${customers.tags} @> ${JSON.stringify([q.tag.trim()])}::jsonb`)
-    }
-    const rows = await db
-      .select()
+  const m = await loadMembership(user.id, slug)
+  if (!m) return reply.code(404).send({ error: 'not_found' })
+  const archived = q.archive === '1' || q.archive === 'true'
+  const role = q.role === 'partner' ? 'partner' : q.role === 'all' ? 'all' : 'customer'
+  const conds = [
+    eq(customers.businessId, m.businessId),
+    archived ? isNotNull(customers.archivedAt) : isNull(customers.archivedAt),
+  ]
+  if (role === 'customer') conds.push(eq(customers.isCustomer, true))
+  if (role === 'partner') conds.push(eq(customers.isPartner, true))
+  if (role === 'partner' && q.status && ['active', 'inactive'].includes(q.status)) {
+    conds.push(eq(customers.partnerStatus, q.status))
+  } else if (role !== 'partner' && q.status && ['lead', 'prospect', 'customer'].includes(q.status)) {
+    conds.push(eq(customers.relationStatus, q.status))
+  }
+  if (role === 'partner' && q.category?.trim()) {
+    conds.push(eq(customers.partnerCategory, q.category.trim()))
+  }
+  if (q.q?.trim()) {
+    const term = `%${q.q.trim()}%`
+    conds.push(
+      or(
+        ilike(customers.displayName, term),
+        ilike(customers.email, term),
+        ilike(customers.phone, term),
+        ilike(customers.partnerCategory, term),
+      )!,
+    )
+  }
+  if (q.tag?.trim()) {
+    conds.push(sql`${customers.tags} @> ${JSON.stringify([q.tag.trim()])}::jsonb`)
+  }
+  const rows = await db
+    .select()
+    .from(customers)
+    .where(and(...conds))
+    .orderBy(desc(customers.updatedAt))
+  const orgIds = [
+    ...new Set(rows.map((r) => r.orgCustomerId).filter((x): x is string => Boolean(x))),
+  ]
+  const orgMap = new Map<string, { id: string; displayName: string }>()
+  if (orgIds.length) {
+    const orgs = await db
+      .select({ id: customers.id, displayName: customers.displayName })
       .from(customers)
-      .where(and(...conds))
-      .orderBy(desc(customers.updatedAt))
-    const orgIds = [
-      ...new Set(rows.map((r) => r.orgCustomerId).filter((x): x is string => Boolean(x))),
-    ]
-    const orgMap = new Map<string, { id: string; displayName: string }>()
-    if (orgIds.length) {
-      const orgs = await db
-        .select({ id: customers.id, displayName: customers.displayName })
-        .from(customers)
-        .where(
-          and(
-            eq(customers.businessId, m.businessId),
-            eq(customers.kind, 'org'),
-            inArray(customers.id, orgIds),
-          ),
-        )
-      for (const o of orgs) orgMap.set(o.id, o)
-    }
-    return {
-      customers: rows.map((r) =>
-        toCustomer(r, r.orgCustomerId ? orgMap.get(r.orgCustomerId) ?? null : null),
-      ),
-    }
-  })
+      .where(
+        and(
+          eq(customers.businessId, m.businessId),
+          eq(customers.kind, 'org'),
+          inArray(customers.id, orgIds),
+        ),
+      )
+    for (const o of orgs) orgMap.set(o.id, o)
+  }
+  const mapped = rows.map((r) =>
+    toCustomer(r, r.orgCustomerId ? orgMap.get(r.orgCustomerId) ?? null : null),
+  )
+  return { customers: mapped, contacts: mapped }
+}
+
+export async function registerCustomerCrudRoutes(app: FastifyInstance) {
+  app.get('/api/b/:slug/customers', listContactsHandler)
+  app.get('/api/b/:slug/contacts', listContactsHandler)
 
   app.get('/api/b/:slug/customers/:id', async (req, reply) => {
     const user = await requireUser(req)
@@ -147,6 +163,17 @@ export async function registerCustomerCrudRoutes(app: FastifyInstance) {
             .where(
               and(eq(projects.businessId, m.businessId), inArray(projects.id, projectIds)),
             )
+    const identities = await db
+      .select({ kind: contactIdentities.kind, value: contactIdentities.value })
+      .from(contactIdentities)
+      .where(
+        and(eq(contactIdentities.businessId, m.businessId), eq(contactIdentities.customerId, id)),
+      )
+    const hasEmail = identities.some((x) => x.kind === 'email')
+    const hasPhone = identities.some((x) => x.kind === 'phone')
+    const hasWa =
+      hasPhone ||
+      identities.some((x) => x.kind === 'whatsapp' || x.value.startsWith('+'))
     return {
       customer: toCustomer(row, org),
       notes,
@@ -164,9 +191,9 @@ export async function registerCustomerCrudRoutes(app: FastifyInstance) {
       linkedProjects,
       stats,
       channels: {
-        email: { connected: false },
-        whatsapp: { connected: false },
-        phone: { connected: false },
+        email: { connected: hasEmail || Boolean(row.email) },
+        whatsapp: { connected: hasWa },
+        phone: { connected: hasPhone || Boolean(row.phone) },
       },
     }
   })
@@ -175,7 +202,7 @@ export async function registerCustomerCrudRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     const body = CustomerSchema.parse(req.body)
     const street = body.street ?? null
     const postalCode = body.postalCode ?? null
@@ -197,12 +224,24 @@ export async function registerCustomerCrudRoutes(app: FastifyInstance) {
       if (!org) return reply.code(400).send({ error: 'invalid_org' })
       orgCustomerId = org.id
     }
-    const customerNumber = await allocateCustomerNumber(m.businessId)
+    // Zod already applied role defaults; never coerce missing → customer via `!== false`.
+    const isCustomer = body.isCustomer === true
+    const isPartner = body.isPartner === true
+    if (!isCustomer && !isPartner) {
+      return reply.code(400).send({ error: 'role_required' })
+    }
+    const customerNumber = isCustomer ? await allocateCustomerNumber(m.businessId) : null
+    const partnerNumber = isPartner ? await allocatePartnerNumber(m.businessId) : null
     const [row] = await db
       .insert(customers)
       .values({
         businessId: m.businessId,
         customerNumber,
+        partnerNumber,
+        isCustomer,
+        isPartner,
+        partnerCategory: isPartner ? body.partnerCategory?.trim() || null : null,
+        partnerStatus: isPartner ? body.partnerStatus || 'active' : 'active',
         kind: body.kind,
         displayName,
         firstName: body.kind === 'person' ? firstName : null,
@@ -221,13 +260,16 @@ export async function registerCustomerCrudRoutes(app: FastifyInstance) {
         address:
           body.address ??
           formatAddressLine({ street, postalCode, city, country }),
-        relationStatus: body.relationStatus,
+        relationStatus: isCustomer ? body.relationStatus : 'lead',
         birthDate: body.birthDate ?? null,
         photoUrl: body.photoUrl ?? null,
         tags: body.tags,
       })
       .returning()
-    await addEvent(row!.id, 'created', `Kunde angelegt: ${row!.displayName}`, user.id)
+    const roleLabel = [isCustomer ? 'Kunde' : null, isPartner ? 'Partner' : null]
+      .filter(Boolean)
+      .join('+')
+    await addEvent(row!.id, 'created', `Kontakt angelegt (${roleLabel}): ${row!.displayName}`, user.id)
     await writeAudit({
       businessId: m.businessId,
       actorUserId: user.id,
@@ -242,7 +284,7 @@ export async function registerCustomerCrudRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadCustomer(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     const body = CustomerPatchSchema.parse(req.body)
@@ -293,6 +335,35 @@ export async function registerCustomerCrudRoutes(app: FastifyInstance) {
       body.postalCode !== undefined ||
       body.city !== undefined ||
       body.country !== undefined
+
+    const nextIsCustomer =
+      body.isCustomer !== undefined ? body.isCustomer : existing.isCustomer
+    const nextIsPartner = body.isPartner !== undefined ? body.isPartner : existing.isPartner
+    if (!nextIsCustomer && !nextIsPartner) {
+      return reply.code(400).send({ error: 'role_required' })
+    }
+    // Role flags may be cleared; numbers and purchases stay (history). Future billing can block.
+    const rolePatch: {
+      isCustomer?: boolean
+      isPartner?: boolean
+      customerNumber?: number | null
+      partnerNumber?: number | null
+      partnerCategory?: string | null
+    } = {}
+    if (body.isCustomer !== undefined || body.isPartner !== undefined) {
+      rolePatch.isCustomer = nextIsCustomer
+      rolePatch.isPartner = nextIsPartner
+    }
+    if (nextIsCustomer && existing.customerNumber == null) {
+      rolePatch.customerNumber = await allocateCustomerNumber(m.businessId)
+    }
+    if (nextIsPartner && existing.partnerNumber == null) {
+      rolePatch.partnerNumber = await allocatePartnerNumber(m.businessId)
+    }
+    if (!nextIsPartner && body.isPartner === false) {
+      rolePatch.partnerCategory = null
+    }
+
     const [row] = await db
       .update(customers)
       .set({
@@ -336,6 +407,11 @@ export async function registerCustomerCrudRoutes(app: FastifyInstance) {
         ...(body.photoUrl !== undefined ? { photoUrl: body.photoUrl } : {}),
         ...(body.buyerPersonaId !== undefined ? { buyerPersonaId: body.buyerPersonaId } : {}),
         ...(body.tags !== undefined ? { tags: body.tags } : {}),
+        ...(body.partnerCategory !== undefined
+          ? { partnerCategory: body.partnerCategory?.trim() || null }
+          : {}),
+        ...(body.partnerStatus !== undefined ? { partnerStatus: body.partnerStatus } : {}),
+        ...rolePatch,
         updatedAt: new Date(),
       })
       .where(and(eq(customers.id, id), eq(customers.businessId, m.businessId)))
@@ -355,7 +431,7 @@ export async function registerCustomerCrudRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadCustomer(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     const [row] = await db
@@ -371,7 +447,7 @@ export async function registerCustomerCrudRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m.role)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadCustomer(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     const [row] = await db
