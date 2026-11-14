@@ -1,5 +1,6 @@
 /**
  * Finance API — snapshot + account/transaction CRUD.
+ * AuthZ: finance.read for GETs, finance.write for mutations (deny-by-default bundles).
  * Location: apps/api/src/modules/finance/routes.ts
  */
 import type { FastifyInstance } from 'fastify'
@@ -10,7 +11,7 @@ import {
   FinanceSettingsPatchSchema,
   FinanceTransactionCreateSchema,
   FinanceTransactionPatchSchema,
-  canMutateContent,
+  hasPermission,
 } from '@bu2/shared'
 import { writeAudit } from '../../lib/audit.js'
 import { loadMembership, requireUser } from '../../plugins/auth.js'
@@ -34,7 +35,7 @@ export async function financeRoutes(app: FastifyInstance) {
     const { slug } = req.params as { slug: string }
     const q = (req.query as { period?: string }) || {}
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'finance.read')) return reply.code(403).send({ error: 'forbidden' })
     const periodParse = FinancePeriodSchema.safeParse(q.period ?? 'current')
     const period = periodParse.success ? periodParse.data : 'current'
     const snapshot = await buildSnapshot(m.businessId, period)
@@ -45,7 +46,7 @@ export async function financeRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'finance.read')) return reply.code(403).send({ error: 'forbidden' })
     return { accounts: await listAccounts(m.businessId) }
   })
 
@@ -53,7 +54,7 @@ export async function financeRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'finance.write')) return reply.code(403).send({ error: 'forbidden' })
     if (m.status === 'archived') return reply.code(409).send({ error: 'business_archived' })
     const body = FinanceAccountCreateSchema.parse(req.body)
     const account = await createAccount(m.businessId, body)
@@ -71,7 +72,7 @@ export async function financeRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'finance.write')) return reply.code(403).send({ error: 'forbidden' })
     if (m.status === 'archived') return reply.code(409).send({ error: 'business_archived' })
     const body = FinanceAccountPatchSchema.parse(req.body)
     const account = await patchAccount(m.businessId, id, body)
@@ -89,7 +90,7 @@ export async function financeRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'finance.write')) return reply.code(403).send({ error: 'forbidden' })
     const account = await archiveAccount(m.businessId, id)
     if (!account) return reply.code(404).send({ error: 'not_found' })
     await writeAudit({
@@ -106,7 +107,7 @@ export async function financeRoutes(app: FastifyInstance) {
     const { slug } = req.params as { slug: string }
     const q = (req.query as { from?: string; to?: string; limit?: string }) || {}
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'finance.read')) return reply.code(403).send({ error: 'forbidden' })
     const limit = q.limit ? Math.min(Number(q.limit) || 200, 1000) : 200
     const rows = await listTransactions(m.businessId, {
       from: q.from,
@@ -120,7 +121,7 @@ export async function financeRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'finance.write')) return reply.code(403).send({ error: 'forbidden' })
     if (m.status === 'archived') return reply.code(409).send({ error: 'business_archived' })
     const body = FinanceTransactionCreateSchema.parse(req.body)
     try {
@@ -144,7 +145,7 @@ export async function financeRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'finance.write')) return reply.code(403).send({ error: 'forbidden' })
     if (m.status === 'archived') return reply.code(409).send({ error: 'business_archived' })
     const body = FinanceTransactionPatchSchema.parse(req.body)
     const transaction = await patchTransaction(m.businessId, id, body)
@@ -162,7 +163,7 @@ export async function financeRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'finance.write')) return reply.code(403).send({ error: 'forbidden' })
     const ok = await deleteTransaction(m.businessId, id)
     if (!ok) return reply.code(404).send({ error: 'not_found' })
     await writeAudit({
@@ -178,7 +179,7 @@ export async function financeRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'finance.write')) return reply.code(403).send({ error: 'forbidden' })
     if (m.status === 'archived') return reply.code(409).send({ error: 'business_archived' })
     const body = FinanceSettingsPatchSchema.parse(req.body)
     const settings = await upsertSettings(m.businessId, body)

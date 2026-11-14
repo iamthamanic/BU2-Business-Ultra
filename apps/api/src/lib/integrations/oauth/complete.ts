@@ -174,19 +174,24 @@ async function replaceCredentials(
   result: AdapterConnectResult,
   expiresAt: Date | null,
 ): Promise<void> {
-  await db.delete(connectionCredentials).where(eq(connectionCredentials.connectionId, connectionId))
-  for (const cred of result.credentials) {
-    const sealed = sealSecret(cred.plaintext)
-    await db.insert(connectionCredentials).values({
-      connectionId,
-      kind: cred.kind,
-      ciphertext: sealed.ciphertext,
-      iv: sealed.iv,
-      tag: sealed.tag,
-      keyHint: keyHint(cred.plaintext),
-      expiresAt: cred.kind === 'access' ? expiresAt : null,
-    })
-  }
+  // Atomic replace — avoid empty credentials if an insert fails mid-loop.
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(connectionCredentials)
+      .where(eq(connectionCredentials.connectionId, connectionId))
+    for (const cred of result.credentials) {
+      const sealed = sealSecret(cred.plaintext)
+      await tx.insert(connectionCredentials).values({
+        connectionId,
+        kind: cred.kind,
+        ciphertext: sealed.ciphertext,
+        iv: sealed.iv,
+        tag: sealed.tag,
+        keyHint: keyHint(cred.plaintext),
+        expiresAt: cred.kind === 'access' ? expiresAt : null,
+      })
+    }
+  })
 }
 
 /**
