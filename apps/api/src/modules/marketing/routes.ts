@@ -5,8 +5,8 @@ import {
   SocialMasterDraftSchema,
   SocialNetworkSchema,
   StyleguidePutSchema,
-  canMutateContent,
   canSendMail,
+  hasPermission,
 } from '@bu2/shared'
 import { z } from 'zod'
 import { db } from '../../db/client.js'
@@ -38,7 +38,7 @@ export async function marketingRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'marketing.campaign.read')) return reply.code(403).send({ error: 'forbidden' })
     return { networks: NETWORK_CAPABILITIES }
   })
 
@@ -51,7 +51,7 @@ export async function marketingRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, surface } = req.params as { slug: string; surface: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'marketing.campaign.read')) return reply.code(403).send({ error: 'forbidden' })
     const decoded = decodeURIComponent(surface)
     return resolveFunnelSource(m.businessId, decoded)
   })
@@ -66,7 +66,7 @@ export async function marketingRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, channel } = req.params as { slug: string; channel: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'marketing.campaign.read')) return reply.code(403).send({ error: 'forbidden' })
     const ch = channel.toLowerCase()
     if (!isOrganicChannel(ch)) {
       return reply.code(400).send({ error: 'unknown_channel', channel: ch })
@@ -164,7 +164,7 @@ export async function marketingRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'marketing.campaign.read')) return reply.code(403).send({ error: 'forbidden' })
     const secret = await getBusinessSecret(m.businessId, 'metricool')
     if (!secret?.valid) return reply.code(409).send({ error: 'metricool_key_required' })
     const brands = await listBrands(secret.plaintext)
@@ -175,7 +175,7 @@ export async function marketingRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'marketing.campaign.read')) return reply.code(403).send({ error: 'forbidden' })
     const drafts = await listSocialDrafts(m.businessId)
     return { drafts }
   })
@@ -184,7 +184,7 @@ export async function marketingRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'marketing.campaign.write')) return reply.code(403).send({ error: 'forbidden' })
     const body = SocialMasterDraftSchema.parse(req.body)
     const [draft] = await db
       .insert(socialDrafts)
@@ -209,7 +209,7 @@ export async function marketingRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'marketing.campaign.write')) return reply.code(403).send({ error: 'forbidden' })
     const body = SocialMasterDraftSchema.partial().parse(req.body)
     const [draft] = await db
       .update(socialDrafts)
@@ -229,7 +229,7 @@ export async function marketingRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'marketing.campaign.publish')) return reply.code(403).send({ error: 'forbidden' })
     const body = ConfirmMutationSchema.extend({
       onlyNetworks: z.array(SocialNetworkSchema).optional(),
       blogId: z.string().optional(),
@@ -287,7 +287,7 @@ export async function marketingRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'marketing.campaign.publish')) return reply.code(403).send({ error: 'forbidden' })
     ConfirmMutationSchema.parse(req.body)
     const secret = await getBusinessSecret(m.businessId, 'metricool')
     if (!secret?.valid) return reply.code(409).send({ error: 'metricool_key_required' })
@@ -327,7 +327,7 @@ export async function marketingRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'marketing.campaign.read')) return reply.code(403).send({ error: 'forbidden' })
     const campaigns = await db
       .select()
       .from(brevoCampaigns)
@@ -339,7 +339,7 @@ export async function marketingRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'marketing.campaign.write')) return reply.code(403).send({ error: 'forbidden' })
     const body = z
       .object({
         name: z.string().min(1),
@@ -413,14 +413,14 @@ export async function marketingRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'marketing.campaign.read')) return reply.code(403).send({ error: 'forbidden' })
     const rows = await db.select().from(businesses).where(eq(businesses.slug, slug)).limit(1)
     const biz = rows[0]
     if (!biz) return reply.code(404).send({ error: 'not_found' })
     return {
       business: { name: biz.name, logoPath: biz.logoPath },
       styleguide: (biz.styleguide || {}) as Record<string, unknown>,
-      canEdit: canMutateContent(m),
+      canEdit: hasPermission(m, 'marketing.campaign.write'),
     }
   })
 
@@ -428,7 +428,7 @@ export async function marketingRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'marketing.campaign.write')) return reply.code(403).send({ error: 'forbidden' })
     const body = StyleguidePutSchema.parse(req.body)
     const [row] = await db
       .update(businesses)

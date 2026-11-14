@@ -9,7 +9,7 @@ import {
   OrderPatchSchema,
   OrderStatusSchema,
   OrderTemplatePutSchema,
-  canMutateContent,
+  hasPermission,
   isOrderTemplateReady,
 } from '@bu2/shared'
 import { db } from '../../db/client.js'
@@ -30,7 +30,7 @@ export async function orderRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, productId } = req.params as { slug: string; productId: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'products.read')) return reply.code(403).send({ error: 'forbidden' })
 
     const [product] = await db
       .select({ id: products.id })
@@ -70,7 +70,7 @@ export async function orderRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, productId } = req.params as { slug: string; productId: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'products.write')) return reply.code(403).send({ error: 'forbidden' })
     if (m.status === 'archived') return reply.code(409).send({ error: 'business_archived' })
 
     const [product] = await db
@@ -133,7 +133,7 @@ export async function orderRoutes(app: FastifyInstance) {
     const { slug } = req.params as { slug: string }
     const q = (req.query as { status?: string; q?: string }) || {}
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'products.read')) return reply.code(403).send({ error: 'forbidden' })
 
     const filters = [eq(productOrders.businessId, m.businessId)]
     if (q.status) {
@@ -177,7 +177,7 @@ export async function orderRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'products.write')) return reply.code(403).send({ error: 'forbidden' })
     if (m.status === 'archived') return reply.code(409).send({ error: 'business_archived' })
 
     const body = OrderCreateSchema.parse(req.body)
@@ -265,7 +265,7 @@ export async function orderRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'products.write')) return reply.code(403).send({ error: 'forbidden' })
     if (m.status === 'archived') return reply.code(409).send({ error: 'business_archived' })
 
     const body = OrderPatchSchema.parse(req.body)

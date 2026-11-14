@@ -9,6 +9,7 @@ import {
   FunnelBindingsPutSchema,
   SecretProviderSchema,
   canManageCredentials,
+  hasPermission,
 } from '@bu2/shared'
 import { loadMembership, requireUser } from '../../plugins/auth.js'
 import {
@@ -107,7 +108,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'settings.read')) return reply.code(403).send({ error: 'forbidden' })
     const statuses = await listSecretStatuses(m.businessId)
     const by = Object.fromEntries(statuses.map((s) => [s.provider, s.valid]))
     const adsProviders = ['google_ads', 'meta_ads', 'tiktok_ads', 'chatgpt_ads'] as const
@@ -134,7 +135,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'settings.read')) return reply.code(403).send({ error: 'forbidden' })
 
     const [secrets, metricoolLinks, bindings, seoRows] = await Promise.all([
       listSecretStatuses(m.businessId),
@@ -233,7 +234,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     const parsed = SecretProviderSchema.safeParse(provider)
     if (!parsed.success) return reply.code(400).send({ error: 'unknown_provider' })
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'settings.read')) return reply.code(403).send({ error: 'forbidden' })
     const secret = await getBusinessSecret(m.businessId, parsed.data)
     return {
       ready: !!(secret && secret.valid),

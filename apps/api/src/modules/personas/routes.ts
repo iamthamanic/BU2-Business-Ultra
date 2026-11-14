@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { and, eq } from 'drizzle-orm'
-import { PersonaSchema, canMutateContent } from '@bu2/shared'
+import { PersonaSchema, hasPermission } from '@bu2/shared'
 import { db } from '../../db/client.js'
 import { personas } from '../../db/schema.js'
 import { loadMembership, requireUser } from '../../plugins/auth.js'
@@ -64,7 +64,7 @@ export async function personasRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'marketing.campaign.read')) return reply.code(403).send({ error: 'forbidden' })
     const rows = await db.select().from(personas).where(eq(personas.businessId, m.businessId))
     return { personas: rows }
   })
@@ -73,7 +73,7 @@ export async function personasRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'marketing.campaign.write')) return reply.code(403).send({ error: 'forbidden' })
     const body = PersonaSchema.parse(req.body)
     const [row] = await db
       .insert(personas)
@@ -94,7 +94,7 @@ export async function personasRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'marketing.campaign.write')) return reply.code(403).send({ error: 'forbidden' })
     const body = PersonaSchema.parse(req.body)
     const [row] = await db
       .update(personas)
@@ -117,7 +117,7 @@ export async function personasRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'marketing.campaign.read')) return reply.code(403).send({ error: 'forbidden' })
     const rows = await db
       .select()
       .from(personas)

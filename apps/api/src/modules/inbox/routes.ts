@@ -10,7 +10,7 @@ import {
   InboxReplySchema,
   LinkUnipileTelegramSchema,
   canManageCredentials,
-  canMutateContent,
+  hasPermission,
 } from '@bu2/shared'
 import {
   assignConversation,
@@ -45,7 +45,7 @@ export async function inboxRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'inbox.read')) return reply.code(403).send({ error: 'forbidden' })
     const connections = await listTelegramConnections(m.businessId)
     return { connections }
   })
@@ -79,7 +79,7 @@ export async function inboxRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) {
+    if (!m || !hasPermission(m, 'inbox.send')) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     try {
@@ -95,7 +95,7 @@ export async function inboxRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) {
+    if (!m || !hasPermission(m, 'inbox.send')) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     try {
@@ -112,7 +112,7 @@ export async function inboxRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) {
+    if (!m || !hasPermission(m, 'inbox.send')) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     try {
@@ -132,7 +132,7 @@ export async function inboxRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'inbox.read')) return reply.code(403).send({ error: 'forbidden' })
     return { configured: isUnipileConfigured() }
   })
 
@@ -209,7 +209,7 @@ export async function inboxRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) {
+    if (!m || !hasPermission(m, 'inbox.send')) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     try {
@@ -225,7 +225,7 @@ export async function inboxRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'inbox.read')) return reply.code(403).send({ error: 'forbidden' })
     const conversations = await listInboxConversations(m.businessId)
     return { conversations }
   })
@@ -234,7 +234,7 @@ export async function inboxRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'inbox.read')) return reply.code(403).send({ error: 'forbidden' })
     const data = await listConversationMessages(m.businessId, id)
     if (!data) return reply.code(404).send({ error: 'not_found' })
     const identity = await getIdentityContext(m.businessId, data.conversation.contactIdentityId)
@@ -245,7 +245,7 @@ export async function inboxRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) {
+    if (!m || !hasPermission(m, 'inbox.manage')) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     const body = InboxConversationPatchSchema.safeParse(req.body)
@@ -275,7 +275,7 @@ export async function inboxRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) {
+    if (!m || !hasPermission(m, 'inbox.send')) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     const body = InboxReplySchema.safeParse(req.body)
