@@ -6,6 +6,10 @@ import { and, eq, inArray } from 'drizzle-orm'
 import {
   PERMISSION_KEYS,
   SYSTEM_BUNDLE_TEMPLATES,
+  assertCan as assertCanShared,
+  can as canShared,
+  type AuthzResourceContext,
+  type CanDecision,
   type MembershipAuthz,
   type PermissionKey,
   type PlatformCapability,
@@ -81,6 +85,23 @@ export function assertPermission(m: MembershipCtx, key: PermissionKey | string):
     err.statusCode = 403
     throw err
   }
+}
+
+/** Central can() — pass userId when evaluating resource scopes (Epic B). */
+export function can(
+  m: MembershipCtx,
+  key: PermissionKey | string,
+  opts?: { userId?: string; resource?: AuthzResourceContext },
+): CanDecision {
+  return canShared({ ...m, userId: opts?.userId }, key, opts?.resource)
+}
+
+export function assertCan(
+  m: MembershipCtx,
+  key: PermissionKey | string,
+  opts?: { userId?: string; resource?: AuthzResourceContext },
+): void {
+  assertCanShared({ ...m, userId: opts?.userId }, key, opts?.resource)
 }
 
 export async function hasPlatformCapability(

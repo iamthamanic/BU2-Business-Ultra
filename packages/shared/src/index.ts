@@ -35,6 +35,19 @@ export {
   MembershipBundlesAssignSchema,
 } from './permissions.js'
 
+export {
+  AUTHZ_SCOPES,
+  type AuthzScope,
+  type AuthzResourceContext,
+  type AuthzActor,
+  type CanDecision,
+  type PermissionCatalogEntry,
+  PERMISSION_CATALOG,
+  getPermissionCatalogEntry,
+  can,
+  assertCan,
+} from './authz.js'
+
 export const LocaleSchema = z.enum(['de', 'en'])
 export type Locale = z.infer<typeof LocaleSchema>
 

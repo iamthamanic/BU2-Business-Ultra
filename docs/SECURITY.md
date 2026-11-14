@@ -25,12 +25,17 @@
 
 ## Authorization / permissions
 
-Company AuthZ (`packages/shared/src/permissions.ts` + `apps/api/src/lib/authorize.ts`):
+Company AuthZ (`packages/shared/src/permissions.ts`, `packages/shared/src/authz.ts`, `apps/api/src/lib/authorize.ts`):
 
 - `memberships.is_owner` (multi-owner allowed; last-owner protected) **or** union of assigned permission bundles
 - Platform capability `companies.create` via `platform_grants` (never a company bundle)
 - Deny by default for unknown permission keys
 - Helpers: `canManageMembers`, `canSendMail`, `canManageCredentials`, `canMutateContent`, `canOpenSeo`, `canUseTools`, `hasPermission`
+- **Central decision API:** `can(actor, permissionKey, resourceContext?)` / `assertCan` — unknown key → deny; then key grant; optional scope check
+- **Scopes** (`AUTHZ_SCOPES`): `own` | `assigned` | `project_member` | `explicitly_granted` | `company` — resolved server-side from trusted relations (not from client claims)
+- **Catalog:** `PERMISSION_CATALOG` documents module / resource / action / scopes / `sensitive` per key. Sensitive keys (finance, credentials, permission admin, settings.manage) must never be implied by unrelated `*.read`
+- **Owner (v1):** owners still pass all catalog keys via `hasPermission` (admin control). Sensitive flags are for UI warnings and future tightening (Epic C+) — not a second role system
+- **Department scope:** not implemented until a real org unit model exists (do not reuse Marketing/Kunden/Produkt project areas as departments)
 
 | Rule | Source |
 |------|--------|

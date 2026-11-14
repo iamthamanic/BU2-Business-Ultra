@@ -1,9 +1,9 @@
 # Handoff — authz-hardening
 
 - **Date:** 2026-11-14
-- **Last PR:** https://github.com/iamthamanic/BU2-Business-Ultra/pull/22 (`f05a8fa`) — Epic A / #16
-- **Next:** After PR #22 merge → Issue #17 AuthZ core (`can()` + scopes) on fresh branch from main
-- **Then:** #18 module fine keys → #19 UI → #20 migration/verify → #21 HR contract (docs, parallel OK)
+- **Merged:** PR #22 → `509775a` (Epic A / #16)
+- **Open PR:** authz-core-can-helper (Epic B / #17) — see latest PR on branch `feat/authz-core-can-helper`
+- **Next after #17 merge:** #18 module fine keys → #19 UI → #20 migration/verify; #21 HR docs parallel OK
 
 ## Do not claim done for full epic
 
