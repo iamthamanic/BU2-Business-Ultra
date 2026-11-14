@@ -1,6 +1,6 @@
 # Composition Gate — oauth-ads-social
 
-- HEAD_SHA: 204891cf847b26c12bfeba10d2e3fb0fee841bb8
+- HEAD_SHA: d2da78b0018d32bae3f841008736e197e2d27071
 - Date: 2026-11-14
 - Verdict: CLEAR
 
