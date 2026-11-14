@@ -112,7 +112,8 @@ export async function cmbRoutes(app: FastifyInstance) {
   })
 
   app.post('/api/cmb/simulate', async (req) => {
-    // Pure simulation endpoint (no persistence) for golden checks / UI preview
+    // Authn required (CPU DoS / oracle). Pure simulation — no persistence.
+    await requireUser(req)
     const body = z.object({ model: z.record(z.unknown()) }).parse(req.body)
     const snapshot = calculateModel(body.model as unknown as DomainModel)
     return { snapshot }

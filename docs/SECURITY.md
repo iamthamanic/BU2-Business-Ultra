@@ -20,7 +20,8 @@
 | Password change | `POST /api/auth/password` via Better Auth |
 | Rate limit (P-05) | `@fastify/rate-limit` registered with `global: false`; auth routes set `config.rateLimit` |
 
-**Fail closed:** no default session secrets in production env loading (see README / `.env.example`).
+**Fail closed:** no default session secrets in production env loading (see README / `.env.example`).  
+`OPENSEO_SSO_SHARED_SECRET` has **no** Zod default — must be set (CI/local inject for non-prod). Production rejects `change-me-*` placeholders. **Rotate** this secret if any environment ever booted with the former default `change-me-openseo-sso-secret`.
 
 ## Authorization / permissions
 
@@ -73,7 +74,7 @@ No real secrets in git. Docs must not paste credential values.
 
 ## Uploads
 
-Volume `bu2_uploads` (see backup runbook). Postgres dumps do not include uploads. Validation rules: follow Secure-by-Default **P-04**; details **UNRESOLVED** if endpoint-specific limits are not yet centralized.
+Private files live under `{UPLOADS_DIR}/{businessId}/…` and are served only via authenticated `GET /api/media/:businessId/*` (legacy `GET /uploads/:businessId/*` uses the same AuthZ). **No** public `@fastify/static` mount. Volume `bu2_uploads` (see backup runbook) is not in Postgres dumps. Validation: Secure-by-Default **P-04**; magic-byte sniffing still **UNRESOLVED**.
 
 ## External API trust
 
@@ -84,8 +85,9 @@ Adapters treat provider responses as untrusted input; credentials stay server-si
 1. Tenant slug from route + server membership — not client-claimed role.
 2. Secrets fail-closed — no `process.env.SECRET || 'default-…'` in prod paths (**B-10**).
 3. State-changing browser calls need CSRF / SameSite cookie discipline (**F-04**).
-4. Auth endpoints rate-limited (**P-05**) — Ist: `@fastify/rate-limit` on `/api/auth/*` (see table above).
-5. Outbox / sync jobs must be idempotent / claim-safe (**P-06**).
+4. Auth endpoints rate-limited (**P-05**) — Ist: global baseline `@fastify/rate-limit` plus stricter `/api/auth/*` and OAuth configs.
+5. Outbox / sync jobs must be idempotent / claim-safe (**P-06**) — Telegram/Unipile outbox uses atomic `UPDATE … WHERE status='pending'`.
+6. API security headers via `@fastify/helmet` (CSP for HTML may remain at reverse proxy).
 
 ## Negative tests (pointers)
 

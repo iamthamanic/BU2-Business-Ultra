@@ -90,7 +90,7 @@ export function toAttachment(row: typeof taskAttachments.$inferSelect, businessI
     filename: row.filename,
     mimeType: row.mimeType,
     sizeBytes: row.sizeBytes,
-    url: `/uploads/${businessId}/${folder}/${row.filename}`,
+    url: `/api/media/${businessId}/${folder}/${row.filename}`,
     createdByUserId: row.createdByUserId,
     createdAt: row.createdAt,
   }

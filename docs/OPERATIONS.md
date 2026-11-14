@@ -71,13 +71,14 @@ Uploads volume `bu2_uploads` is **not** inside Postgres dumps — mirror separat
 
 ## Monitoring
 
-**UNRESOLVED:** production metrics/log drain / uptime checks. Local: health endpoints above.
+**UNRESOLVED (SC-05):** production metrics/log drain / uptime checks / auth-abuse spike alert. Local: Fastify logger + `/api/health`. Do not claim PASS for launch until an error drain and ≥1 abuse alert exist.
 
 ## Rollback
 
-- App: redeploy previous artifact / git revision (**UNRESOLVED** formal procedure)
+- App: redeploy previous artifact / git revision (**UNRESOLVED** formal procedure — Hostinger/docker tag rollback to be written per deploy target)
 - DB: restore from encrypted dump per runbook; verify with migrate no-op + smoke login
 - Do not delete held dumps under legal retention holds
+- **SC-07:** quarterly restore checklist in [BACKUP_RUNBOOK.md](./BACKUP_RUNBOOK.md) — last rehearsal date must be recorded in ops ticket (none claimed in this hardening PR)
 
 ## Start / stop (local)
 

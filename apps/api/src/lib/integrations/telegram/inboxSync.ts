@@ -634,16 +634,19 @@ async function processTelegramOutboxJob(jobId: string) {
   const jobs = await db.select().from(outboxJobs).where(eq(outboxJobs.id, jobId)).limit(1)
   const job = jobs[0]
   if (!job || job.kind !== 'telegram_send') return
-  if (job.status !== 'pending' && job.status !== 'processing') return
+  if (job.status !== 'pending') return
 
-  await db
+  // Atomic claim — only one worker proceeds (P-06).
+  const claimed = await db
     .update(outboxJobs)
     .set({
       status: 'processing',
       attempts: (job.attempts || 0) + 1,
       updatedAt: new Date(),
     })
-    .where(eq(outboxJobs.id, jobId))
+    .where(and(eq(outboxJobs.id, jobId), eq(outboxJobs.status, 'pending')))
+    .returning({ id: outboxJobs.id })
+  if (!claimed[0]) return
 
   const payload = job.payload as {
     messageId?: string
@@ -848,7 +851,7 @@ export async function replyInConversation(opts: {
     const diskName = `${messageId}-${mediaFilename}`
     mediaPath = join(dir, diskName)
     await writeFile(mediaPath, parsed.bytes)
-    storedPublic = `/uploads/${opts.businessId}/inbox/${diskName}`
+    storedPublic = `/api/media/${opts.businessId}/inbox/${diskName}`
   }
 
   const provisionalProviderId = `pending:${messageId}`

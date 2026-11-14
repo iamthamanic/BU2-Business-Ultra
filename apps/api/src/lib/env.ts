@@ -21,16 +21,23 @@ const EnvSchema = z.object({
   SECRETS_MASTER_KEY: z.string().min(16),
   SESSION_SECRET: z.string().min(16),
   BOOTSTRAP_OWNER_EMAIL: z.string().email().default('raccoova@gmail.com'),
-  /** Local/dev bootstrap password only — never use a weak value in production */
-  BOOTSTRAP_OWNER_PASSWORD: z.string().min(4).default('change-me-local'),
+  /** Required in schema; prod rejects placeholders. Dev may inject before parse. */
+  BOOTSTRAP_OWNER_PASSWORD: z.string().min(4),
   BREVO_SENDER_EMAIL: z.string().email().default('social@halteverbot123.de'),
   BREVO_SENDER_NAME: z.string().default('Business Ultra'),
   BREVO_API_KEY: z.string().optional().default(''),
   OPENSEO_BASE_URL: z.string().default('http://127.0.0.1:8750'),
-  OPENSEO_SSO_SHARED_SECRET: z.string().min(8).default('change-me-openseo-sso-secret'),
+  /** Required — no Zod default (B-10). Dev may inject before parse; prod rejects placeholders. */
+  OPENSEO_SSO_SHARED_SECRET: z.string().min(16),
   SORTANIZE_URL: z.string().default('http://127.0.0.1:8760'),
   UPLOADS_DIR: z.string().default('./uploads'),
 })
+
+const FORBIDDEN_SECRET_PLACEHOLDERS = new Set([
+  'change-me-openseo-sso-secret',
+  'change-me-local',
+  'changeme',
+])
 
 export type Env = z.infer<typeof EnvSchema>
 
@@ -110,6 +117,12 @@ export function loadEnv(): Env {
     if (input.SESSION_SECRET == null || input.SESSION_SECRET === '') {
       input.SESSION_SECRET = 'dev-only-session-secret-32bytes!!'
     }
+    if (input.OPENSEO_SSO_SHARED_SECRET == null || input.OPENSEO_SSO_SHARED_SECRET === '') {
+      input.OPENSEO_SSO_SHARED_SECRET = 'dev-only-openseo-sso-secret!!'
+    }
+    if (input.BOOTSTRAP_OWNER_PASSWORD == null || input.BOOTSTRAP_OWNER_PASSWORD === '') {
+      input.BOOTSTRAP_OWNER_PASSWORD = 'change-me-local'
+    }
   }
 
   const parsed = EnvSchema.safeParse(input)
@@ -117,6 +130,24 @@ export function loadEnv(): Env {
     console.error('Invalid environment', parsed.error.flatten())
     throw new Error('Invalid environment configuration')
   }
-  cached = parsed.data
+
+  const data = parsed.data
+  if (isProd) {
+    if (
+      !data.OPENSEO_SSO_SHARED_SECRET ||
+      FORBIDDEN_SECRET_PLACEHOLDERS.has(data.OPENSEO_SSO_SHARED_SECRET) ||
+      data.OPENSEO_SSO_SHARED_SECRET.startsWith('change-me')
+    ) {
+      throw new Error('OPENSEO_SSO_SHARED_SECRET must be set to a non-placeholder value in production')
+    }
+    if (
+      data.BOOTSTRAP_OWNER_PASSWORD &&
+      FORBIDDEN_SECRET_PLACEHOLDERS.has(data.BOOTSTRAP_OWNER_PASSWORD)
+    ) {
+      throw new Error('BOOTSTRAP_OWNER_PASSWORD must not use a placeholder value in production')
+    }
+  }
+
+  cached = data
   return cached
 }

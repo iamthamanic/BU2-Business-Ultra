@@ -400,12 +400,15 @@ async function processUnipileOutboxJob(jobId: string) {
   const jobs = await db.select().from(outboxJobs).where(eq(outboxJobs.id, jobId)).limit(1)
   const job = jobs[0]
   if (!job) return
-  if (job.status !== 'pending' && job.status !== 'processing') return
+  if (job.status !== 'pending') return
 
-  await db
+  // Atomic claim — only one worker proceeds (P-06).
+  const claimed = await db
     .update(outboxJobs)
     .set({ status: 'processing', attempts: job.attempts + 1, updatedAt: new Date() })
-    .where(eq(outboxJobs.id, jobId))
+    .where(and(eq(outboxJobs.id, jobId), eq(outboxJobs.status, 'pending')))
+    .returning({ id: outboxJobs.id })
+  if (!claimed[0]) return
 
   const payload = job.payload as {
     messageId?: string

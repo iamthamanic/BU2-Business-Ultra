@@ -100,6 +100,32 @@ export async function loadMembership(
   return buildMembershipCtx(row)
 }
 
+/** Membership by business UUID (e.g. media downloads keyed by id, not slug). */
+export async function loadMembershipByBusinessId(
+  userId: string,
+  businessId: string,
+): Promise<MembershipCtx | null> {
+  const rows = await db
+    .select({
+      membershipId: memberships.id,
+      businessId: businesses.id,
+      slug: businesses.slug,
+      businessStatus: businesses.status,
+      isOwner: memberships.isOwner,
+      membershipStatus: memberships.status,
+    })
+    .from(businesses)
+    .innerJoin(
+      memberships,
+      and(eq(memberships.businessId, businesses.id), eq(memberships.userId, userId)),
+    )
+    .where(eq(businesses.id, businessId))
+    .limit(1)
+  const row = rows[0]
+  if (!row) return null
+  return buildMembershipCtx(row)
+}
+
 export async function registerAuth(app: FastifyInstance) {
   app.decorateRequest('user', null)
   app.decorateRequest('membership', null)

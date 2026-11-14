@@ -7,6 +7,12 @@
   "engines": {
     "node": ">=20"
   },
+  "pnpm": {
+    "overrides": {
+      "vitest": ">=3.2.6",
+      "tinypool": ">=2.1.2"
+    }
+  },
   "scripts": {
     "dev": "pnpm -r --parallel --filter @bu2/api --filter @bu2/web dev",
     "dev:api": "pnpm --filter @bu2/api dev",
