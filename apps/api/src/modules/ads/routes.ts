@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { and, eq } from 'drizzle-orm'
-import { AdsCampaignDraftSchema, ConfirmMutationSchema, canMutateContent } from '@bu2/shared'
+import { AdsCampaignDraftSchema, ConfirmMutationSchema, hasPermission } from '@bu2/shared'
 import { db } from '../../db/client.js'
 import { adsCampaigns } from '../../db/schema.js'
 import { loadMembership, requireUser } from '../../plugins/auth.js'
@@ -19,7 +19,7 @@ export async function adsRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'ads.campaign.read')) return reply.code(403).send({ error: 'forbidden' })
     const campaigns = await db
       .select()
       .from(adsCampaigns)
@@ -31,7 +31,7 @@ export async function adsRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'ads.campaign.write')) return reply.code(403).send({ error: 'forbidden' })
     const body = AdsCampaignDraftSchema.parse(req.body)
     if (!isAdsProvider(body.provider)) {
       return reply.code(400).send({ error: 'unknown_provider' })
@@ -64,7 +64,7 @@ export async function adsRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'ads.campaign.write')) return reply.code(403).send({ error: 'forbidden' })
     ConfirmMutationSchema.parse(req.body)
     const campaign = (
       await db

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { and, eq, isNull } from 'drizzle-orm'
-import { CatalogProductSchema, canMutateContent } from '@bu2/shared'
+import { CatalogProductSchema, hasPermission } from '@bu2/shared'
 import { db } from '../../db/client.js'
 import { catalogProducts } from '../../db/schema.js'
 import { loadMembership, requireUser } from '../../plugins/auth.js'
@@ -11,7 +11,7 @@ export async function catalogRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'catalog.read')) return reply.code(403).send({ error: 'forbidden' })
     const products = await db
       .select()
       .from(catalogProducts)
@@ -23,7 +23,7 @@ export async function catalogRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'catalog.write')) return reply.code(403).send({ error: 'forbidden' })
     if (m.status === 'archived') return reply.code(409).send({ error: 'business_archived' })
     const body = CatalogProductSchema.parse(req.body)
     const [product] = await db
@@ -52,7 +52,7 @@ export async function catalogRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'catalog.write')) return reply.code(403).send({ error: 'forbidden' })
     const body = CatalogProductSchema.partial().parse(req.body)
     const [product] = await db
       .update(catalogProducts)
@@ -67,7 +67,7 @@ export async function catalogRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'catalog.write')) return reply.code(403).send({ error: 'forbidden' })
     await db
       .update(catalogProducts)
       .set({ archivedAt: new Date(), active: false, updatedAt: new Date() })

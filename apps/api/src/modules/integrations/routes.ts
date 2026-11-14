@@ -13,7 +13,7 @@ import {
   SetModuleBindingSchema,
   UpsertSyncCursorSchema,
   canManageCredentials,
-  canMutateContent,
+  hasPermission,
 } from '@bu2/shared'
 import {
   connectFinapiAccount,
@@ -63,7 +63,7 @@ export async function integrationRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'integrations.connections.read')) return reply.code(403).send({ error: 'forbidden' })
     const providers = PROVIDER_CATALOG.filter((p) => p.id !== 'mock').map((p) => {
       const redirectUri = oauthRedirectUriForProvider(p.id)
       const oauthConfigured =
@@ -101,7 +101,7 @@ export async function integrationRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'integrations.connections.read')) return reply.code(403).send({ error: 'forbidden' })
     const env = loadEnv()
     const finapi = getFinapiPlatformConfig()
     return {
@@ -191,7 +191,7 @@ export async function integrationRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'integrations.connections.read')) return reply.code(403).send({ error: 'forbidden' })
     const connections = await listConnections(m.businessId)
     return { connections }
   })
@@ -200,7 +200,7 @@ export async function integrationRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'integrations.connections.read')) return reply.code(403).send({ error: 'forbidden' })
     const connection = await getConnectionForBusiness(m.businessId, id)
     if (!connection) return reply.code(404).send({ error: 'not_found' })
     return { connection }
@@ -239,7 +239,7 @@ export async function integrationRoutes(app: FastifyInstance) {
     const { slug } = req.params as { slug: string }
     const q = req.query as { activeOnly?: string; module?: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'integrations.connections.read')) return reply.code(403).send({ error: 'forbidden' })
     const mod = q.module ? IntegrationModuleSchema.safeParse(q.module) : null
     if (q.module && !mod?.success) {
       return reply.code(400).send({ error: 'invalid_module' })
@@ -302,7 +302,9 @@ export async function integrationRoutes(app: FastifyInstance) {
         purpose: string
       }
       const m = await loadMembership(user.id, slug)
-      if (!m) return reply.code(403).send({ error: 'forbidden' })
+      if (!m || !hasPermission(m, 'integrations.connections.read')) {
+        return reply.code(403).send({ error: 'forbidden' })
+      }
       const purposeParsed = BindingPurposeSchema.safeParse(purpose)
       if (!purposeParsed.success) {
         return reply.code(400).send({ error: 'invalid_purpose' })
@@ -350,7 +352,7 @@ export async function integrationRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'integrations.connections.read')) return reply.code(403).send({ error: 'forbidden' })
     const conn = await getConnectionForBusiness(m.businessId, id)
     if (!conn || conn.provider !== 'google_ads') {
       return reply.code(404).send({ error: 'not_found' })
@@ -399,7 +401,7 @@ export async function integrationRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'integrations.connections.read')) return reply.code(403).send({ error: 'forbidden' })
     const conn = await getConnectionForBusiness(m.businessId, id)
     if (!conn || conn.provider !== 'google_ads') {
       return reply.code(404).send({ error: 'not_found' })
@@ -423,7 +425,7 @@ export async function integrationRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) {
+    if (!m || !hasPermission(m, 'integrations.connections.manage')) {
       return reply.code(403).send({ error: 'forbidden' })
     }
     const conn = await getConnectionForBusiness(m.businessId, id)

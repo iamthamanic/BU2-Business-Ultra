@@ -4,7 +4,7 @@
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { and, desc, eq, ilike, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm'
-import { CustomerPatchSchema, CustomerSchema, canMutateContent } from '@bu2/shared'
+import { CustomerPatchSchema, CustomerSchema, hasPermission } from '@bu2/shared'
 import { db } from '../../db/client.js'
 import {
   contactIdentities,
@@ -44,7 +44,7 @@ async function listContactsHandler(req: FastifyRequest, reply: FastifyReply) {
       category?: string
     }) || {}
   const m = await loadMembership(user.id, slug)
-  if (!m) return reply.code(404).send({ error: 'not_found' })
+  if (!m || !hasPermission(m, 'customers.read')) return reply.code(403).send({ error: 'forbidden' })
   const archived = q.archive === '1' || q.archive === 'true'
   const role = q.role === 'partner' ? 'partner' : q.role === 'all' ? 'all' : 'customer'
   const conds = [
@@ -111,7 +111,7 @@ export async function registerCustomerCrudRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'customers.read')) return reply.code(403).send({ error: 'forbidden' })
     const row = await loadCustomer(m.businessId, id)
     if (!row) return reply.code(404).send({ error: 'not_found' })
     const [notes, consents, events, stats, org] = await Promise.all([
@@ -202,7 +202,7 @@ export async function registerCustomerCrudRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'customers.write')) return reply.code(403).send({ error: 'forbidden' })
     const body = CustomerSchema.parse(req.body)
     const street = body.street ?? null
     const postalCode = body.postalCode ?? null
@@ -284,7 +284,7 @@ export async function registerCustomerCrudRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'customers.write')) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadCustomer(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     const body = CustomerPatchSchema.parse(req.body)
@@ -431,7 +431,7 @@ export async function registerCustomerCrudRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'customers.write')) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadCustomer(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     const [row] = await db
@@ -447,7 +447,7 @@ export async function registerCustomerCrudRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'customers.write')) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadCustomer(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     const [row] = await db

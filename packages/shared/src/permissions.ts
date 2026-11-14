@@ -93,6 +93,10 @@ export const SYSTEM_BUNDLE_TEMPLATES: ReadonlyArray<{
       'tools.manage',
       'seo.open',
       'mail.send',
+      'catalog.read',
+      'catalog.write',
+      'products.read',
+      'products.write',
     ],
   },
   {

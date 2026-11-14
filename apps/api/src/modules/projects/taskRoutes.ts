@@ -13,7 +13,7 @@ import {
   TaskPatchSchema,
   TaskSchema,
   TaskStatusSchema,
-  canMutateContent,
+  hasPermission,
 } from '@bu2/shared'
 import { db } from '../../db/client.js'
 import {
@@ -55,7 +55,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
       status?: string
     }) || {}
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'projects.read')) return reply.code(403).send({ error: 'forbidden' })
     const conds = [eq(tasks.businessId, m.businessId), isNull(tasks.archivedAt)]
     if (q.projectId) {
       const p = await loadProject(m.businessId, q.projectId)
@@ -110,7 +110,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'projects.read')) return reply.code(403).send({ error: 'forbidden' })
     // Only tasks / rules assigned to the current user (all projects).
     const rows = await db
       .select()
@@ -171,7 +171,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'projects.read')) return reply.code(403).send({ error: 'forbidden' })
     const row = await loadTask(m.businessId, id)
     if (!row) return reply.code(404).send({ error: 'not_found' })
     if (row.projectId) {
@@ -228,7 +228,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'projects.write')) return reply.code(403).send({ error: 'forbidden' })
     const body = TaskSchema.parse(req.body)
     if (body.projectId) {
       const p = await loadProject(m.businessId, body.projectId)
@@ -279,7 +279,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'projects.write')) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadTask(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     if (!(await assertTaskProjectAccess(m.businessId, existing.projectId, user.id, m))) {
@@ -336,7 +336,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'projects.write')) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadTask(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     if (!(await assertTaskProjectAccess(m.businessId, existing.projectId, user.id, m))) {
@@ -372,7 +372,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'projects.write')) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadTask(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     const body = TaskCommentSchema.parse(req.body)
@@ -399,7 +399,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'projects.write')) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadTask(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     const body = TaskChecklistItemSchema.parse(req.body)
@@ -430,7 +430,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
       itemId: string
     }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'projects.write')) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadTask(m.businessId, taskId)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     const body = TaskChecklistItemSchema.partial().parse(req.body)
@@ -460,7 +460,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'projects.read')) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadTask(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     const rows = await db
@@ -475,7 +475,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'projects.write')) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadTask(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
 
@@ -546,7 +546,7 @@ export async function registerTaskRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id, attId } = req.params as { slug: string; id: string; attId: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'projects.write')) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadTask(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     const [att] = await db
