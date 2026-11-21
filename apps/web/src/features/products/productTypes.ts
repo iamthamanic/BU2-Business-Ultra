@@ -1,44 +1,23 @@
 /**
- * productTypes — client shapes for Product screen / modal.
+ * productTypes — client shapes for Product screen / modal (contract types from @bu2/shared).
  * Location: apps/web/src/features/products/productTypes.ts
  */
 
-import { defaultJourneyMap, type JourneyMap } from './customerJourney'
+import type {
+  ProductCostDept,
+  ProductCostPosition,
+  ProductInput,
+  ProductJourneyCanvas,
+} from '@bu2/shared'
+import { defaultJourneyMap } from './customerJourney'
 
-export type ProductMarket = 'b2b' | 'b2c'
-export type PriceKind = 'gross' | 'net'
-export type CostDept = 'marketing' | 'sales' | 'operations' | 'support' | 'overhead'
-
-export type CostPosition = {
-  id: string
-  dept: CostDept
-  label: string
-  amountCents: number
-  enabled: boolean
-  note?: string
-}
-
-export type JourneyNode = {
-  id: string
-  kind: 'product' | 'persona' | 'stage'
-  label: string
-  x: number
-  y: number
-  refId?: string
-}
-
-export type JourneyEdge = {
-  id: string
-  source: string
-  target: string
-}
-
-export type JourneyCanvas = {
-  nodes: JourneyNode[]
-  edges: JourneyEdge[]
-  /** Legacy-style Customer Journey matrix (phases × lanes) */
-  map?: JourneyMap
-}
+// Shapes shared with the API contract are derived from @bu2/shared Zod schemas.
+export type ProductMarket = ProductInput['market']
+export type PriceKind = ProductInput['priceKind']
+export type CostDept = ProductCostDept
+export type CostPosition = ProductCostPosition
+/** nodes/edges + optional legacy-style Customer Journey matrix (phases × lanes) */
+export type JourneyCanvas = ProductJourneyCanvas
 
 export type PersonaDraft = {
   /** Display name for the product-scoped buyer persona hero */
