@@ -12197,7 +12197,7 @@ a.customer-tag-chip--link:focus-visible {
   }
 
   .customer-settings-row,
-.customer-address-row {
+  .customer-address-row {
     grid-template-columns: 1fr;
   }
 
