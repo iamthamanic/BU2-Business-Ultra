@@ -77,5 +77,3 @@ export const telegramAdapter: ProviderAdapter = {
 export function ensureTelegramAdapterRegistered(): void {
   registerAdapter(telegramAdapter)
 }
-
-ensureTelegramAdapterRegistered()

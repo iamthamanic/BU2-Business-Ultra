@@ -23,7 +23,6 @@ import {
   replyInConversation,
   syncTelegramConnection,
 } from '../../lib/integrations/telegram/inboxSync.js'
-import { ensureTelegramAdapterRegistered } from '../../lib/integrations/telegram/adapter.js'
 import {
   finalizeUnipileTelegramQr,
   isUnipileConfigured,
@@ -31,14 +30,10 @@ import {
   startUnipileTelegramQr,
   syncUnipileConnection,
 } from '../../lib/integrations/unipile/inboxSync.js'
-import { ensureUnipileAdapterRegistered } from '../../lib/integrations/unipile/adapter.js'
 import { syncGmailConnection } from '../../lib/integrations/gmail/inboxSync.js'
 import { syncAllInboxConnections } from '../../lib/integrations/inbox/syncAll.js'
 import { httpError } from '../../lib/httpError.js'
 import { loadMembership, requireUser } from '../../plugins/auth.js'
-
-ensureTelegramAdapterRegistered()
-ensureUnipileAdapterRegistered()
 
 export async function inboxRoutes(app: FastifyInstance) {
   app.get('/api/b/:slug/inbox/connections', async (req, reply) => {

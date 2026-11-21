@@ -31,12 +31,6 @@ import { oauthIntegrationRoutes } from './modules/integrations/oauthRoutes.js'
 import { inboxRoutes } from './modules/inbox/routes.js'
 import { financeRoutes } from './modules/finance/routes.js'
 import { mediaRoutes } from './modules/media/routes.js'
-import './lib/integrations/core/mockAdapter.js'
-import { ensureFinapiAdapterRegistered } from './lib/integrations/finapi/adapter.js'
-import { ensureTelegramAdapterRegistered } from './lib/integrations/telegram/adapter.js'
-import { ensureUnipileAdapterRegistered } from './lib/integrations/unipile/adapter.js'
-
-ensureFinapiAdapterRegistered()
 
 async function main() {
   const env = loadEnv()
@@ -68,9 +62,6 @@ async function main() {
   await app.register(multipart, { limits: { fileSize: 256 * 1024 * 1024 } })
 
   await registerAuth(app)
-  // Mock adapter self-registers on import (connections.ts / mockAdapter.ts side effect).
-  ensureTelegramAdapterRegistered()
-  ensureUnipileAdapterRegistered()
 
   app.get('/api/health', async () => ({
     ok: true,

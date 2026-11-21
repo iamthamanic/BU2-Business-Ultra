@@ -18,7 +18,7 @@ import {
 import { keyHint, sealSecret } from '../../crypto.js'
 import { parseCapabilitiesCache, purposeAllowed } from '../core/capabilities.js'
 import { bumpConversationUnread } from '../inbox/unread.js'
-import { ensureUnipileAdapterRegistered, unipileAdapter } from './adapter.js'
+import { unipileAdapter } from './adapter.js'
 import {
   getUnipileConfig,
   requireUnipileConfig,
@@ -28,8 +28,6 @@ import {
   unipileSendMessage,
   unipileStartTelegram,
 } from './client.js'
-
-ensureUnipileAdapterRegistered()
 
 const STREAM = 'unipile:chats'
 const CHANNEL = 'telegram_user'

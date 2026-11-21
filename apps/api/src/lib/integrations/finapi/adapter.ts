@@ -68,5 +68,3 @@ export const finapiAdapter: ProviderAdapter = {
 export function ensureFinapiAdapterRegistered(): void {
   registerAdapter(finapiAdapter)
 }
-
-ensureFinapiAdapterRegistered()

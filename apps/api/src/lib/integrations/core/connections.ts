@@ -24,12 +24,15 @@ import { parseCapabilitiesCache, purposeAllowed } from './capabilities.js'
 import { ensureMockAdapterRegistered } from './mockAdapter.js'
 import { ensureImapAdapterRegistered } from '../imap/adapter.js'
 import { ensureFinapiAdapterRegistered } from '../finapi/adapter.js'
-import { ensureAdsKeyAdaptersRegistered } from '../adsKey/adapter.js'
+import { ensureTelegramAdapterRegistered } from '../telegram/adapter.js'
+import { ensureUnipileAdapterRegistered } from '../unipile/adapter.js'
 
+// Single adapter registration path: this module is the only getAdapter() consumer.
 ensureMockAdapterRegistered()
 ensureImapAdapterRegistered()
 ensureFinapiAdapterRegistered()
-ensureAdsKeyAdaptersRegistered()
+ensureTelegramAdapterRegistered()
+ensureUnipileAdapterRegistered()
 
 export type PublicConnection = {
   id: string

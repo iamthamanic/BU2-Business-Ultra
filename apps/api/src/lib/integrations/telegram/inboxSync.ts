@@ -26,7 +26,7 @@ import { keyHint, openSecret, sealSecret } from '../../crypto.js'
 import { purposeAllowed, parseCapabilitiesCache } from '../core/capabilities.js'
 import { composerFormatsForConnection } from '../inbox/composerFormats.js'
 import { bumpConversationUnread, markConversationRead } from '../inbox/unread.js'
-import { ensureTelegramAdapterRegistered, telegramAdapter } from './adapter.js'
+import { telegramAdapter } from './adapter.js'
 import {
   displayNameFromUser,
   telegramGetUpdates,
@@ -38,8 +38,6 @@ import {
 } from './api.js'
 
 const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024
-
-ensureTelegramAdapterRegistered()
 
 const STREAM = 'telegram:updates'
 
