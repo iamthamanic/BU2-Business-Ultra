@@ -39,7 +39,7 @@ HTTP: `apps/api/src/modules/integrations/*` under `/api/b/:slug/integrations/…
 
 1. Extend `IntegrationProviderSchema` in `packages/shared`
 2. Add catalog row in `lib/integrations/core/providers.ts` with `domainGroup` + `authMethods` + `connectKind`
-3. Copy `lib/integrations/core/adapterTemplate.ts` → `lib/integrations/<provider>/adapter.ts`, implement `connect` / `resolveCapabilities`, register on boot
+3. Copy `lib/integrations/core/adapterTemplate.ts` → `lib/integrations/<provider>/adapter.ts`, implement `connect` / `resolveCapabilities`, register it in the single registration block of `lib/integrations/core/connections.ts` (the only `getAdapter` consumer; adapters do not self-register on import)
 4. Prefer OAuth PKCE or API key; persist via Integration Core credentials — never `settings_secrets` for multi-account
 5. Sync/send live in a follow-up slice after credentials path is green
 

@@ -6,7 +6,7 @@
  * 1. Add provider id to IntegrationProvider (packages/shared) + PROVIDER_CATALOG
  *    with domainGroup: social | paid | finance | generic
  * 2. Copy this file → lib/integrations/<provider>/adapter.ts
- * 3. Implement connect + resolveCapabilities; register on boot
+ * 3. Implement connect + resolveCapabilities; register in core/connections.ts
  * 4. Wire sync/send in a provider module only after credentials land
  *
  * Prefer official APIs (OAuth PKCE or API key). No secrets in code.
