@@ -26,6 +26,7 @@ import { keyHint, openSecret, sealSecret } from '../../crypto.js'
 import { purposeAllowed, parseCapabilitiesCache } from '../core/capabilities.js'
 import { composerFormatsForConnection } from '../inbox/composerFormats.js'
 import { bumpConversationUnread, markConversationRead } from '../inbox/unread.js'
+import { ensureInboxBindings, upsertConversation, upsertTelegramUserIdentity } from '../inbox/threads.js'
 import { telegramAdapter } from './adapter.js'
 import {
   displayNameFromUser,
@@ -72,30 +73,6 @@ async function loadBotToken(businessId: string, connectionId: string): Promise<s
   const row = creds[0]
   if (!row) throw Object.assign(new Error('credential_missing'), { statusCode: 409 })
   return openSecret(row.ciphertext, row.iv, row.tag)
-}
-
-async function ensureInboxBindings(businessId: string, connectionId: string) {
-  for (const purpose of ['read_dm', 'send_dm', 'sync'] as const) {
-    const existing = await db
-      .select()
-      .from(moduleBindings)
-      .where(
-        and(
-          eq(moduleBindings.connectionId, connectionId),
-          eq(moduleBindings.module, 'inbox'),
-          eq(moduleBindings.purpose, purpose),
-        ),
-      )
-      .limit(1)
-    if (existing[0]) continue
-    await db.insert(moduleBindings).values({
-      businessId,
-      connectionId,
-      module: 'inbox',
-      purpose,
-      enabled: true,
-    })
-  }
 }
 
 export async function connectTelegramBot(opts: {
@@ -163,94 +140,6 @@ export async function connectTelegramBot(opts: {
     }
     throw e
   }
-}
-
-async function upsertIdentity(
-  businessId: string,
-  telegramUserId: string,
-  displayName: string,
-) {
-  const existing = await db
-    .select()
-    .from(contactIdentities)
-    .where(
-      and(
-        eq(contactIdentities.businessId, businessId),
-        eq(contactIdentities.kind, 'telegram_user'),
-        eq(contactIdentities.value, telegramUserId),
-      ),
-    )
-    .limit(1)
-  if (existing[0]) {
-    if (displayName && existing[0].displayName !== displayName) {
-      await db
-        .update(contactIdentities)
-        .set({ displayName, updatedAt: new Date() })
-        .where(eq(contactIdentities.id, existing[0].id))
-    }
-    return existing[0].id
-  }
-  const rows = await db
-    .insert(contactIdentities)
-    .values({
-      businessId,
-      kind: 'telegram_user',
-      value: telegramUserId,
-      displayName,
-      confidence: 'high',
-    })
-    .returning()
-  return rows[0]!.id
-}
-
-async function upsertConversation(opts: {
-  businessId: string
-  connectionId: string
-  chatId: string
-  title: string
-  identityId: string
-  preview: string
-  at: Date
-}) {
-  const existing = await db
-    .select()
-    .from(conversations)
-    .where(
-      and(
-        eq(conversations.connectionId, opts.connectionId),
-        eq(conversations.externalThreadId, opts.chatId),
-      ),
-    )
-    .limit(1)
-  if (existing[0]) {
-    await db
-      .update(conversations)
-      .set({
-        title: opts.title,
-        contactIdentityId: opts.identityId,
-        lastMessageAt: opts.at,
-        lastPreview: opts.preview,
-        status: 'open',
-        updatedAt: new Date(),
-      })
-      .where(eq(conversations.id, existing[0].id))
-    return existing[0].id
-  }
-  const rows = await db
-    .insert(conversations)
-    .values({
-      businessId: opts.businessId,
-      connectionId: opts.connectionId,
-      channel: 'telegram',
-      externalThreadId: opts.chatId,
-      title: opts.title,
-      contactIdentityId: opts.identityId,
-      lastMessageAt: opts.at,
-      lastPreview: opts.preview,
-      status: 'open',
-    })
-    .returning()
-  return rows[0]!.id
 }
 
 async function insertInboundMessage(opts: {
@@ -328,11 +217,12 @@ export async function syncTelegramConnection(businessId: string, connectionId: s
     const fromId = String(msg.from?.id || msg.chat.id)
     const title = displayNameFromUser(msg.from, msg.chat)
     const at = new Date((msg.date || 0) * 1000)
-    const identityId = await upsertIdentity(businessId, fromId, title)
+    const identityId = await upsertTelegramUserIdentity(businessId, fromId, title, 'high')
     const conversationId = await upsertConversation({
       businessId,
       connectionId,
-      chatId,
+      channel: 'telegram',
+      externalThreadId: chatId,
       title,
       identityId,
       preview: previewOf(text),

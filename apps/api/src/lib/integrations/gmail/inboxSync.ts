@@ -14,6 +14,7 @@ import {
 } from '../../../db/schema.js'
 import { parseCapabilitiesCache, purposeAllowed } from '../core/capabilities.js'
 import { bumpConversationUnread } from '../inbox/unread.js'
+import { upsertConversation } from '../inbox/threads.js'
 import { getGoogleAccessToken } from '../google/tokens.js'
 import {
   buildReplyRfc822,
@@ -63,56 +64,6 @@ async function upsertEmailIdentity(businessId: string, email: string, displayNam
       value,
       displayName: displayName || value,
       confidence: 'high',
-    })
-    .returning()
-  return rows[0]!.id
-}
-
-async function upsertEmailConversation(opts: {
-  businessId: string
-  connectionId: string
-  threadId: string
-  title: string
-  identityId: string
-  preview: string
-  at: Date
-}) {
-  const existing = await db
-    .select()
-    .from(conversations)
-    .where(
-      and(
-        eq(conversations.connectionId, opts.connectionId),
-        eq(conversations.externalThreadId, opts.threadId),
-      ),
-    )
-    .limit(1)
-  if (existing[0]) {
-    await db
-      .update(conversations)
-      .set({
-        title: opts.title,
-        contactIdentityId: opts.identityId,
-        lastMessageAt: opts.at,
-        lastPreview: opts.preview,
-        status: 'open',
-        updatedAt: new Date(),
-      })
-      .where(eq(conversations.id, existing[0].id))
-    return existing[0].id
-  }
-  const rows = await db
-    .insert(conversations)
-    .values({
-      businessId: opts.businessId,
-      connectionId: opts.connectionId,
-      channel: 'email',
-      externalThreadId: opts.threadId,
-      title: opts.title,
-      contactIdentityId: opts.identityId,
-      lastMessageAt: opts.at,
-      lastPreview: opts.preview,
-      status: 'open',
     })
     .returning()
   return rows[0]!.id
@@ -198,10 +149,11 @@ export async function syncGmailConnection(businessId: string, connectionId: stri
     const body = extractPlainText(last)
     const at = last.internalDate ? new Date(Number(last.internalDate)) : new Date()
     const identityId = await upsertEmailIdentity(businessId, fromEmail, from)
-    const conversationId = await upsertEmailConversation({
+    const conversationId = await upsertConversation({
       businessId,
       connectionId,
-      threadId: t.id,
+      channel: 'email',
+      externalThreadId: t.id,
       title,
       identityId,
       preview: previewOf(body || t.snippet || ''),
