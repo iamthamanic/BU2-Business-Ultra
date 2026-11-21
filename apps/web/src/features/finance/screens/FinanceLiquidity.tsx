@@ -5,7 +5,7 @@
 import { useState } from 'react'
 import { useI18n } from '../../../lib/i18n'
 import { formatEur, formatEurOrDash } from '../financeModel'
-import { EmptyFilterBlock, FinanceConnectHint, Tag, useFinance, type NavProps } from './financeScreenShared'
+import { FinanceConnectHint, useFinance, type NavProps } from './financeScreenShared'
 
 export function FinanceLiquidity({ go, settingsHref, data }: NavProps) {
   const { t } = useI18n()

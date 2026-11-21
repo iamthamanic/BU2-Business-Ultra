@@ -17,7 +17,7 @@ import {
   moduleBindings,
   syncCursors,
 } from '../../../db/schema.js'
-import { keyHint, openSecret, sealSecret } from '../../crypto.js'
+import { keyHint, sealSecret } from '../../crypto.js'
 import type { AdapterConnectResult } from './adapter.js'
 import { getAdapter } from './adapter.js'
 import { parseCapabilitiesCache, purposeAllowed } from './capabilities.js'
@@ -276,17 +276,6 @@ export async function connectFinapiAccount(opts: {
   })
 }
 
-/** @deprecated Paid ads use OAuth — kept to avoid broken imports. */
-export async function connectAdsApiKeyAccount(_opts: {
-  businessId: string
-  userId: string
-  provider: string
-  apiKey: string
-  displayName?: string
-}): Promise<PublicConnection> {
-  throw Object.assign(new Error('ads_api_key_retired'), { statusCode: 410 })
-}
-
 /** Soft-delete: revoke connection (credentials cascade via FK). */
 export async function revokeConnection(
   businessId: string,
@@ -306,29 +295,6 @@ export async function revokeConnection(
     .delete(connections)
     .where(and(eq(connections.id, connectionId), eq(connections.businessId, businessId)))
   return true
-}
-
-/** Server-only — never expose via API. */
-export async function readConnectionCredential(
-  businessId: string,
-  connectionId: string,
-  kind: string,
-): Promise<string | null> {
-  const conn = await getConnectionForBusiness(businessId, connectionId)
-  if (!conn) return null
-  const rows = await db
-    .select()
-    .from(connectionCredentials)
-    .where(
-      and(
-        eq(connectionCredentials.connectionId, connectionId),
-        eq(connectionCredentials.kind, kind),
-      ),
-    )
-    .limit(1)
-  const row = rows[0]
-  if (!row) return null
-  return openSecret(row.ciphertext, row.iv, row.tag)
 }
 
 export async function createModuleBinding(

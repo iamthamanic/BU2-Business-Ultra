@@ -5,12 +5,6 @@
 import { timingSafeEqual } from 'node:crypto'
 import { loadEnv } from '../../lib/env.js'
 
-export function mapRole(role: string): 'admin' | 'member' | 'viewer' {
-  if (role === 'owner' || role === 'admin') return 'admin'
-  if (role === 'editor') return 'member'
-  return 'viewer'
-}
-
 export function editorCapabilities() {
   return {
     allowed: ['research', 'analyze', 'audit', 'reports'] as const,

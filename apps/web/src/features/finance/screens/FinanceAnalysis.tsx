@@ -7,8 +7,8 @@ import {
   Sparkle,
 } from '@phosphor-icons/react'
 import { useI18n } from '../../../lib/i18n'
-import { formatEur, formatEurOrDash, type FinanceSnapshot } from '../financeModel'
-import { EmptyFilterBlock, FinanceConnectHint, Tag, useFinance } from './financeScreenShared'
+import { formatEur, type FinanceSnapshot } from '../financeModel'
+import { FinanceConnectHint, Tag, useFinance } from './financeScreenShared'
 
 export function FinanceAnalysis({
   settingsHref,

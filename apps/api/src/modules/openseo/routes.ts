@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { and, eq, isNull } from 'drizzle-orm'
 import { canOpenSeo, canManageMembers } from '@bu2/shared'
 import { z } from 'zod'
-import { createHmac, timingSafeEqual } from 'node:crypto'
+import { createHmac } from 'node:crypto'
 import { db } from '../../db/client.js'
 import {
   businesses,
@@ -16,7 +16,7 @@ import { loadMembership, requireUser } from '../../plugins/auth.js'
 import { hashToken, randomToken, safeEqualHex } from '../../lib/crypto.js'
 import { loadEnv } from '../../lib/env.js'
 import { writeAudit } from '../../lib/audit.js'
-import { mapRole, editorCapabilities, verifyInternalSecret } from './service.js'
+import { editorCapabilities, verifyInternalSecret } from './service.js'
 
 export async function openseoRoutes(app: FastifyInstance) {
   app.get('/api/b/:slug/openseo', async (req, reply) => {

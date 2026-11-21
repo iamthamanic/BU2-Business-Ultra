@@ -6,7 +6,7 @@ import { mkdir, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import type { FastifyInstance } from 'fastify'
-import { and, asc, desc, eq, ne } from 'drizzle-orm'
+import { and, asc, eq, ne } from 'drizzle-orm'
 import {
   RecurrenceRulePatchSchema,
   RecurrenceRuleSchema,

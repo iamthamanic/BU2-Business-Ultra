@@ -154,7 +154,6 @@ export function AdsPage() {
     }
   }
 
-  const title = providerLabel(provider, t)
   const stub = isStub(provider)
   const showConnect = stub || (!loading && !ready)
   const emptyRow = loading
@@ -243,26 +242,6 @@ export function AdsPage() {
       {msg ? <pre className="panel muted">{msg}</pre> : null}
     </div>
   )
-}
-
-function providerLabel(
-  p: Provider,
-  t: (
-    k:
-      | 'googleAds'
-      | 'metaAds'
-      | 'tiktokAds'
-      | 'chatgptAds'
-      | 'linkedinAds'
-      | 'microsoftAds',
-  ) => string,
-) {
-  if (p === 'google_ads') return t('googleAds')
-  if (p === 'meta_ads') return t('metaAds')
-  if (p === 'tiktok_ads') return t('tiktokAds')
-  if (p === 'chatgpt_ads') return t('chatgptAds')
-  if (p === 'linkedin_ads') return t('linkedinAds')
-  return t('microsoftAds')
 }
 
 type CampaignMetrics = {

@@ -334,6 +334,3 @@ export function NoteEditor({
     </div>
   )
 }
-
-/** @deprecated Prefer NoteEditor — kept for call-site compatibility. */
-export const CustomerNoteEditor = NoteEditor

@@ -7,7 +7,6 @@ import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod'
-import { resolveNetRevenue } from '@bu2/finance-calc'
 import { ProductPatchSchema, ProductSchema, canMutateContent } from '@bu2/shared'
 import { db } from '../../db/client.js'
 import { products } from '../../db/schema.js'
@@ -16,14 +15,6 @@ import { loadEnv } from '../../lib/env.js'
 import { randomToken } from '../../lib/crypto.js'
 import { loadMembership, requireUser } from '../../plugins/auth.js'
 
-type CostPos = {
-  id: string
-  dept: string
-  label: string
-  amountCents: number
-  enabled: boolean
-  note?: string
-}
 import { calcSummary, toClient } from './service.js'
 
 export async function productRoutes(app: FastifyInstance) {

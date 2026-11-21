@@ -135,17 +135,6 @@ function EnvelopeMark({ size, id, bg }: { size: Size; id: string; bg: string }) 
   )
 }
 
-function AdsMark({ size, id, bg }: { size: Size; id: string; bg: string }) {
-  return (
-    <Tile id={id} bg={bg} size={size}>
-      <path
-        fill="#fff"
-        d="M4 18V6l9 6-9 6zm10.5-1.2V7.2L20 12l-5.5 4.8z"
-      />
-    </Tile>
-  )
-}
-
 /** OpenAI / ChatGPT bloom (Simple Icons). */
 function ChatGptMark({ size }: { size: Size }) {
   return (

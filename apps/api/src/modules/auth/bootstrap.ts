@@ -3,7 +3,7 @@
  * Used by CLI (`pnpm setup`) and first-run web wizard.
  * Location: apps/api/src/modules/auth/bootstrap.ts
  */
-import { eq, sql } from 'drizzle-orm'
+import { sql } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { BootstrapSetupSchema, type BootstrapSetupInput } from '@bu2/shared'
 import { db } from '../../db/client.js'

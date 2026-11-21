@@ -8,7 +8,7 @@ import {
 } from '@phosphor-icons/react'
 import { useI18n } from '../../../lib/i18n'
 import { formatEur, formatEurOrDash } from '../financeModel'
-import { EmptyFilterBlock, FinanceConnectHint, Tag, useFinance, type NavProps } from './financeScreenShared'
+import { FinanceConnectHint, Tag, useFinance, type NavProps } from './financeScreenShared'
 
 export function FinanceProfitability({ go, settingsHref, data }: NavProps) {
   const { t } = useI18n()

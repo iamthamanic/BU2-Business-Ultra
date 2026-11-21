@@ -9,7 +9,7 @@ import {
 } from '@phosphor-icons/react'
 import type { MessageKey } from '../../../i18n/messages'
 import { useI18n } from '../../../lib/i18n'
-import { formatEur, formatEurOrDash, type FinanceSnapshot } from '../financeModel'
+import { formatEur, type FinanceSnapshot } from '../financeModel'
 import { FinanceConnectHint, Tag, useFinance } from './financeScreenShared'
 
 type ScenarioType = 'hire' | 'marketing' | 'subscription' | 'investment' | 'revenue'

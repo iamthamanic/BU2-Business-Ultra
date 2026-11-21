@@ -3,13 +3,6 @@
  */
 import { parseFetchJson } from '../parseFetchJson.js'
 
-export async function brevoGetAccount(apiKey: string) {
-  const res = await fetch('https://api.brevo.com/v3/account', {
-    headers: { 'api-key': apiKey, accept: 'application/json' },
-  })
-  return { ok: res.ok, status: res.status, body: await parseFetchJson(res) }
-}
-
 export async function createEmailCampaign(
   apiKey: string,
   input: {
