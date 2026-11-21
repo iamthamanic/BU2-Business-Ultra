@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Check, UsersThree, X } from '@phosphor-icons/react'
 import { useI18n } from '../../lib/i18n'
 import { MemberAvatar, memberDisplayName, type MemberInfo } from './MemberAvatar'
-import type { BuProject } from './projectTypes'
+import { dateToIso, type BuProject } from './projectTypes'
 
 type CreateBody = {
   type: 'area' | 'custom'
@@ -28,12 +28,6 @@ type Props = {
   currentUserId?: string | null
   onClose: () => void
   onSave: (body: CreateBody) => Promise<void>
-}
-
-function dateToIso(v: string): string | null {
-  if (!v.trim()) return null
-  const d = new Date(`${v.trim()}T09:00:00`)
-  return Number.isNaN(d.getTime()) ? null : d.toISOString()
 }
 
 export function ProjectCreateModal({

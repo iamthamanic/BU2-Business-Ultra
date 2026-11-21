@@ -34,6 +34,7 @@ import {
   WhatsappLogo,
 } from '@phosphor-icons/react'
 import { PARTNER_CATEGORY_SUGGESTIONS } from '@bu2/shared'
+import { initials } from '../../components/BizLogo'
 import { CrmIconSelect, type CrmIconSelectOption } from '../../components/CrmIconSelect'
 import { FunnelDateRangePicker } from '../../components/FunnelDateRangePicker'
 import { FunnelTip } from '../../components/FunnelTip'
@@ -50,6 +51,7 @@ import { useI18n } from '../../lib/i18n'
 import type { MessageKey } from '../../i18n/messages'
 import { companyRoutes } from '../../lib/companyPaths'
 import type { CustomerOutletContext } from './CustomerShell'
+import { statusIcon, statusLabel } from './customerStatus'
 import type {
   BuCustomer,
   BuCustomerConsent,
@@ -104,25 +106,6 @@ const TABS: { id: Tab; labelKey: MessageKey; Icon: typeof SquaresFour }[] = [
   { id: 'history', labelKey: 'customerTabHistory', Icon: ClockCounterClockwise },
   { id: 'cases', labelKey: 'customerTabCases', Icon: Folders },
 ]
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (parts.length === 0) return '?'
-  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase()
-  return `${parts[0]![0] ?? ''}${parts[1]![0] ?? ''}`.toUpperCase()
-}
-
-function statusLabel(s: string, t: TFn): string {
-  if (s === 'prospect') return t('customerStatusProspect')
-  if (s === 'customer') return t('customerStatusCustomer')
-  return t('customerStatusLead')
-}
-
-function statusIcon(s: string) {
-  if (s === 'prospect') return <Handshake size={12} weight="regular" aria-hidden />
-  if (s === 'customer') return <SealCheck size={12} weight="regular" aria-hidden />
-  return <UserPlus size={12} weight="regular" aria-hidden />
-}
 
 function formatWhen(iso: string): string {
   const d = new Date(iso)

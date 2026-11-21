@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { CrmIconSelect, type CrmIconSelectOption } from '../../components/CrmIconSelect'
 import { api } from '../../lib/api'
 import { useI18n } from '../../lib/i18n'
-import type { BuProject } from './projectTypes'
+import { dueAtFromDateInput, type BuProject } from './projectTypes'
 import { ProjectGlyphAvatar } from './projectVisual'
 import {
   remindersToPayload,
@@ -55,12 +55,6 @@ type Props = {
 
 function memberLabel(m: MemberOpt) {
   return m.displayName?.trim() || m.email
-}
-
-function dueAtFromDateInput(v: string): string | null {
-  if (!v.trim()) return null
-  const d = new Date(`${v.trim()}T17:00:00`)
-  return Number.isNaN(d.getTime()) ? null : d.toISOString()
 }
 
 function startsAtFromInputs(dateStr: string, timeStr: string): string {

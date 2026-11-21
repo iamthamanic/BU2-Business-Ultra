@@ -30,7 +30,7 @@ import {
 import { api } from '../../lib/api'
 import { useI18n } from '../../lib/i18n'
 import { MemberAvatar, memberDisplayName, type MemberInfo } from './MemberAvatar'
-import type { BuTask, BuTaskAttachment } from './projectTypes'
+import { dueAtFromDateInput, type BuTask, type BuTaskAttachment } from './projectTypes'
 import { TASK_STATUSES, formatReopenCountdown, taskStatusLabel } from './taskLabels'
 import {
   remindersFromApi,
@@ -70,12 +70,6 @@ function dueInputValue(iso: string | null): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
   return d.toISOString().slice(0, 10)
-}
-
-function dueAtFromDateInput(v: string): string | null {
-  if (!v.trim()) return null
-  const d = new Date(`${v.trim()}T17:00:00`)
-  return Number.isNaN(d.getTime()) ? null : d.toISOString()
 }
 
 function descEqual(a: string, b: string): boolean {

@@ -9,7 +9,7 @@ import { api } from '../../lib/api'
 import type { MessageKey } from '../../i18n/messages'
 import { MemberAvatar, type MemberInfo } from './MemberAvatar'
 import { TaskPriorityBadge } from './TaskBadges'
-import type { BuTask, BuTaskMode } from './projectTypes'
+import { taskMode, type BuTask } from './projectTypes'
 import {
   formatReopenCountdown,
   normalizeLaneOrder,
@@ -31,10 +31,6 @@ type Props = {
   onCreate: (status?: TaskStatus) => void
   onChanged: () => Promise<void>
   onLaneOrderChange: (order: TaskStatus[]) => Promise<void>
-}
-
-function taskMode(task: BuTask): BuTaskMode {
-  return task.mode === 'recurring' ? 'recurring' : 'once'
 }
 
 function formatDue(iso: string | null): string | null {

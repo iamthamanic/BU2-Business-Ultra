@@ -1,5 +1,5 @@
 /**
- * Projects/tasks client types — derived from @bu2/shared DTOs.
+ * Projects/tasks client types — derived from @bu2/shared DTOs — plus small shared task/date helpers.
  * Location: apps/web/src/features/projects/projectTypes.ts
  */
 import type {
@@ -57,4 +57,22 @@ export type BuRecurrenceRule = {
   lastCompletedAt?: string | null
   nextAt: string
   reminders?: BuTaskReminder[]
+}
+
+export function taskMode(task: BuTask): BuTaskMode {
+  return task.mode === 'recurring' ? 'recurring' : 'once'
+}
+
+/** `<input type="date">` value → ISO at 09:00 local (project start/due). */
+export function dateToIso(v: string): string | null {
+  if (!v.trim()) return null
+  const d = new Date(`${v.trim()}T09:00:00`)
+  return Number.isNaN(d.getTime()) ? null : d.toISOString()
+}
+
+/** `<input type="date">` value → ISO at 17:00 local (task due). */
+export function dueAtFromDateInput(v: string): string | null {
+  if (!v.trim()) return null
+  const d = new Date(`${v.trim()}T17:00:00`)
+  return Number.isNaN(d.getTime()) ? null : d.toISOString()
 }

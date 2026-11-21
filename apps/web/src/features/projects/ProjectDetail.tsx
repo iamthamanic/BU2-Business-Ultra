@@ -26,7 +26,7 @@ import { ProjectStatusBadge } from './TaskBadges'
 import { EmptyTaskTable, TaskTable } from './TaskTable'
 import { TaskCreateModal } from './TaskCreateModal'
 import { TaskDetailModal } from './TaskDetailModal'
-import type { BuProject, BuProjectEvent, BuTask } from './projectTypes'
+import { dateToIso, type BuProject, type BuProjectEvent, type BuTask } from './projectTypes'
 import type { ProjectsOutletContext } from './ProjectsShell'
 import { normalizeLaneOrder, taskStatusLabel, type TaskStatus } from './taskLabels'
 
@@ -39,12 +39,6 @@ function dateInputValue(iso: string | null | undefined): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
   return d.toISOString().slice(0, 10)
-}
-
-function dateToIso(v: string): string | null {
-  if (!v.trim()) return null
-  const d = new Date(`${v.trim()}T09:00:00`)
-  return Number.isNaN(d.getTime()) ? null : d.toISOString()
 }
 
 function formatMetaDate(iso: string | null | undefined, empty: string): string {

@@ -9,8 +9,6 @@ import {
   Handshake,
   MagnifyingGlass,
   Plus,
-  SealCheck,
-  UserPlus,
   UsersThree,
 } from '@phosphor-icons/react'
 import { canMutateContent } from '@bu2/shared'
@@ -29,6 +27,7 @@ import { CrmEmptyPreview } from '../../components/CrmEmptyPreview'
 import { CrmMultiCheckFilter } from '../../components/CrmMultiCheckFilter'
 import { CustomerCreateModal } from './CustomerCreateModal'
 import type { BuCustomer } from './customerTypes'
+import { statusIcon, statusLabel } from './customerStatus'
 
 export type CustomerOutletContext = CompanyOutletContext & {
   slug: string
@@ -542,16 +541,4 @@ export function CustomerShell() {
       />
     </div>
   )
-}
-
-function statusLabel(s: string, t: TFn) {
-  if (s === 'prospect') return t('customerStatusProspect')
-  if (s === 'customer') return t('customerStatusCustomer')
-  return t('customerStatusLead')
-}
-
-function statusIcon(s: string) {
-  if (s === 'prospect') return <Handshake size={12} weight="regular" aria-hidden />
-  if (s === 'customer') return <SealCheck size={12} weight="regular" aria-hidden />
-  return <UserPlus size={12} weight="regular" aria-hidden />
 }
