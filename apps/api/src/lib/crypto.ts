@@ -36,10 +36,6 @@ export function randomToken(bytes = 32): string {
   return randomBytes(bytes).toString('base64url')
 }
 
-export function randomOtp(): string {
-  return String(Math.floor(100000 + Math.random() * 900000))
-}
-
 export function keyHint(secret: string): string {
   if (secret.length <= 4) return '****'
   return `${secret.slice(0, 2)}…${secret.slice(-2)}`

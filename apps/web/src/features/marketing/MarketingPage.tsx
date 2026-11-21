@@ -108,50 +108,6 @@ export function MarketingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh on route/window
   }, [slug, ch, isCustom, isEmail, isOffline, isPlanung, win])
 
-  async function createDraft(nextTitle: string, nextText: string) {
-    await api(`/api/b/${slug}/marketing/drafts`, {
-      method: 'POST',
-      body: JSON.stringify({
-        title: nextTitle,
-        masterText: nextText,
-        variants: caps
-          .filter((c) => c.canSchedule)
-          .slice(0, 5)
-          .map((c) => ({
-            network: c.network,
-            text: nextText,
-            enabled: true,
-            mediaKind: c.supportsVideo && !c.supportsImage ? 'video' : 'text',
-          })),
-      }),
-    })
-    await refresh()
-  }
-
-  async function schedule(id: string) {
-    if (!confirm(t('confirmSchedule'))) return
-    try {
-      const r = await api(`/api/b/${slug}/marketing/drafts/${id}/schedule`, {
-        method: 'POST',
-        body: JSON.stringify({ confirm: true }),
-      })
-      setMsg(JSON.stringify(r, null, 2))
-      await refresh()
-    } catch (e) {
-      setMsg(String(e))
-    }
-  }
-
-  async function retry(id: string) {
-    if (!confirm(t('confirmSchedule'))) return
-    const r = await api(`/api/b/${slug}/marketing/drafts/${id}/retry`, {
-      method: 'POST',
-      body: JSON.stringify({ confirm: true }),
-    })
-    setMsg(JSON.stringify(r, null, 2))
-    await refresh()
-  }
-
   async function createBrevo() {
     await api(`/api/b/${slug}/marketing/brevo`, {
       method: 'POST',

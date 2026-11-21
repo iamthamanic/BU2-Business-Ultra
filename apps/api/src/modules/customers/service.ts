@@ -248,8 +248,6 @@ export async function loadCustomer(businessId: string, id: string) {
   return rows[0] ?? null
 }
 
-export const loadContact = loadCustomer
-
 export async function addEvent(
   customerId: string,
   type: string,

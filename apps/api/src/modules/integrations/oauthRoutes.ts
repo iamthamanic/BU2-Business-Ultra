@@ -18,7 +18,8 @@ import {
 } from '../../lib/integrations/oauth/redirects.js'
 import { parseOAuthState } from '../../lib/integrations/oauth/state.js'
 import { loadMembership, requireUser } from '../../plugins/auth.js'
-import { httpError, oauthFailRedirect, settingsReturnUrl } from './oauthService.js'
+import { httpError } from '../../lib/httpError.js'
+import { oauthFailRedirect, settingsReturnUrl } from './oauthService.js'
 
 const oauthStartLimit = { max: 20, timeWindow: '1 minute' as const }
 const oauthCallbackLimit = { max: 40, timeWindow: '1 minute' as const }

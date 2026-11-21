@@ -122,5 +122,3 @@ export const imapAdapter: ProviderAdapter = {
 export function ensureImapAdapterRegistered(): void {
   registerAdapter(imapAdapter)
 }
-
-ensureImapAdapterRegistered()

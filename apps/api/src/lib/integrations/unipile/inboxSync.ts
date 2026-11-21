@@ -8,17 +8,16 @@ import { db } from '../../../db/client.js'
 import {
   connectionCredentials,
   connections,
-  contactIdentities,
   conversations,
   messages,
-  moduleBindings,
   outboxJobs,
   syncCursors,
 } from '../../../db/schema.js'
 import { keyHint, sealSecret } from '../../crypto.js'
 import { parseCapabilitiesCache, purposeAllowed } from '../core/capabilities.js'
 import { bumpConversationUnread } from '../inbox/unread.js'
-import { ensureUnipileAdapterRegistered, unipileAdapter } from './adapter.js'
+import { ensureInboxBindings, upsertConversation, upsertTelegramUserIdentity } from '../inbox/threads.js'
+import { unipileAdapter } from './adapter.js'
 import {
   getUnipileConfig,
   requireUnipileConfig,
@@ -29,122 +28,12 @@ import {
   unipileStartTelegram,
 } from './client.js'
 
-ensureUnipileAdapterRegistered()
-
 const STREAM = 'unipile:chats'
 const CHANNEL = 'telegram_user'
 
 function previewOf(text: string): string {
   const t = text.replace(/\s+/g, ' ').trim()
   return t.length > 140 ? `${t.slice(0, 137)}…` : t
-}
-
-async function ensureInboxBindings(businessId: string, connectionId: string) {
-  for (const purpose of ['read_dm', 'send_dm', 'sync'] as const) {
-    const existing = await db
-      .select()
-      .from(moduleBindings)
-      .where(
-        and(
-          eq(moduleBindings.connectionId, connectionId),
-          eq(moduleBindings.module, 'inbox'),
-          eq(moduleBindings.purpose, purpose),
-        ),
-      )
-      .limit(1)
-    if (existing[0]) continue
-    await db.insert(moduleBindings).values({
-      businessId,
-      connectionId,
-      module: 'inbox',
-      purpose,
-      enabled: true,
-    })
-  }
-}
-
-async function upsertIdentity(businessId: string, value: string, displayName: string) {
-  const existing = await db
-    .select()
-    .from(contactIdentities)
-    .where(
-      and(
-        eq(contactIdentities.businessId, businessId),
-        eq(contactIdentities.kind, 'telegram_user'),
-        eq(contactIdentities.value, value),
-      ),
-    )
-    .limit(1)
-  if (existing[0]) {
-    if (displayName && existing[0].displayName !== displayName) {
-      await db
-        .update(contactIdentities)
-        .set({ displayName, updatedAt: new Date() })
-        .where(eq(contactIdentities.id, existing[0].id))
-    }
-    return existing[0].id
-  }
-  const rows = await db
-    .insert(contactIdentities)
-    .values({
-      businessId,
-      kind: 'telegram_user',
-      value,
-      displayName,
-      confidence: 'medium',
-    })
-    .returning()
-  return rows[0]!.id
-}
-
-async function upsertConversation(opts: {
-  businessId: string
-  connectionId: string
-  chatId: string
-  title: string
-  identityId: string
-  preview: string
-  at: Date
-}) {
-  const existing = await db
-    .select()
-    .from(conversations)
-    .where(
-      and(
-        eq(conversations.connectionId, opts.connectionId),
-        eq(conversations.externalThreadId, opts.chatId),
-      ),
-    )
-    .limit(1)
-  if (existing[0]) {
-    await db
-      .update(conversations)
-      .set({
-        title: opts.title,
-        contactIdentityId: opts.identityId,
-        lastMessageAt: opts.at,
-        lastPreview: opts.preview,
-        status: 'open',
-        updatedAt: new Date(),
-      })
-      .where(eq(conversations.id, existing[0].id))
-    return existing[0].id
-  }
-  const rows = await db
-    .insert(conversations)
-    .values({
-      businessId: opts.businessId,
-      connectionId: opts.connectionId,
-      channel: CHANNEL,
-      externalThreadId: opts.chatId,
-      title: opts.title,
-      contactIdentityId: opts.identityId,
-      lastMessageAt: opts.at,
-      lastPreview: opts.preview,
-      status: 'open',
-    })
-    .returning()
-  return rows[0]!.id
 }
 
 async function insertMessage(opts: {
@@ -323,7 +212,7 @@ export async function syncUnipileConnection(businessId: string, connectionId: st
   for (const chat of chats) {
     if (!chat.id) continue
     const title = (chat.name || chat.provider_id || chat.id).slice(0, 200)
-    const identityId = await upsertIdentity(businessId, `chat:${chat.id}`, title)
+    const identityId = await upsertTelegramUserIdentity(businessId, `chat:${chat.id}`, title, 'medium')
     const msgs = await unipileListMessages(cfg, chat.id, 25)
     // API returns newest first — reverse for chronological ingest
     const ordered = [...msgs].reverse()
@@ -339,7 +228,8 @@ export async function syncUnipileConnection(businessId: string, connectionId: st
       const conversationId = await upsertConversation({
         businessId,
         connectionId,
-        chatId: chat.id,
+        channel: CHANNEL,
+        externalThreadId: chat.id,
         title,
         identityId,
         preview: lastPreview,
@@ -364,7 +254,8 @@ export async function syncUnipileConnection(businessId: string, connectionId: st
       await upsertConversation({
         businessId,
         connectionId,
-        chatId: chat.id,
+        channel: CHANNEL,
+        externalThreadId: chat.id,
         title,
         identityId,
         preview: lastPreview || title,

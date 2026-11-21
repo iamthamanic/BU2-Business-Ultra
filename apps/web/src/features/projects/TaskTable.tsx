@@ -23,7 +23,7 @@ import type { FunnelExportPayload } from '../../lib/funnelExport'
 import { usePersistedTableColumns, type TableColumnDef } from '../../lib/tableColumns'
 import { MemberAvatar, memberDisplayName, type MemberInfo } from './MemberAvatar'
 import { TaskPriorityBadge, TaskStatusBadge } from './TaskBadges'
-import type { BuTask, BuTaskMode } from './projectTypes'
+import { taskMode, type BuTask } from './projectTypes'
 import {
   formatReopenCountdown,
   taskPriorityLabel,
@@ -62,10 +62,6 @@ function formatDue(iso: string | null, t: TFn): string {
   const overdue = d.getTime() < Date.now()
   const label = d.toLocaleDateString(undefined, { day: '2-digit', month: 'short' })
   return overdue ? `${label} · ${t('taskOverdue')}` : label
-}
-
-function taskMode(task: BuTask): BuTaskMode {
-  return task.mode === 'recurring' ? 'recurring' : 'once'
 }
 
 function statusFilterIcon(status: string) {

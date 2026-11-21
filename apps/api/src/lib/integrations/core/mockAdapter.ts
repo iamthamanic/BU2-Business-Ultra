@@ -74,5 +74,3 @@ export const mockAdapter: ProviderAdapter = {
 export function ensureMockAdapterRegistered(): void {
   registerAdapter(mockAdapter)
 }
-
-ensureMockAdapterRegistered()

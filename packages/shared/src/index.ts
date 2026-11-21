@@ -194,6 +194,10 @@ export const ProductSchema = z.object({
 })
 
 export const ProductPatchSchema = ProductSchema.partial()
+export type ProductInput = z.infer<typeof ProductSchema>
+export type ProductCostDept = z.infer<typeof ProductCostDeptSchema>
+export type ProductCostPosition = z.infer<typeof ProductCostPositionSchema>
+export type ProductJourneyCanvas = z.infer<typeof ProductJourneyCanvasSchema>
 
 /** Order template block types for Auftragsgestaltung. */
 export const OrderTemplateBlockTypeSchema = z.enum(['text', 'heading', 'divider'])

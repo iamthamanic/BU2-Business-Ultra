@@ -172,7 +172,6 @@ export function SettingsConnectionsTab({ slug, secrets, canManage, onSecretsChan
   }
 
   const metricoolSecret = secretFor('metricool')
-  const brevoSecret = secretFor('brevo')
   const seoOk = seoStatus !== 'not_provisioned' && seoStatus !== '—'
 
   const coreSocial = SURFACE_PROVIDERS.social

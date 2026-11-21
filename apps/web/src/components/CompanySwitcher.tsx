@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { CaretDown } from '@phosphor-icons/react'
 import { api } from '../lib/api'
+import { initials } from './BizLogo'
 import { companyBase } from '../lib/companyPaths'
 import { writeLastCompany } from '../lib/lastCompany'
 import { useI18n } from '../lib/i18n'
@@ -29,13 +30,6 @@ type Props = {
   variant?: 'dropdown' | 'panel'
   /** Extra class on host (e.g. sidebar layout). */
   className?: string
-}
-
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (!parts.length) return '?'
-  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase()
-  return `${parts[0]![0] ?? ''}${parts[1]![0] ?? ''}`.toUpperCase()
 }
 
 function LogoMark({

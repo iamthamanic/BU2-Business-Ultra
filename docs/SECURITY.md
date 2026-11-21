@@ -15,10 +15,10 @@
 |-------|------------|
 | Primary | Better Auth — email + password; open signup **disabled** |
 | Secondary | Magic link + email OTP plugins (Brevo when keyed; otherwise console in non-prod) |
-| Bootstrap | Interactive setup (`pnpm setup` / first-run web) creates first user + `companies.create` + first company |
+| Bootstrap | Only while no user exists: `pnpm setup` (CLI), first-run web (`GET /api/setup/status`, `POST /api/setup`) or `pnpm db:seed` (env `BOOTSTRAP_OWNER_*`) — one bootstrap service creates first user + `companies.create` + first company + system bundles; afterwards `POST /api/setup` → 409 |
 | Session | Better Auth session cookie; `apps/api/src/plugins/auth.ts` loads session → BU2 `users` profile |
 | Password change | `POST /api/auth/password` via Better Auth |
-| Rate limit (P-05) | `@fastify/rate-limit` registered with `global: false`; auth routes set `config.rateLimit` |
+| Rate limit (P-05, B-06) | `@fastify/rate-limit` **global** baseline 300 req/min; stricter per-route `config.rateLimit`: login + password change 20/min, challenge routes (magic link, OTP verify, `POST /api/setup`, Better Auth `/api/auth/*` catch-all) 10/min, session routes (`/api/auth/me`, logout, setup status) 60/min, OAuth start 20/min, OAuth callback 40/min, OAuth redirect-URIs 30/min |
 
 **Fail closed:** no default session secrets in production env loading (see README / `.env.example`).  
 `OPENSEO_SSO_SHARED_SECRET` has **no** Zod default — must be set (CI/local inject for non-prod). Production rejects `change-me-*` placeholders. **Rotate** this secret if any environment ever booted with the former default `change-me-openseo-sso-secret`.
@@ -30,7 +30,8 @@ Company AuthZ (`packages/shared/src/permissions.ts`, `packages/shared/src/authz.
 - `memberships.is_owner` (multi-owner allowed; last-owner protected) **or** union of assigned permission bundles
 - Platform capability `companies.create` via `platform_grants` (never a company bundle)
 - Deny by default for unknown permission keys
-- Helpers: `canManageMembers`, `canSendMail`, `canManageCredentials`, `canMutateContent`, `canOpenSeo`, `canUseTools`, `hasPermission`
+- Helpers: `hasPermission`, `hasAnyPermission`, `canManageMembers`, `canSendMail`, `canManageCredentials`, `canMutateContent`, `canOpenSeo`, `canUseTools`, `canManageTools`
+- **System bundles** (`SYSTEM_BUNDLE_TEMPLATES`, copied per company on create/bootstrap/seed): `administration` (members, settings, connections, apps/tools, `seo.open`, `mail.send`), `marketing` (marketing + ads campaigns, inbox read/send), `projects` (read/write/delete), `crm` (customers read/write/export), `finance_read` (finance read/export). Custom bundles via bundle API; assignment is grant-subset (B-07)
 - **Central decision API:** `can(actor, permissionKey, resourceContext?)` / `assertCan` — unknown key → deny; then key grant; optional scope check
 - **Scopes** (`AUTHZ_SCOPES`): `own` | `assigned` | `project_member` | `explicitly_granted` | `company` — resolved server-side from trusted relations (not from client claims)
 - **Catalog:** `PERMISSION_CATALOG` documents module / resource / action / scopes / `sensitive` per key. Sensitive keys (finance, credentials, permission admin, settings.manage) must never be implied by unrelated `*.read`

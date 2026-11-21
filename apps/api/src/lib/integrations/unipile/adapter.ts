@@ -85,5 +85,3 @@ export const unipileAdapter: ProviderAdapter = {
 export function ensureUnipileAdapterRegistered(): void {
   registerAdapter(unipileAdapter)
 }
-
-ensureUnipileAdapterRegistered()

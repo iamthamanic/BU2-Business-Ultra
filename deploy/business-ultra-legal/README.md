@@ -14,9 +14,10 @@ Hosting: Hostinger VPS (IONOS nur DNS).
 ## Inhalt
 
 ```
-index.html
-styles.css
-brand/bu-mark.png
+index.html            # Weiterleitung → /rechtliches/
+app-icon-1024.png
+rechtliches/styles.css    # einziges Stylesheet (auch von index.html genutzt)
+rechtliches/brand/bu-mark.png
 rechtliches/...
 ```
 

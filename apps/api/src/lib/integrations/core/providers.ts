@@ -199,7 +199,3 @@ export const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
     domainGroup: 'finance',
   },
 ]
-
-export function providersByDomainGroup(group: ProviderDomainGroup): ProviderCatalogEntry[] {
-  return PROVIDER_CATALOG.filter((p) => p.domainGroup === group)
-}

@@ -3,9 +3,6 @@
  * Location: apps/api/src/modules/integrations/oauthService.ts
  */
 import { loadEnv } from '../../lib/env.js'
-import { httpError } from '../../lib/httpError.js'
-
-export { httpError }
 
 export function settingsReturnUrl(slug: string): string {
   const web = loadEnv().PUBLIC_WEB_URL.replace(/\/$/, '')

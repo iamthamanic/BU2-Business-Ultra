@@ -29,10 +29,7 @@ import {
   upsertSyncCursor,
 } from '../../lib/integrations/core/connections.js'
 import { PROVIDER_CATALOG } from '../../lib/integrations/core/providers.js'
-import { ensureAdsKeyAdaptersRegistered } from '../../lib/integrations/adsKey/adapter.js'
-import { ensureFinapiAdapterRegistered } from '../../lib/integrations/finapi/adapter.js'
 import { getFinapiPlatformConfig } from '../../lib/integrations/finapi/config.js'
-import { ensureImapAdapterRegistered } from '../../lib/integrations/imap/adapter.js'
 import { and, eq } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { connections } from '../../db/schema.js'
@@ -53,10 +50,6 @@ import { isUnipileConfigured } from '../../lib/integrations/unipile/inboxSync.js
 import { uploadYoutubeVideo } from '../../lib/integrations/youtube/client.js'
 import { loadMembership, requireUser } from '../../plugins/auth.js'
 import { loadEnv } from '../../lib/env.js'
-
-ensureImapAdapterRegistered()
-ensureFinapiAdapterRegistered()
-ensureAdsKeyAdaptersRegistered()
 
 export async function integrationRoutes(app: FastifyInstance) {
   app.get('/api/b/:slug/integrations/providers', async (req, reply) => {

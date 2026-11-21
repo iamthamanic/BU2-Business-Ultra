@@ -46,17 +46,25 @@ Also set `PUBLIC_WEB_URL` / `PUBLIC_API_URL` / `CORS_ORIGIN` to match (defaults 
 
 ### First login
 
-Primary auth is **email + password**. Magic Link / OTP remains as a secondary/dev option on the login page.
+Primary auth is **email + password** (Better Auth; open signup disabled). Magic Link / OTP remains as a secondary/dev option on the login page.
+
+**First run (empty database)** — all three paths use the same bootstrap service and create the first user, the platform grant `companies.create`, the first company and its system permission bundles:
+
+- `pnpm setup` — interactive CLI (email, password ≥8, display name, company name/slug)
+- First-run web: while no user exists, the web app shows the setup screen (`GET /api/setup/status` → `POST /api/setup`, auto sign-in)
+- `pnpm db:seed` — non-interactive: uses `BOOTSTRAP_OWNER_EMAIL` / `BOOTSTRAP_OWNER_PASSWORD` (must be ≥8 chars; in development an empty value defaults to `change-me-local`) and creates the company `My Company` (`my-company`)
+
+**Existing database (legacy seed path)** — `pnpm db:seed` does not create users. If `BOOTSTRAP_OWNER_EMAIL` exists it re-syncs that user's Better Auth password credential (password <8 chars → `change-me-local`), adds a missing `companies.create` grant and ensures system bundles for every company; otherwise it is a no-op.
 
 | Field | Local default (from `.env.example`) |
 |-------|-------------------------------------|
 | Email | `raccoova@gmail.com` (`BOOTSTRAP_OWNER_EMAIL`) |
-| Password | `change-me-local` (`BOOTSTRAP_OWNER_PASSWORD`) |
+| Password | `change-me-local` (`BOOTSTRAP_OWNER_PASSWORD`, dev default when empty) |
 
-1. `pnpm db:migrate && pnpm db:seed` (creates/refreshes Better Auth credential for bootstrap owner; password must be ≥8 chars — otherwise seed uses `change-me-local`)
+1. `pnpm db:migrate && pnpm db:seed` (or `pnpm setup` / web setup, see above)
 2. Open `/login` → email + password → **Anmelden**
 3. Optional: expand Magic Link / OTP; without `BREVO_API_KEY`, codes print to the API console
-4. Create first company (empty start) → Marketing Hub at `/co/:slug/marketing`
+4. Further companies need the `companies.create` platform grant → Marketing Hub at `/co/:slug/marketing`
 5. Settings → Verbindungen → OAuth connect for Google/Meta/LinkedIn/TikTok/X/Pinterest/Ads (Client ID/Secret in server env); Metricool/Brevo remain API-key gates
 
 **Local demo data (optional):** set `BU2_DEMO_SEED=1` in `.env.local`, then `pnpm db:seed:demo`.  
@@ -71,7 +79,7 @@ Sender: `social@halteverbot123.de`.
 ## Checks
 
 ```bash
-pnpm checks   # lint + typecheck + web build
+pnpm checks   # boundaries + build shared/finance-calc + lint + typecheck + web build
 ```
 
 UI tokens and component rules: [`docs/UI_STYLEGUIDE.md`](./docs/UI_STYLEGUIDE.md). Agent map: [`AGENTS.md`](./AGENTS.md).
@@ -79,10 +87,10 @@ UI tokens and component rules: [`docs/UI_STYLEGUIDE.md`](./docs/UI_STYLEGUIDE.md
 ## Tests
 
 ```bash
-pnpm --filter @bu2/finance-calc test   # CMB goldens + money/pricing
+pnpm test                              # finance-calc + shared + api (Vitest)
 pnpm typecheck
 pnpm --filter @bu2/web build
-# Core acceptance (API must be migratable; uses /api/auth/dev/last-otp in non-production)
+# Core acceptance (needs Postgres; migrate + seed first — logs in with BOOTSTRAP_OWNER_PASSWORD)
 pnpm --filter @bu2/e2e exec playwright install chromium
 E2E_NO_SERVER=1 pnpm test:e2e   # if api+web already running
 # or: pnpm test:e2e
