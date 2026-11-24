@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { canMutateContent } from '@bu2/shared'
+import { hasPermission } from '@bu2/shared'
 import { loadMembership, requireUser } from '../../plugins/auth.js'
 import { loadEnv } from '../../lib/env.js'
 import { writeAudit } from '../../lib/audit.js'
@@ -9,7 +9,7 @@ export async function sortanizeRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'tools.use')) return reply.code(403).send({ error: 'forbidden' })
     const env = loadEnv()
     try {
       const res = await fetch(`${env.SORTANIZE_URL}/health`)
@@ -24,7 +24,7 @@ export async function sortanizeRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'tools.manage')) return reply.code(403).send({ error: 'forbidden' })
     const env = loadEnv()
     try {
       const res = await fetch(`${env.SORTANIZE_URL}/match`, {
@@ -50,7 +50,7 @@ export async function sortanizeRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'tools.manage')) return reply.code(403).send({ error: 'forbidden' })
     const env = loadEnv()
     try {
       const res = await fetch(`${env.SORTANIZE_URL}/run`, {
@@ -76,7 +76,7 @@ export async function sortanizeRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'tools.use')) return reply.code(403).send({ error: 'forbidden' })
     const env = loadEnv()
     try {
       const res = await fetch(`${env.SORTANIZE_URL}/preview`, {

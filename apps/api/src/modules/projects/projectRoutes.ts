@@ -3,7 +3,7 @@
  */
 import type { FastifyInstance } from 'fastify'
 import { and, asc, desc, eq, ilike, isNotNull, isNull } from 'drizzle-orm'
-import { ProjectPatchSchema, ProjectSchema, canMutateContent } from '@bu2/shared'
+import { ProjectPatchSchema, ProjectSchema, hasPermission } from '@bu2/shared'
 import { db } from '../../db/client.js'
 import { projectEvents, projects, recurrenceRules, tasks, users } from '../../db/schema.js'
 import { writeAudit } from '../../lib/audit.js'
@@ -26,7 +26,7 @@ export async function registerProjectCrudRoutes(app: FastifyInstance) {
       const { slug } = req.params as { slug: string }
       const q = (req.query as { archive?: string; q?: string; type?: string }) || {}
       const m = await loadMembership(user.id, slug)
-      if (!m) return reply.code(404).send({ error: 'not_found' })
+      if (!m || !hasPermission(m, 'projects.read')) return reply.code(403).send({ error: 'forbidden' })
       // Backfill Marketing/Kunden/Produkt once for empty companies; never re-seed after delete.
       await ensureDefaultAreaProjectsIfEmpty(m.businessId, user.id)
       const archived = q.archive === '1' || q.archive === 'true'
@@ -59,7 +59,7 @@ export async function registerProjectCrudRoutes(app: FastifyInstance) {
       const user = await requireUser(req)
       const { slug, id } = req.params as { slug: string; id: string }
       const m = await loadMembership(user.id, slug)
-      if (!m) return reply.code(404).send({ error: 'not_found' })
+      if (!m || !hasPermission(m, 'projects.read')) return reply.code(403).send({ error: 'forbidden' })
       const row = await loadProject(m.businessId, id)
       if (!row) return reply.code(404).send({ error: 'not_found' })
       if (!assertProjectAccess(row, user.id, m)) {
@@ -90,7 +90,7 @@ export async function registerProjectCrudRoutes(app: FastifyInstance) {
       const user = await requireUser(req)
       const { slug } = req.params as { slug: string }
       const m = await loadMembership(user.id, slug)
-      if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+      if (!m || !hasPermission(m, 'projects.write')) return reply.code(403).send({ error: 'forbidden' })
       const body = ProjectSchema.parse(req.body)
       if (body.parentAreaProjectId) {
         const parent = await loadProject(m.businessId, body.parentAreaProjectId)
@@ -131,7 +131,7 @@ export async function registerProjectCrudRoutes(app: FastifyInstance) {
       const user = await requireUser(req)
       const { slug, id } = req.params as { slug: string; id: string }
       const m = await loadMembership(user.id, slug)
-      if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+      if (!m || !hasPermission(m, 'projects.write')) return reply.code(403).send({ error: 'forbidden' })
       const existing = await loadProject(m.businessId, id)
       if (!existing) return reply.code(404).send({ error: 'not_found' })
       if (!assertProjectAccess(existing, user.id, m)) {
@@ -192,7 +192,7 @@ export async function registerProjectCrudRoutes(app: FastifyInstance) {
       const user = await requireUser(req)
       const { slug, id } = req.params as { slug: string; id: string }
       const m = await loadMembership(user.id, slug)
-      if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+      if (!m || !hasPermission(m, 'projects.write')) return reply.code(403).send({ error: 'forbidden' })
       const existing = await loadProject(m.businessId, id)
       if (!existing) return reply.code(404).send({ error: 'not_found' })
       if (!assertProjectAccess(existing, user.id, m)) {
@@ -214,7 +214,7 @@ export async function registerProjectCrudRoutes(app: FastifyInstance) {
       const user = await requireUser(req)
       const { slug, id } = req.params as { slug: string; id: string }
       const m = await loadMembership(user.id, slug)
-      if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+      if (!m || !hasPermission(m, 'projects.write')) return reply.code(403).send({ error: 'forbidden' })
       const existing = await loadProject(m.businessId, id)
       if (!existing) return reply.code(404).send({ error: 'not_found' })
       if (!assertProjectAccess(existing, user.id, m)) {
@@ -233,7 +233,7 @@ export async function registerProjectCrudRoutes(app: FastifyInstance) {
       const user = await requireUser(req)
       const { slug, id } = req.params as { slug: string; id: string }
       const m = await loadMembership(user.id, slug)
-      if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+      if (!m || !hasPermission(m, 'projects.write')) return reply.code(403).send({ error: 'forbidden' })
       const existing = await loadProject(m.businessId, id)
       if (!existing) return reply.code(404).send({ error: 'not_found' })
       if (!assertProjectAccess(existing, user.id, m)) {
@@ -253,7 +253,7 @@ export async function registerProjectCrudRoutes(app: FastifyInstance) {
       const { slug, id } = req.params as { slug: string; id: string }
       const q = (req.query as { limit?: string }) || {}
       const m = await loadMembership(user.id, slug)
-      if (!m) return reply.code(404).send({ error: 'not_found' })
+      if (!m || !hasPermission(m, 'projects.read')) return reply.code(403).send({ error: 'forbidden' })
       const project = await loadProject(m.businessId, id)
       if (!project) return reply.code(404).send({ error: 'not_found' })
       if (!assertProjectAccess(project, user.id, m)) {

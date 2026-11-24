@@ -12,7 +12,7 @@ import {
   RecurrenceRuleSchema,
   TaskChecklistItemSchema,
   TaskCommentSchema,
-  canMutateContent,
+  hasPermission,
 } from '@bu2/shared'
 import { db } from '../../db/client.js'
 import {
@@ -50,7 +50,7 @@ export async function registerRecurrenceRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'projects.read')) return reply.code(403).send({ error: 'forbidden' })
     // Materialize on load (idempotent)
     const tick = await materializeDueRules(m.businessId)
     const rows = await db
@@ -65,7 +65,7 @@ export async function registerRecurrenceRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'projects.read')) return reply.code(403).send({ error: 'forbidden' })
     const row = await loadRule(m.businessId, id)
     if (!row) return reply.code(404).send({ error: 'not_found' })
     if (row.projectId) {
@@ -82,7 +82,7 @@ export async function registerRecurrenceRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'projects.write')) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadRule(m.businessId, id)
     if (!existing || !isRuleActive(existing)) return reply.code(404).send({ error: 'not_found' })
     const body = TaskCommentSchema.parse(req.body)
@@ -109,7 +109,7 @@ export async function registerRecurrenceRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'projects.write')) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadRule(m.businessId, id)
     if (!existing || !isRuleActive(existing)) return reply.code(404).send({ error: 'not_found' })
     const body = TaskChecklistItemSchema.parse(req.body)
@@ -136,7 +136,7 @@ export async function registerRecurrenceRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id, itemId } = req.params as { slug: string; id: string; itemId: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'projects.write')) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadRule(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     const body = TaskChecklistItemSchema.partial().parse(req.body)
@@ -157,7 +157,7 @@ export async function registerRecurrenceRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'projects.write')) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadRule(m.businessId, id)
     if (!existing || !isRuleActive(existing)) return reply.code(404).send({ error: 'not_found' })
 
@@ -228,7 +228,7 @@ export async function registerRecurrenceRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id, attId } = req.params as { slug: string; id: string; attId: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'projects.write')) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadRule(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     const [att] = await db
@@ -260,7 +260,7 @@ export async function registerRecurrenceRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'projects.write')) return reply.code(403).send({ error: 'forbidden' })
     const rule = await loadRule(m.businessId, id)
     if (!rule || !isRuleActive(rule)) return reply.code(404).send({ error: 'not_found' })
 
@@ -397,7 +397,7 @@ export async function registerRecurrenceRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'projects.write')) return reply.code(403).send({ error: 'forbidden' })
     const rule = await loadRule(m.businessId, id)
     if (!rule || !isRuleActive(rule)) return reply.code(404).send({ error: 'not_found' })
 
@@ -427,7 +427,7 @@ export async function registerRecurrenceRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'projects.write')) return reply.code(403).send({ error: 'forbidden' })
     const body = RecurrenceRuleSchema.parse(req.body)
     if (body.projectId) {
       const p = await loadProject(m.businessId, body.projectId)
@@ -461,7 +461,7 @@ export async function registerRecurrenceRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'projects.write')) return reply.code(403).send({ error: 'forbidden' })
     const existing = await db
       .select()
       .from(recurrenceRules)
@@ -502,7 +502,7 @@ export async function registerRecurrenceRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'projects.write')) return reply.code(403).send({ error: 'forbidden' })
     const result = await materializeDueRules(m.businessId)
     return { ok: true, ...result }
   })

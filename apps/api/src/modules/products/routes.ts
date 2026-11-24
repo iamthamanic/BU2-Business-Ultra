@@ -8,7 +8,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod'
 import { resolveNetRevenue } from '@bu2/finance-calc'
-import { ProductPatchSchema, ProductSchema, canMutateContent } from '@bu2/shared'
+import { ProductPatchSchema, ProductSchema, hasPermission } from '@bu2/shared'
 import { db } from '../../db/client.js'
 import { products } from '../../db/schema.js'
 import { writeAudit } from '../../lib/audit.js'
@@ -32,7 +32,7 @@ export async function productRoutes(app: FastifyInstance) {
     const { slug } = req.params as { slug: string }
     const q = (req.query as { archive?: string }) || {}
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'products.read')) return reply.code(403).send({ error: 'forbidden' })
     const archived = q.archive === '1' || q.archive === 'true'
     const rows = await db
       .select()
@@ -51,7 +51,7 @@ export async function productRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'products.read')) return reply.code(403).send({ error: 'forbidden' })
     const rows = await db
       .select()
       .from(products)
@@ -66,7 +66,7 @@ export async function productRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'products.write')) return reply.code(403).send({ error: 'forbidden' })
     if (m.status === 'archived') return reply.code(409).send({ error: 'business_archived' })
     const body = ProductSchema.parse(req.body)
     const [row] = await db
@@ -100,7 +100,7 @@ export async function productRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'products.write')) return reply.code(403).send({ error: 'forbidden' })
     const body = ProductPatchSchema.parse(req.body)
     const [row] = await db
       .update(products)
@@ -135,7 +135,7 @@ export async function productRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'products.write')) return reply.code(403).send({ error: 'forbidden' })
     const body = z.object({ archived: z.boolean() }).parse(req.body ?? { archived: true })
     const [row] = await db
       .update(products)
@@ -153,7 +153,7 @@ export async function productRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'products.write')) return reply.code(403).send({ error: 'forbidden' })
     const body = z.object({ dataUrl: z.string().startsWith('data:image/') }).parse(req.body)
     const match = /^data:(image\/[a-zA-Z0-9+.-]+);base64,(.+)$/.exec(body.dataUrl)
     if (!match) return reply.code(400).send({ error: 'invalid_data_url' })
@@ -185,7 +185,7 @@ export async function productRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'products.read')) return reply.code(403).send({ error: 'forbidden' })
     const body = z
       .object({
         sellingPriceCents: z.number().int().nonnegative(),

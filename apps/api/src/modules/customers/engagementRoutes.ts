@@ -9,7 +9,7 @@ import {
   CustomerConsentSchema,
   CustomerPurchaseSchema,
   CustomerStatsPatchSchema,
-  canMutateContent,
+  hasPermission,
 } from '@bu2/shared'
 import { db } from '../../db/client.js'
 import {
@@ -29,7 +29,7 @@ export async function registerEngagementRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'customers.read')) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadCustomer(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     return { stats: await loadCustomerStats(m.businessId, existing) }
@@ -39,7 +39,7 @@ export async function registerEngagementRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'customers.write')) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadCustomer(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     const body = CustomerStatsPatchSchema.parse(req.body)
@@ -70,7 +70,7 @@ export async function registerEngagementRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'customers.write')) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadCustomer(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     const body = CustomerPurchaseSchema.parse(req.body)
@@ -120,7 +120,7 @@ export async function registerEngagementRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id, purchaseId } = req.params as { slug: string; id: string; purchaseId: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'customers.write')) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadCustomer(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     const [deleted] = await db
@@ -142,7 +142,7 @@ export async function registerEngagementRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'customers.write')) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadCustomer(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     const body = CustomerConsentSchema.parse(req.body)
@@ -172,7 +172,7 @@ export async function registerEngagementRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'customers.write')) return reply.code(403).send({ error: 'forbidden' })
     const existing = await loadCustomer(m.businessId, id)
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     const body = CustomerCommLogSchema.parse(req.body)

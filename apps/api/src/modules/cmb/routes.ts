@@ -7,7 +7,7 @@ import {
     TEMPLATES,
     type DomainModel,
   } from '@bu2/finance-calc'
-import { canMutateContent } from '@bu2/shared'
+import { hasPermission } from '@bu2/shared'
 import { db } from '../../db/client.js'
 import { cmbModels, cmbSnapshots } from '../../db/schema.js'
 import { loadMembership, requireUser } from '../../plugins/auth.js'
@@ -18,7 +18,7 @@ export async function cmbRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'finance.read')) return reply.code(403).send({ error: 'forbidden' })
     return {
       templates: Object.entries(TEMPLATES).map(([key, model]) => ({
         key,
@@ -33,7 +33,7 @@ export async function cmbRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'finance.read')) return reply.code(403).send({ error: 'forbidden' })
     const models = await db.select().from(cmbModels).where(eq(cmbModels.businessId, m.businessId))
     return { models }
   })
@@ -42,7 +42,7 @@ export async function cmbRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug } = req.params as { slug: string }
     const m = await loadMembership(user.id, slug)
-    if (!m || !canMutateContent(m)) return reply.code(403).send({ error: 'forbidden' })
+    if (!m || !hasPermission(m, 'finance.write')) return reply.code(403).send({ error: 'forbidden' })
     const body = z
       .object({
         name: z.string().min(1),
@@ -73,7 +73,7 @@ export async function cmbRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'finance.write')) return reply.code(403).send({ error: 'forbidden' })
     const rows = await db
       .select()
       .from(cmbModels)
@@ -103,7 +103,7 @@ export async function cmbRoutes(app: FastifyInstance) {
     const user = await requireUser(req)
     const { slug, id } = req.params as { slug: string; id: string }
     const m = await loadMembership(user.id, slug)
-    if (!m) return reply.code(404).send({ error: 'not_found' })
+    if (!m || !hasPermission(m, 'finance.read')) return reply.code(403).send({ error: 'forbidden' })
     const snaps = await db
       .select()
       .from(cmbSnapshots)
